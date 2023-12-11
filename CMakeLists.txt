@@ -1,9 +1,12 @@
-cmake_minimum_required(VERSION 3.27)
+cmake_minimum_required(VERSION 3.25)
 
 set(CMAKE_CUDA_ARCHITECTURES 75)
 
-# Important: nvcc requires GNU version <= 12
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${CMAKE_CXX_COMPILER}")
+
+if (NOT MSVC)
+    # Important: nvcc requires GNU version <= 12
+    #set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${CMAKE_CXX_COMPILER}")
+endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -g")
@@ -18,8 +21,7 @@ add_executable(lego_builder
         src/main.cu
         src/bricks.cuh
         src/exceptions.hpp
-        src/misc.hpp
-)
+        )
 
 target_include_directories(lego_builder PRIVATE ./external/stb)
 target_include_directories(lego_builder PRIVATE ./external/glm)

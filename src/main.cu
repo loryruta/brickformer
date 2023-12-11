@@ -9,6 +9,7 @@
 #include <stb_image.h>
 #include <glm/glm.hpp>
 #include <thrust/device_ptr.h>
+#include <thrust/device_vector.h>
 #include <thrust/extrema.h>
 
 #include "bricks.cuh"
@@ -49,11 +50,10 @@ __device__ glm::vec<FORMAT, DATA_TYPE> read_pixel(Image<FORMAT, DATA_TYPE> const
     return pixel;
 }
 
-
 template<typename T>
 __device__ T warp_sum(uint32_t mask, T value)
 {
-
+    // TODO
 }
 
 /// Checks whether the thread executing this function covers a brick grid cell.
@@ -118,13 +118,18 @@ __device__ float eval_placement(
         Image<1, uint16_t> const& prv_placement_map
         )
 {
-    assert(is_brick_grid_thread());
-
     auto& brick = k_bricks[placement.m_brick_id];
 
+    // Filter out threads of the warp that process elements outside the brick's grid
     uint32_t mask = FULL_MASK;
+    mask = __ballot_sync(mask, is_brick_grid_thread());
 
-    // TODO Avoid additional processing if a thread works on an empty area of the block's grid
+    bool thread_active = false;  // A thread is active if at least one cell of its brick grid portion is set
+    iterate_brick_grid([&](uint32_t x, uint32_t y)
+    {
+        thread_active |= brick[x][y];
+    });
+    mask = __ballot_sync(mask, thread_active);
 
     // Check if the current placement is invalid:
     // - goes outside the color_map
@@ -157,21 +162,21 @@ __device__ float eval_placement(
 
         if (brick[bx][by])
         {
-            bool cover_map = read_pixel(color_map, map_x, map_y).a > 0;
-            num_covered_map_cells += warp_sum(FULL_MASK, cover_map); // TODO maybe not FULL
-
-            brick_size += warp_sum(FULL_MASK, 1); // TODO maybe not FULL
-
-            size_t cur_adjacent_bricks = count_adjacent_bricks(placement, bx, by, cur_placement_map);
-            num_adjacent_bricks += warp_sum(FULL_MASK, cur_adjacent_bricks); // TODO maybe not FULL
+            num_covered_map_cells += read_pixel(color_map, map_x, map_y).a > 0;
+            brick_size++;
+            num_adjacent_bricks += count_adjacent_bricks(placement, bx, by, cur_placement_map);
         }
     });
 
-    float result = 0.0f; // How good is this placement?
-    result += float(num_covered_map_cells);
-    result += float(brick_size);
-    result += float(num_adjacent_bricks);
-    return result;
+    num_covered_map_cells = warp_sum(mask, num_covered_map_cells); // TODO maybe not FULL
+    brick_size = warp_sum(mask, 1); // TODO maybe not FULL
+    num_adjacent_bricks = warp_sum(mask, num_adjacent_bricks); // TODO maybe not FULL
+
+    float val = 0.0f; // How good is this placement?
+    val += float(num_covered_map_cells);
+    val += float(brick_size);
+    val += float(num_adjacent_bricks);
+    return val;
 }
 
 __global__ void eval_placements(
@@ -183,7 +188,9 @@ __global__ void eval_placements(
         )
 {
     size_t i = blockIdx.x * 32 + (threadIdx.x >> 5);
-    out_result[i] = eval_placement(placements[i], color_map, cur_placement_map, prv_placement_map);
+
+    float val = eval_placement(placements[i], color_map, cur_placement_map, prv_placement_map);
+    if (threadIdx.x % 32 == 0) out_result[i] = val;
 }
 
 __global__ void init_placements(Placement* placements)
@@ -229,15 +236,11 @@ void print_devices()
 
 ColorMapT load_color_map(char const* path)
 {
-    FILE* f = fopen(path, "r");
-    CHECK_STATE(f);
-
     int image_width, image_height;
     int channels;
-    uint8_t* image_data = stbi_load_from_file(f, &image_width, &image_height, &channels, STBI_rgb_alpha);
+    uint8_t* image_data = stbi_load(path, &image_width, &image_height, &channels, STBI_rgb_alpha);
+    CHECK_STATE(image_data);
     CHECK_STATE(channels == STBI_rgb_alpha);
-
-    fclose(f);
 
     size_t image_size = image_width * image_height * 4;
 
@@ -267,18 +270,29 @@ PlacementMapT create_placement_map()
 }
 
 template<typename T>
-std::pair<size_t, T*> find_max(const T* d_array, size_t size)
+std::pair<size_t, T*> find_max_element(T* d_array, size_t size)
 {
-    thrust::device_ptr<T> d_array_ptr = thrust::device_pointer_cast(d_array);
+    thrust::device_ptr<T> d_base_ptr = thrust::device_pointer_cast(d_array);
+    thrust::device_ptr<T> d_result = thrust::max_element(d_base_ptr, d_base_ptr + size);
+
+    size_t i = d_result - d_base_ptr;
+    return {i, d_result.get()};
 }
 
+template<typename T>
+T get_device_value(const T* d_value)
+{
+    T value{};
+    CHECK_CU(cudaMemcpy(&value, d_value, sizeof(T), cudaMemcpyDeviceToHost));
+    return value;
+}
 
 int main(int argc, char* argv[])
 {
     printf("Bricks: %zu\n", k_num_bricks);
 
     std::filesystem::path resource_dir = std::filesystem::path(__FILE__).parent_path().parent_path() / "layers";
-    std::filesystem::path color_map_path = resource_dir / "layer1.png";
+    std::string color_map_path = (resource_dir / "layer1.png").string();
 
     printf("Loading color map at \"%s\"...\n", color_map_path.c_str());
     ColorMapT color_map = load_color_map(color_map_path.c_str());
@@ -302,17 +316,20 @@ int main(int argc, char* argv[])
     PlacementMapT cur_placement_map = create_placement_map();
     PlacementMapT prv_placement_map = create_placement_map();
 
-    for (int i = 0; i < 5; i++)
+    for (size_t i = 0; i < 5; i++)
     {
+        printf("Round %zu\n", i);
+
         // Evaluate the objective function on all the possible placements
         eval_placements<<<num_blocks, block_dim>>>(d_placements, color_map, cur_placement_map, prv_placement_map, d_eval_result);
         CHECK_CU(cudaDeviceSynchronize());
 
         // Get the placement that maximizes the objective function
-        find_max();
-        CHECK_CU(cudaDeviceSynchronize());
+        std::pair<size_t, float*> max_pair = find_max_element(d_eval_result, k_num_placements);
+        float max_reward = get_device_value(max_pair.second);
 
-
+        printf("  Best placement: %zu\n", max_pair.first);
+        printf("  Reward: %.3f\n", max_reward);
     }
 
     return 0;
