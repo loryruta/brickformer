@@ -4,3 +4,9 @@
 [submodule "external/cccl"]
 	path = external/cccl
 	url = https://github.com/NVIDIA/cccl
+[submodule "external/glfw"]
+	path = external/glfw
+	url = https://github.com/glfw/glfw
+[submodule "external/raylib"]
+	path = external/raylib
+	url = https://github.com/raysan5/raylib

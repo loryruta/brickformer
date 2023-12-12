@@ -14,12 +14,12 @@
 namespace lego_builder
 {
     inline void check_state(
-            bool condition,
-            char const* check_str,
-            char const* file,
-            int line,
-            char const* message
-            )
+        bool condition,
+        char const* check_str,
+        char const* file,
+        int line,
+        char const* message
+    )
     {
         if (!condition) // TODO Mark as unlikely path
         {
@@ -34,8 +34,17 @@ namespace lego_builder
     {
         if (error != cudaSuccess) // TODO Mark as unlikely path
         {
-            fprintf(stderr, "CUDA error: %s %s %d\n", cudaGetErrorString(error), file, line);
+            fprintf(stderr, "CUDA error: %s (%s) (file: %s, line: %d)\n", cudaGetErrorName(error), cudaGetErrorString(error), file, line);
             exit(error);
         }
+    }
+
+    /// Transfers the given device object to host and returns it.
+    template<typename T>
+    T to_host(const T* d_object)
+    {
+        T host_copy{};
+        CHECK_CU(cudaMemcpy(&host_copy, d_object, sizeof(T), cudaMemcpyDeviceToHost));
+        return host_copy;
     }
 }
