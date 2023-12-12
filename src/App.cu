@@ -88,6 +88,11 @@ App::~App()
     CloseWindow();
 }
 
+bool App::should_close() const
+{
+    return WindowShouldClose();
+}
+
 void App::set_color_map(const ColorMapT* d_color_map)
 {
     copy_to_gl_texture(to_host(d_color_map), m_color_map_texture);

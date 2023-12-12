@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cinttypes>
 #include <cstdio>
 #include <filesystem>
 
@@ -10,14 +11,12 @@
 #include <thrust/device_vector.h>
 #include <thrust/extrema.h>
 #include <stb_image.h> // STB_IMAGE_IMPLEMENTATION already by raylib
-#include <cuda_gl_interop.h>
 
 #include "bricks.cuh"
 #include "DeviceImage.cuh"
 #include "primitives.cuh"
 #include "App.cuh"
-
-#define FULL_MASK 0xFFFFFFFF
+#include "StopWatch.hpp"
 
 #define MAP_WIDTH  256
 #define MAP_HEIGHT 256
@@ -248,8 +247,6 @@ void place(const Placement& placement, uint16_t placement_id, PlacementMapT* pla
 
 int main(int argc, char* argv[])
 {
-    App app;
-
     printf("Bricks: %zu\n", k_num_bricks);
 
     std::filesystem::path resource_dir = std::filesystem::path(__FILE__).parent_path().parent_path() / "layers";
@@ -257,7 +254,6 @@ int main(int argc, char* argv[])
 
     printf("Loading color map at \"%s\"...\n", color_map_path.c_str());
     ColorMapT* color_map = load_color_map(color_map_path.c_str());
-    app.set_color_map(color_map);
 
     printf("Allocating %zu possible placements (%.3f Mb)...\n", k_num_placements, (k_num_placements * sizeof(Placement)) / 1e6);
 
@@ -281,17 +277,23 @@ int main(int argc, char* argv[])
     PlacementMapT* prv_placement_map = PlacementMapT::create_device_ptr(MAP_WIDTH, MAP_HEIGHT, nullptr);
     prv_placement_map->fill(0);
 
-    for (size_t i = 0; i < 256; i++)
+    for (size_t i = 0; i < 10; i++)
     {
-        app.draw();
+        StopWatch stop_watch{};
 
         printf("Round %zu\n", i);
 
         // Evaluate the objective function on all the possible placements
+        stop_watch.reset();
+
         eval_placements<<<num_blocks, block_dim>>>(d_placements, color_map, cur_placement_map, prv_placement_map, d_eval_result);
         CHECK_CU(cudaDeviceSynchronize());
 
+        printf("  Evaluation performed in: %" PRIu64 " ms\n", stop_watch.elapsed_millis());
+
         // Get the placement that maximizes the objective function
+        stop_watch.reset();
+
         std::pair<size_t, float*> max_pair = find_max_element(d_eval_result, k_num_placements);
 
         Placement placement = to_host(d_placements + max_pair.first);
@@ -301,11 +303,27 @@ int main(int argc, char* argv[])
         printf("  Best placement index: %zu\n", max_pair.first);
         printf("  Placement: (%d, %d) -> %d\n", placement.m_x, placement.m_y, placement.m_brick_id);
         printf("  Reward: %.3f\n", max_reward);
+        //printf("  Best solution found in: %" PRIu64 " ms\n", stop_watch.elapsed_millis());
+
+        // Place the brick in the current layer
+        stop_watch.reset();
 
         place(placement, uint16_t(i), cur_placement_map);
 
-        app.set_placement_map(cur_placement_map);
+        //printf("  Placement added in: %" PRIu64 " ms\n", stop_watch.elapsed_millis());
+
+        //
     }
+
+    /*
+    App app;
+    app.set_color_map(color_map);
+    app.set_placement_map(cur_placement_map);
+
+    while (!app.should_close())
+    {
+        app.draw();
+    }*/
 
     return 0;
 }

@@ -21,6 +21,8 @@ namespace lego_builder
         explicit App();
         ~App();
 
+        [[nodiscard]] bool should_close() const;
+
         void set_color_map(const ColorMapT* d_color_map);
         void set_placement_map(const PlacementMapT* d_placement_map);
 
