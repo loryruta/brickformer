@@ -2,9 +2,12 @@
 
 #include <cstdint>
 
+#define BRICK_MAX_WIDTH  8 // Must be a power of 2
+#define BRICK_MAX_HEIGHT 8
+
 namespace lego_builder
 {
-    using BlockLayoutT = uint8_t[16][16];
+    using BlockLayoutT = uint8_t[BRICK_MAX_WIDTH][BRICK_MAX_HEIGHT];
 
     // clang-format off
     __constant__ const BlockLayoutT k_bricks[] = {

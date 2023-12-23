@@ -3,10 +3,10 @@ cmake_minimum_required(VERSION 3.25)
 set(CMAKE_CUDA_ARCHITECTURES 75)
 
 # Important: nvcc requires GNU version <= 12
-#set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${CMAKE_CXX_COMPILER}")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${CMAKE_CXX_COMPILER}")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-#    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -g")
+#   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -g")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -17,6 +17,9 @@ project(lego_builder LANGUAGES C CXX CUDA)
 # External libraries
 # -----------------------------------------------------------------------------------------------
 
+# bvh
+add_subdirectory(external/bvh)
+
 # cccl
 set(CCCL_ENABLE_LIBCUDACXX OFF)
 set(CCCL_ENABLE_CUB ON)
@@ -25,6 +28,10 @@ set(CCCL_ENABLE_TESTING OFF)
 set(CCCL_ENABLE_EXAMPLES OFF)
 set(CCCL_ENABLE_BENCHMARKS OFF)
 add_subdirectory(external/cccl)
+
+# glad
+add_library(glad STATIC external/glad/src/gl.c)
+target_include_directories(glad PUBLIC external/glad/include/)
 
 # GLM
 add_library(glm INTERFACE)
@@ -37,6 +44,15 @@ add_subdirectory(external/raylib)
 # stb
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE external/stb)
+
+# tinygltf
+option(TINYGLTF_BUILD_LOADER_EXAMPLE  OFF)
+option(TINYGLTF_BUILD_GL_EXAMPLES OFF)
+option(TINYGLTF_BUILD_VALIDATOR_EXAMPLE OFF)
+option(TINYGLTF_BUILD_BUILDER_EXAMPLE OFF)
+option(TINYGLTF_HEADER_ONLY OFF)
+option(TINYGLTF_INSTALL OFF)
+add_subdirectory(external/tinygltf)
 
 # -----------------------------------------------------------------------------------------------
 # Targets
@@ -72,3 +88,5 @@ add_executable(lego_builder_test
 target_include_directories(lego_builder_test PRIVATE ./src)
 target_link_libraries(lego_builder_test PRIVATE lego_builder_lib)
 
+# slicer
+add_subdirectory(src/slicer)

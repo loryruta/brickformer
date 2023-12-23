@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <chrono>
 
 #define CHECK_STATE(condition) \
     lego_builder::check_state(condition, #condition, __FILE__, __LINE__, nullptr)
@@ -10,6 +11,8 @@
 
 #define CHECK_CU(error) \
     lego_builder::check_cuda((error), __FILE__, __LINE__)
+
+#define FULL_MASK UINT32_MAX
 
 namespace lego_builder
 {
@@ -39,12 +42,70 @@ namespace lego_builder
         }
     }
 
+    template<typename T>
+    std::string to_string(const T& element)  // TODO Move it in a more generic file (this is cuda-specific)
+    {
+        return std::to_string(element);
+    }
+
+    template<typename T>
+    T* to_device(const T* elements, size_t num_elements)
+    {
+        T* d_elements;
+        CHECK_CU(cudaMalloc(&d_elements, num_elements * sizeof(T)));
+        CHECK_CU(cudaMemcpy(d_elements, elements, num_elements * sizeof(T), cudaMemcpyHostToDevice));
+        return d_elements;
+    }
+
+    /// Transfers the given host object to device.
+    template<typename T>
+    T* to_device(const T& element)
+    {
+        return to_device(&element, 1);
+    }
+
+    template<typename T>
+    void to_host(const T* d_elements, size_t num_elements, T* out_elements)
+    {
+        CHECK_CU(cudaMemcpy(out_elements, d_elements, num_elements * sizeof(T), cudaMemcpyDeviceToHost));
+    }
+
     /// Transfers the given device object to host and returns it.
     template<typename T>
-    T to_host(const T* d_object)
+    T to_host(const T* d_element)
     {
-        T host_copy{};
-        CHECK_CU(cudaMemcpy(&host_copy, d_object, sizeof(T), cudaMemcpyDeviceToHost));
-        return host_copy;
+        T element{};
+        CHECK_CU(cudaMemcpy(&element, d_element, sizeof(T), cudaMemcpyDeviceToHost));
+        return element;
+    }
+
+    template<typename T>
+    void dump_device_buffer(const T* d_elements, size_t num_elements)
+    {
+        T* elements = (T*) malloc(num_elements * sizeof(T));
+        CHECK_STATE(elements);
+        to_host(d_elements, num_elements, elements);
+
+        printf("{");
+        for (size_t i = 0; i < num_elements; i++)
+        {
+            printf("[%zu]: %s, ", i, to_string(elements[i]).c_str());
+        }
+        printf("}\n");
+    }
+
+    template<typename IntegerT>
+    constexpr __host__ __device__ IntegerT div_round_up(IntegerT n, IntegerT d)
+    {
+        // Source:
+        // https://stackoverflow.com/questions/17944/how-to-round-up-the-result-of-integer-division
+
+        return (n + d - 1) / d;
+    }
+
+    inline uint64_t current_ms_since_epoch()
+    {
+        using namespace std::chrono;
+        return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     }
 }

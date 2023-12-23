@@ -1,5 +1,7 @@
 #include "App.cuh"
 
+#include <cinttypes>
+
 #include <external/glad.h> // From raylib.h
 #include <texture_types.h>
 #include <cuda_gl_interop.h>
@@ -37,7 +39,7 @@ namespace
     }
 
     template<typename CALLBACK>
-    void map_gl_texture(const Texture& texture, CALLBACK callback)
+    void map_gl_texture(const Texture& texture, CALLBACK callback)  // TODO move to utility file
     {
         cudaGraphicsResource* resource;
         CHECK_CU(cudaGraphicsGLRegisterImage(&resource, texture.id, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard));
@@ -71,7 +73,7 @@ namespace
 
 App::App()
 {
-    InitWindow(500, 500, "lego_builder   ¯\\_(ツ)_/¯");
+    InitWindow(800, 800, "lego_builder   ¯\\_(ツ)_/¯");
 
     m_color_map_texture = create_texture(MAP_WIDTH, MAP_HEIGHT);
 
@@ -146,9 +148,19 @@ void App::draw()
     int screen_w = GetScreenWidth();
     int screen_h = GetScreenHeight();
 
+    static uint64_t start_ms = current_ms_since_epoch();
+
     BeginDrawing();
     {
-        ClearBackground(BLACK);
+        float t = float(current_ms_since_epoch() - start_ms)  * 0.001f;
+        float val = (abs(sinf(t * 0.55f)) * 0.35f) * 255.0f;
+
+        Color bg_color;
+        bg_color.r = val;
+        bg_color.g = val;
+        bg_color.b = val;
+        bg_color.a = 1.0f;
+        ClearBackground(bg_color);
 
         DrawTexturePro(m_cur_placement_map_texture,
                        {0, 0, (float) m_cur_placement_map_texture.width, (float) m_cur_placement_map_texture.height},

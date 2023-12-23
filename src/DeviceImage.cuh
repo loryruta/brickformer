@@ -38,8 +38,9 @@ public:
             )
     {
         DeviceImage<FORMAT, DATA_TYPE> host_copy = to_host(this);
-        CHECK_STATE(dst_x + src_w < host_copy.m_width);
-        CHECK_STATE(dst_y + src_h < host_copy.m_height);
+        //printf("dst_x: %d, dst_y: %d, src_w: %d, src_h: %d, w: %d, h: %d\n", dst_x, dst_y, src_w, src_h, host_copy.m_width, host_copy.m_height);
+        CHECK_STATE(dst_x + src_w <= host_copy.m_width);
+        CHECK_STATE(dst_y + src_h <= host_copy.m_height);
         CHECK_STATE(src_data);
 
         for (uint32_t y = 0; y < src_h; y++)
@@ -62,8 +63,8 @@ public:
     /// Fills image data with the supplied int value.
     __host__ void fill(int value)
     {
-        DeviceImage<FORMAT, DATA_TYPE> host_image = to_host(this);
-        CHECK_CU(cudaMemset(host_image.m_data, value, host_image.data_size()));
+        CHECK_CU(cudaMemset(m_data, value, data_size()));
+        CHECK_CU(cudaDeviceSynchronize());  // cudaMemset is async with respect to the host (according to docs)
     }
 
     /// Creates a host-local struct (still allocating its data on device).
@@ -82,12 +83,7 @@ public:
     /// Creates a device-local image having (if non-null) the given data.
     static DeviceImage<FORMAT, DATA_TYPE>* create_device_ptr(uint32_t width, uint32_t height, const uint8_t* data)
     {
-        DeviceImage<FORMAT, DATA_TYPE> init_struct = create(width, height, data);  // Just used for initialization
-
-        DeviceImage<FORMAT, DATA_TYPE>* image;
-        CHECK_CU(cudaMalloc(&image, sizeof(DeviceImage<FORMAT, DATA_TYPE>)));
-        CHECK_CU(cudaMemcpy(image, &init_struct, sizeof(init_struct), cudaMemcpyHostToDevice));
-        return image;
+        return to_device(create(width, height, data));
     }
 };
 

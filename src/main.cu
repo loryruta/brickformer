@@ -31,58 +31,69 @@ struct Placement
 
 __constant__ const size_t k_num_placements = MAP_WIDTH * MAP_HEIGHT * k_num_bricks;
 
-/// Checks whether the thread executing this function covers a brick grid cell.
-__device__ bool is_brick_grid_thread()
-{
-    uint32_t warp_y = cub::LaneId() / 4;
-    return warp_y < 4;
-}
-
 /// Iterates the brick grid within the warp and callbacks every occurrence.
+/// Important: don't perform warp sync operations within the callback.
 template<typename CALLBACK>
 __device__ void iterate_brick_grid(CALLBACK callback)
 {
-    if (!is_brick_grid_thread()) return;
+    uint32_t lane_i = cub::LaneId();
+    uint32_t lane_x = lane_i % 5;
+    uint32_t lane_y = lane_i / 5;
 
-    uint32_t lane_id = cub::LaneId();
-    uint32_t lane_x = lane_id % 4;
-    uint32_t lane_y = lane_id / 4;
+    if (lane_y >= 5) return;
 
-    for (uint32_t item_x = 0; item_x < 4; item_x++)
+    const uint32_t k_item_w = div_round_up(BRICK_MAX_WIDTH, 5);
+    const uint32_t k_item_h = div_round_up(BRICK_MAX_HEIGHT, 5);
+
+    for (uint32_t item_x = 0; item_x < k_item_w; item_x++)
     {
-        for (uint32_t item_y = 0; item_y < 4; item_y++)
+        for (uint32_t item_y = 0; item_y < k_item_h; item_y++)
         {
-            uint32_t bx = lane_x * 4 + item_x;
-            uint32_t by = lane_y * 4 + item_y;
-            assert(bx < 16 && by < 16);
+            uint32_t bx = lane_x * k_item_w + item_x;
+            uint32_t by = lane_y * k_item_h + item_y;
 
-            callback(bx, by);
+            if (bx < BRICK_MAX_WIDTH && by < BRICK_MAX_HEIGHT)
+                callback(bx, by);
         }
     }
 }
 
-__device__ size_t count_adjacent_bricks(
-        Placement const& placement,
-        int32_t bx,
-        int32_t by,
-        PlacementMapT const* cur_placement_map
+__device__ void inspect_neighborhood(
+        const Placement& placement,
+        int32_t bx, int32_t by,
+        const PlacementMapT* placement_map,
+        size_t& num_neighbors,
+        size_t& num_connectible_sides
         )
 {
     auto& brick = k_bricks[placement.m_brick_id];
 
-    int32_t map_x = placement.m_x + bx;
-    int32_t map_y = placement.m_y + by;
+    int32_t mx = placement.m_x + bx;
+    int32_t my = placement.m_y + by;
 
-    size_t count = 0;
-    count += map_x + 1 < cur_placement_map->m_width && (bx + 1 >= 16 || !brick[bx + 1][by]) &&
-            cur_placement_map->read_pixel(map_x + 1, map_y).x > 0;
-    count += map_y + 1 < cur_placement_map->m_width && (by + 1 >= 16 || !brick[bx][by + 1]) &&
-            cur_placement_map->read_pixel(map_x, map_y + 1).x > 0;
-    count += map_x - 1 >= 0 && (bx - 1 < 0 || !brick[bx - 1][by]) &&
-            cur_placement_map->read_pixel(map_x - 1, map_y).x > 0;
-    count += map_y - 1 >= 0 && (by - 1 < 0 || !brick[bx][by - 1]) &&
-            cur_placement_map->read_pixel(map_x, map_y - 1).x > 0;
-    return count;
+    if (mx + 1 < placement_map->m_width && (bx + 1 >= BRICK_MAX_WIDTH || !brick[bx + 1][by]))
+    {
+        if (placement_map->read_pixel(mx + 1, my).x > 0) ++num_neighbors;
+        ++num_connectible_sides;
+    }
+
+    if (my + 1 < placement_map->m_width && (by + 1 >= BRICK_MAX_HEIGHT || !brick[bx][by + 1]))
+    {
+        if (placement_map->read_pixel(mx, my + 1).x > 0) ++num_neighbors;
+        ++num_connectible_sides;
+    }
+
+    if (mx - 1 >= 0 && (bx - 1 < 0 || !brick[bx - 1][by]))
+    {
+        if (placement_map->read_pixel(mx - 1, my).x > 0) ++num_neighbors;
+        ++num_connectible_sides;
+    }
+
+    if (my - 1 >= 0 && (by - 1 < 0 || !brick[bx][by - 1]))
+    {
+        if (placement_map->read_pixel(mx, my - 1).x > 0) ++num_neighbors;
+        ++num_connectible_sides;
+    }
 }
 
 __device__ float eval_placement(
@@ -92,60 +103,70 @@ __device__ float eval_placement(
         PlacementMapT const* prv_placement_map
         )
 {
-    assert(placement.m_brick_id < 16);
     auto& brick = k_bricks[placement.m_brick_id];
-
-    // Check if the current placement is invalid:
-    // - goes outside the color_map
-    // - overlaps a previous placement on this layer
-    bool invalid = false;
-    iterate_brick_grid([&](uint32_t bx, uint32_t by)
-    {
-        uint32_t pos_x = placement.m_x + bx;
-        uint32_t pos_y = placement.m_y + by;
-
-        if (brick[bx][by])
-        {
-            invalid |= pos_x >= color_map->m_width && pos_y >= color_map->m_height;  // The placement goes out of bounds
-            invalid |= cur_placement_map->read_pixel(pos_x, pos_y).x != 0; // The placement would overlap a previous placement
-        }
-    });
-    invalid = __any_sync(FULL_MASK, invalid);
 
     // "Reward" the placement based on:
     // - the number of colored cells covered of the current layer
     // - the number of adjacent placements
     // - the size of the brick
     // - TODO the number of underlying bricks covered by the current placement
+    bool is_outside = false;
+    bool is_overlapping = false;
     size_t num_covered_map_cells = 0;  // The number of cells of the underlying color_map being covered by the placement
     size_t brick_size = 0;             // The number of set cells of the brick's grid
-    size_t num_adjacent_bricks = 0;    // A number proportional to the number of bricks adjacent to the placement (likely >=)
+    size_t num_neighbors = 0;          // A number *proportional* to the number of bricks adjacent to the placement (likely >=)
+    size_t num_connectible_sides = 0;  // A number *proportional* to the number of connectible sides
 
     iterate_brick_grid([&](int32_t bx, int32_t by)
     {
-        int32_t map_x = placement.m_x + bx;
-        int32_t map_y = placement.m_y + by;
+        uint32_t mx = placement.m_x + bx;
+        uint32_t my = placement.m_y + by;
 
         if (brick[bx][by])
         {
-            num_covered_map_cells += color_map->read_pixel(map_x, map_y).a > 0;
+            // Placement out of bounds
+            is_outside |= mx >= color_map->m_width && my >= color_map->m_height;
+
+            // Placement would overlap a previous placement on the current layer
+            is_overlapping |= cur_placement_map->read_pixel(mx, my).x != 0;
+
+            // Count the number of colored cells covered
+            num_covered_map_cells += color_map->read_pixel(mx, my).a > 0;
+
+            // Count the size of the brick (number of cells set in brick's grid)
             brick_size++;
-            num_adjacent_bricks += count_adjacent_bricks(placement, bx, by, cur_placement_map);
+
+            // Inspect the neighborhood to get:
+            // - the number of adjacent bricks in the current layer
+            // - whether this brick is covering a hole (all neighbors are set)
+            inspect_neighborhood(placement, bx, by, cur_placement_map, num_neighbors, num_connectible_sides);
         }
     });
 
-    num_covered_map_cells = warp_add(num_covered_map_cells);
-    brick_size = warp_add(1);
-    num_adjacent_bricks = warp_add(num_adjacent_bricks);
+    // Important: If the warp's thread didn't cover any grid's cell (i.e. callback wasn't invoked).
+    // The score must be zero!
 
-    float val = 0.0f; // How good is this placement?
-    if (!invalid)
+    bool is_invalid = is_outside || is_overlapping;
+    is_invalid = __any_sync(FULL_MASK, is_invalid);
+
+    num_covered_map_cells = warp_add(num_covered_map_cells);  // TODO maybe group to a single reduction
+    brick_size = warp_add(brick_size);
+    num_neighbors = warp_add(num_neighbors);
+    num_connectible_sides = warp_add(num_connectible_sides);
+
+    float cn = float(num_covered_map_cells) / float(brick_size);
+    float an = float(num_neighbors) / float(num_connectible_sides);
+    float bn = float(brick_size) / float(BRICK_MAX_WIDTH * BRICK_MAX_HEIGHT);
+
+    float score = 0.0f; // How good is this placement?
+    if (!is_invalid)
     {
-        val += float(num_covered_map_cells);
-        val += float(brick_size);
-        val += float(num_adjacent_bricks);
+        float c = 0.7f * (cn * cn * cn) + 0.1f; // Color factor [0.1, 0.8]
+        float a = an * an * an;                 // Adjacency factor [0.0, 1.0]
+        float b = bn * 0.2f + 0.8f;             // Block size factor [0.8, 1.0]
+        score = glm::max(a, c) * b;
     }
-    return val;
+    return score;
 }
 
 __global__ void eval_placements(
@@ -164,7 +185,7 @@ __global__ void eval_placements(
 
 __global__ void init_placements(Placement* placements)
 {
-    size_t i = blockIdx.x * 32 + (threadIdx.x >> 5);
+    size_t i = (blockIdx.x << 5) + (threadIdx.x >> 5);
 
     if (threadIdx.x % 32 == 0)
     {
@@ -233,9 +254,9 @@ void place(const Placement& placement, uint16_t placement_id, PlacementMapT* pla
     auto& brick = k_bricks[placement.m_brick_id];
 
     PlacementMapT::PixelT value{placement_id};
-    for (uint8_t bx = 0; bx < 16; bx++)
+    for (uint8_t bx = 0; bx < BRICK_MAX_WIDTH; bx++)
     {
-        for (uint8_t by = 0; by < 16; by++)
+        for (uint8_t by = 0; by < BRICK_MAX_HEIGHT; by++)
         {
             if (brick[bx][by])
             {
@@ -262,7 +283,7 @@ int main(int argc, char* argv[])
 
     // A block processes at most 32 placements, a placement takes 32 threads (1 warp)
     // An arch of 1024 threads per block is required!
-    size_t num_blocks = k_num_placements >> 5;
+    const size_t num_blocks = div_round_up(k_num_placements, size_t(32));
     size_t block_dim = 1024;
 
     init_placements<<<num_blocks, block_dim>>>(d_placements);  // We could use a fitter configuration
@@ -277,19 +298,25 @@ int main(int argc, char* argv[])
     PlacementMapT* prv_placement_map = PlacementMapT::create_device_ptr(MAP_WIDTH, MAP_HEIGHT, nullptr);
     prv_placement_map->fill(0);
 
-    for (size_t i = 0; i < 10; i++)
-    {
-        StopWatch stop_watch{};
+    App app;
+    app.set_color_map(color_map);
 
-        printf("Round %zu\n", i);
+    float stop_threshold = 0.3f;
+
+    for (size_t i = 0;; i++)
+    {
+        app.draw();
+
+        StopWatch stop_watch{};
 
         // Evaluate the objective function on all the possible placements
         stop_watch.reset();
 
+        // TODO Solution space could be reduced by trimming already occupied positions
         eval_placements<<<num_blocks, block_dim>>>(d_placements, color_map, cur_placement_map, prv_placement_map, d_eval_result);
         CHECK_CU(cudaDeviceSynchronize());
 
-        printf("  Evaluation performed in: %" PRIu64 " ms\n", stop_watch.elapsed_millis());
+        uint64_t eval_placements_dt = stop_watch.elapsed_millis();
 
         // Get the placement that maximizes the objective function
         stop_watch.reset();
@@ -300,30 +327,42 @@ int main(int argc, char* argv[])
         float max_reward = to_host(max_pair.second);
         CHECK_STATE(max_reward > 0.0f);  // If 0 it's an invalid placement!
 
-        printf("  Best placement index: %zu\n", max_pair.first);
-        printf("  Placement: (%d, %d) -> %d\n", placement.m_x, placement.m_y, placement.m_brick_id);
-        printf("  Reward: %.3f\n", max_reward);
-        //printf("  Best solution found in: %" PRIu64 " ms\n", stop_watch.elapsed_millis());
+        if (max_reward < stop_threshold) break;
+
+        uint64_t reduce_dt = stop_watch.elapsed_millis();
 
         // Place the brick in the current layer
         stop_watch.reset();
 
         place(placement, uint16_t(i), cur_placement_map);
 
-        //printf("  Placement added in: %" PRIu64 " ms\n", stop_watch.elapsed_millis());
+        uint64_t placement_dt = stop_watch.elapsed_millis();
 
         //
+        printf("Round %zu; "
+               "Placement: (%d, %d) -> %d, "
+               "Value: %.3f, "
+               "Eval in %" PRIu64 " ms, "
+               "Reduced in %" PRIu64 " ms, "
+               "Placed in: %" PRIu64 " ms\n",
+               i,
+               placement.m_x, placement.m_y, placement.m_brick_id,
+               max_reward,
+               eval_placements_dt, reduce_dt, placement_dt);
+
+        //
+        if (i % 1000 == 0) app.set_placement_map(cur_placement_map);
+        //printf("  Placement added in: %" PRIu64 " ms\n", stop_watch.elapsed_millis());
     }
 
-    /*
-    App app;
-    app.set_color_map(color_map);
+    printf("Done!\n");
+
     app.set_placement_map(cur_placement_map);
 
     while (!app.should_close())
     {
         app.draw();
-    }*/
+    }
 
     return 0;
 }

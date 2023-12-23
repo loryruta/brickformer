@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <cub/cub.cuh>
 
 #define FULL_MASK 0xffffffff
 
