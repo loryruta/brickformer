@@ -53,7 +53,6 @@ const DeviceModel* lego_builder::upload_model(const Model& model)
         d_mesh.m_indices = to_device(mesh.m_indices.data(), mesh.m_indices.size());
 
         d_mesh.m_texture_idx = mesh.m_texture_idx;
-        d_mesh.m_transform = mesh.m_transform;
 
         d_meshes.emplace_back(d_mesh);
     }

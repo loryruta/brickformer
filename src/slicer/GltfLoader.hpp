@@ -29,7 +29,7 @@ namespace lego_builder
 
         void eval_mesh_min_max(Mesh& mesh);
 
-        void parse_vertices(const tinygltf::Primitive& primitive, Mesh& mesh);
+        void parse_vertices(const tinygltf::Primitive& primitive, Mesh& mesh, const glm::mat4& transform);
         void parse_indices(const tinygltf::Primitive& primitive, Mesh& mesh);
 
         void parse_mesh(const tinygltf::Mesh& gltf_mesh, const glm::mat4& transform);

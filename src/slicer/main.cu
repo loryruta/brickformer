@@ -1,19 +1,38 @@
 #include <filesystem>
+#include <thread>
 
 #include "Model.hpp"
 #include "GltfLoader.hpp"
 #include "video/ViewModelApp.hpp"
 #include "video/gl_helpers.hpp"
-#include "BuildBvh.cuh"
-#include "DeviceModel.cuh"
-#include "Slicer.cuh"
+#include "video/cuda_interop_helpers.cuh"
 #include "../StopWatch.hpp"
 #include "video/TextureRenderer.hpp"
+#include "Slicer.cuh"
+
 
 using namespace lego_builder;
+using namespace std::chrono_literals;
+
+/// Transforms the model vertices such that the XZ axes fit the given size.
+/// Use case: used before performing slicing to fit the Model within the Slicer space.
+void fit_xz_plane(Model& model, float new_xz_side)
+{
+    glm::vec3 model_size = model.size();
+    float max_xz_side = glm::max(model_size.x, model_size.z);
+
+    glm::mat4 transform = glm::identity<glm::mat4>();
+    transform = glm::scale(transform, glm::vec3(new_xz_side / max_xz_side));
+    transform = glm::translate(transform, -model.m_min);
+
+    model.apply_transform(transform);
+    model.update_min_max(true /* update_mesh_minmax */);
+}
 
 int main(int argc, char* argv[])
 {
+    constexpr uint32_t k_slice_side = 256; // TODO put in a global config.hpp
+
     Window window(500, 500, "lego_builder");
 
     int version = gladLoadGL(glfwGetProcAddress);
@@ -24,55 +43,71 @@ int main(int argc, char* argv[])
     enable_gl_debug_output();
 
     std::filesystem::path model_path =
-            "/home/loryruta/CLionProjects/lego-builder/resources/models/prehistoric_planet_tyrannosaurus_rex_model.glb";
+            "/home/loryruta/CLionProjects/lego-builder/resources/models/shinto_shrine.glb";
 
     GltfLoader gltf_loader;
+
     Model model = gltf_loader.load_file(model_path);
 
-    //ViewModelApp view_model_app(window, model);
+    fit_xz_plane(model, k_slice_side);
+
+    glm::vec3 model_size = model.size();
+
+    printf("Transformed model in slice-space; Min: (%.3f, %.3f, %.3f), Max: (%.3f, %.3f, %.3f); Size: (%.3f, %.3f, %.3f)\n",
+           model.m_min.x, model.m_min.y, model.m_min.z,
+           model.m_max.x, model.m_max.y, model.m_max.z,
+           model_size.x, model_size.y, model_size.z
+           );
+
+    // Visualize that the model is correctly transformed into the Slicer space
+    glm::vec3 model_hsize = model_size / 2.0f;
+
+    glm::vec3 orbit_center = model.m_min + model_hsize;
+
+    float cam_rad = glm::sqrt(model_hsize.x * model_hsize.x + model_hsize.z * model_hsize.z);
+    cam_rad *= 1.3f;
+    glm::vec3 cam_position = orbit_center + glm::vec3(cam_rad, model_hsize.y / 2.0f, cam_rad);
+
+    //ViewModelApp view_model_app(window, model, orbit_center, cam_position, 100.0f);
     //if (view_model_app.run()) exit(0);
 
-    BuildBvh build_bvh;
-    const Bvh* d_bvh = build_bvh.build(model);
+    //const DeviceModel* d_model = upload_model(model);
 
-    const DeviceModel* d_model = upload_model(model);
+    Slicer slicer(model, k_slice_side);
 
-    constexpr uint32_t k_slice_side = 256; // TODO put in a global config.hpp
-
-    Slicer slicer(d_bvh, d_model, model.m_transformed_min, model.m_transformed_max, k_slice_side);
-
-    using SliceImageT = DeviceImage<4, uint8_t>;
-
-    SliceImageT slice_img = SliceImageT::create(k_slice_side, k_slice_side, nullptr);
-    slice_img.fill(0);
-    SliceImageT* d_slice_img = to_device(slice_img);
+    SliceT slice = SliceT::create(k_slice_side, k_slice_side);
 
     TextureRenderer tex_renderer;
-    GLuint frame_tex = create_gl_texture_from_cuda_image(slice_img, false /* copy_content */);
 
-    for (uint32_t slice_y = 0; slice_y < slicer.num_slices(); slice_y++)
+    // Create a GL texture mapped to a CUDA resource. It's used to visually display the result of the slicing
+    CudaMappedGlTexture frame_texture = CudaMappedGlTexture::create(k_slice_side, k_slice_side);
+
+    uint32_t num_slices = glm::ceil(model_size.y);
+
+    for (uint32_t slice_y = 0; slice_y < num_slices; slice_y++)
     {
-        printf("Slice %d/%d...\n", slice_y + 1, slicer.num_slices());
+        printf("Slice %d/%d...\n", slice_y + 1, num_slices);
 
         StopWatch stop_watch;
 
-        slicer.slice(slice_y, d_slice_img);
+        slicer.slice(slice_y, slice);
 
         std::string slice_dt_str = stop_watch.elapsed_time_str();
-        printf("Slice %d/%d generated in %s\n", slice_y + 1, slicer.num_slices(), slice_dt_str.c_str());
+        printf("Slice %d/%d generated in %s\n", slice_y + 1, num_slices, slice_dt_str.c_str());
 
         // Render
         window.begin_frame();
 
-        glDisable(GL_DEPTH_TEST);
-
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        copy_cuda_image_to_gl_texture(slice_img, frame_tex);
-        tex_renderer.render(frame_tex);
+        frame_texture.copy_from(slice);
+        tex_renderer.render(frame_texture.gl_texture());
 
         window.end_frame();
+
+        //
+        std::this_thread::sleep_for(0.1s);
     }
 
     return 0;

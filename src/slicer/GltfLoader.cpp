@@ -37,21 +37,7 @@ void GltfLoader::copy_accessor_data(const tinygltf::Accessor& src_accessor, int 
     }
 }
 
-void GltfLoader::eval_mesh_min_max(Mesh& mesh)
-{
-    mesh.m_transformed_min = glm::vec3(std::numeric_limits<float>::infinity());
-    mesh.m_transformed_max = glm::vec3(-std::numeric_limits<float>::infinity());
-
-    for (const Vertex& v : mesh.m_vertices)
-    {
-        glm::vec3 v_pos = mesh.m_transform * glm::vec4(v.m_position, 1);
-
-        mesh.m_transformed_min = glm::min(mesh.m_transformed_min, v_pos);
-        mesh.m_transformed_max = glm::max(mesh.m_transformed_max, v_pos);
-    }
-}
-
-void GltfLoader::parse_vertices(const tinygltf::Primitive& primitive, Mesh& mesh)
+void GltfLoader::parse_vertices(const tinygltf::Primitive& primitive, Mesh& mesh, const glm::mat4& transform)
 {
     assert(primitive.mode == TINYGLTF_MODE_TRIANGLES);
 
@@ -110,6 +96,12 @@ void GltfLoader::parse_vertices(const tinygltf::Primitive& primitive, Mesh& mesh
     {
         copy_accessor_data(*color_accessor, color_accessor->type, dst_vertices + offsetof(Vertex, m_color), sizeof(Vertex));
     }
+
+    // Apply the transform to all vertices' position
+    mesh.apply_transform(transform);
+
+    // Compute the mesh min/max
+    mesh.update_min_max();
 }
 
 void GltfLoader::parse_indices(const tinygltf::Primitive& primitive, Mesh& mesh)
@@ -138,21 +130,12 @@ void GltfLoader::parse_mesh(const tinygltf::Mesh& gltf_mesh, const glm::mat4& tr
             continue;
         }
 
-        parse_vertices(primitive, mesh);
+        parse_vertices(primitive, mesh, transform);
         parse_indices(primitive, mesh);
 
         tinygltf::Material& material = m_gltf_model.materials.at(primitive.material);
         mesh.m_texture_idx = material.pbrMetallicRoughness.baseColorTexture.index;
     }
-
-    mesh.m_transform = transform;
-
-    // Evaluate min/max for the mesh
-    eval_mesh_min_max(mesh);
-
-    // Update min/max for the model
-    m_model.m_transformed_min = glm::min(m_model.m_transformed_min, mesh.m_transformed_min);
-    m_model.m_transformed_max = glm::max(m_model.m_transformed_max, mesh.m_transformed_max);
 
     m_model.m_meshes.emplace_back(std::move(mesh));
 }
@@ -279,6 +262,8 @@ Model&& GltfLoader::load_file(const std::filesystem::path& model_path)
 
     load_textures();
     parse_scene(m_gltf_model.scenes.at(m_gltf_model.defaultScene));
+
+    m_model.update_min_max(false /* update_mesh_minmax */);
 
     printf("Model loaded!\n");
 

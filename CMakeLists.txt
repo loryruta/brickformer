@@ -5,6 +5,8 @@ set(CMAKE_CUDA_ARCHITECTURES 75)
 # Important: nvcc requires GNU version <= 12
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${CMAKE_CXX_COMPILER}")
 
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 #   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -g")
 endif()
@@ -76,7 +78,8 @@ add_executable(lego_builder
         src/App.cu
         src/App.cuh
         src/main.cu
-        src/StopWatch.hpp)
+        src/StopWatch.hpp
+        src/Bvh.cuh)
 
 target_link_libraries(lego_builder PRIVATE lego_builder_lib)
 

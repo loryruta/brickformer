@@ -26,16 +26,21 @@ public:
 
     [[nodiscard]] size_t data_size() const { return m_width * m_height * sizeof(PixelT); };
 
-    __device__ PixelT read_pixel(uint32_t x, uint32_t y) const
+    __host__ __device__
+    bool is_valid_pixel(int x, int y) const
+    {
+        return x >= 0 && x < m_width &&
+            y >= 0 && y < m_height;
+    }
+
+    __device__
+    PixelT read_pixel(uint32_t x, uint32_t y) const
     {
         return m_data[y * m_height + x];
     }
 
-    __host__ void write_region(
-            uint32_t dst_x, uint32_t dst_y,
-            uint32_t src_w, uint32_t src_h,
-            const PixelT* src_data
-            )
+    __host__
+    void write_region(uint32_t dst_x, uint32_t dst_y, uint32_t src_w, uint32_t src_h, const PixelT* src_data)
     {
         DeviceImage<FORMAT, DATA_TYPE> host_copy = to_host(this);
         //printf("dst_x: %d, dst_y: %d, src_w: %d, src_h: %d, w: %d, h: %d\n", dst_x, dst_y, src_w, src_h, host_copy.m_width, host_copy.m_height);
@@ -51,7 +56,8 @@ public:
         }
     }
 
-    __host__ __device__ void write_pixel(uint32_t x, uint32_t y, const PixelT& value)
+    __host__ __device__
+    void write_pixel(uint32_t x, uint32_t y, const PixelT& value)
     {
 #ifdef __CUDA_ARCH__
         m_data[y * m_width + x] = value;
@@ -61,14 +67,15 @@ public:
     }
 
     /// Fills image data with the supplied int value.
-    __host__ void fill(int value)
+    __host__
+    void fill(int value)
     {
-        CHECK_CU(cudaMemset(m_data, value, data_size()));
+        CHECK_CU(cudaMemset(m_data, value, m_width * m_height * sizeof(PixelT)));
         CHECK_CU(cudaDeviceSynchronize());  // cudaMemset is async with respect to the host (according to docs)
     }
 
     /// Creates a host-local struct (still allocating its data on device).
-    static DeviceImage<FORMAT, DATA_TYPE> create(uint32_t width, uint32_t height, const uint8_t* data)
+    static DeviceImage<FORMAT, DATA_TYPE> create(uint32_t width, uint32_t height, const uint8_t* data = nullptr)
     {
         DeviceImage<FORMAT, DATA_TYPE> image{};
         image.m_width = width;

@@ -15,13 +15,13 @@ namespace lego_builder
         std::unique_ptr<BakedModel> m_baked_model;
         ModelRenderer m_model_renderer;
 
-        /// Matrix used to scale the model to a fixed size (e.g. (0,0,0) and (1,1,1)).
-        glm::mat4 m_model_norm_transform;
+        glm::vec3 m_orbit_center;
+        float m_cam_speed;
 
         Camera m_camera;
 
     public:
-        explicit ViewModelApp(Window& window, const Model& model);
+        explicit ViewModelApp(Window& window, const Model& model, const glm::vec3& orbit_center, const glm::vec3& cam_position, float cam_speed);
         ~ViewModelApp() = default;
 
         bool run();

@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <chrono>
 
+#include <glm/glm.hpp>
+
 #define CHECK_STATE(condition) \
     lego_builder::check_state(condition, #condition, __FILE__, __LINE__, nullptr)
 
@@ -95,7 +97,8 @@ namespace lego_builder
     }
 
     template<typename IntegerT>
-    constexpr __host__ __device__ IntegerT div_round_up(IntegerT n, IntegerT d)
+    __host__ __device__
+    constexpr IntegerT div_round_up(IntegerT n, IntegerT d)
     {
         // Source:
         // https://stackoverflow.com/questions/17944/how-to-round-up-the-result-of-integer-division
@@ -108,4 +111,13 @@ namespace lego_builder
         using namespace std::chrono;
         return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     }
+
+    __host__ __device__
+    inline glm::vec4 to_fvec4(const uchar4& v) { return {v.x, v.y, v.z, v.w}; }
+
+    __host__ __device__
+    inline glm::vec4 to_fvec4(const uint4& v) { return {v.x, v.y, v.z, v.w}; }
+
+    __host__ __device__
+    inline glm::vec4 to_fvec4(const float4& v) { return {v.x, v.y, v.z, v.w}; }
 }

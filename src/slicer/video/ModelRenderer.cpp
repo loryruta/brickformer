@@ -30,7 +30,6 @@ const char* k_vert_shader_src = R"(#version 460 core
     layout(location = 2) in vec2 a_texcoord;
     layout(location = 3) in vec4 a_color;
 
-    uniform mat4 u_mesh_transform;
     uniform mat4 u_transform;
     uniform mat4 u_camera;
 
@@ -41,9 +40,8 @@ const char* k_vert_shader_src = R"(#version 460 core
 
     void main()
     {
-        mat4 transform = u_transform * u_mesh_transform;
-        vec4 position = transform * vec4(a_position, 1.0);
-        vec4 normal = transform * vec4(a_normal, 0.0);
+        vec4 position = u_transform * vec4(a_position, 1.0);
+        vec4 normal = u_transform * vec4(a_normal, 0.0);
 
         gl_Position = u_camera * position;
 
@@ -79,8 +77,6 @@ BakedMesh::BakedMesh(BakedMesh&& other) noexcept :
     m_num_elements(other.m_num_elements),
     m_texture_idx(other.m_texture_idx)
 {
-    std::memcpy(m_transform, other.m_transform, sizeof(float[16]));
-
     other.m_vao = 0;  // Prevent moved element from being deleted
     other.m_vbo = 0;
     other.m_ebo = 0;
@@ -153,7 +149,6 @@ void ModelRenderer::render(const BakedModel& baked_model, const Camera& camera, 
     {
         if (baked_mesh.m_num_elements == 0) continue;
 
-        glUniformMatrix4fv(get_uniform_location(m_program, "u_mesh_transform"), 1, GL_FALSE, baked_mesh.m_transform);
         glUniformMatrix4fv(get_uniform_location(m_program, "u_transform"), 1, GL_FALSE, glm::value_ptr(transform));
 
         glm::mat4 camera_mat = camera.matrix();
@@ -208,8 +203,6 @@ BakedMesh ModelRenderer::bake_mesh(const Mesh& mesh)
     glVertexAttribPointer(attrib_loc, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_color));
 
     glBindVertexArray(0);
-
-    std::memcpy(baked_mesh.m_transform, glm::value_ptr(mesh.m_transform), sizeof(float[16]));
 
     baked_mesh.m_texture_idx = mesh.m_texture_idx;
 

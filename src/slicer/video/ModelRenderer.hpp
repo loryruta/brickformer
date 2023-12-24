@@ -13,7 +13,6 @@ namespace lego_builder
     {
         GLuint m_vao, m_vbo, m_ebo;
         size_t m_num_elements;
-        float m_transform[16];
 
         /// A non-owned reference to the baked texture, stored in BakedModel.
         /// If negative, a white texture is used.

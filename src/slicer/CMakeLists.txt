@@ -14,15 +14,18 @@ add_executable(slicer main.cu
         video/Camera.cpp
         video/gl_helpers.cpp
         video/gl_helpers.hpp
-        BuildBvh.cuh
-        BuildBvh.cu
         DeviceModel.cuh
         DeviceModel.cu
-        Slicer.cuh
-        Slicer.cu
         intersections.cuh
         video/TextureRenderer.hpp
         video/TextureRenderer.cpp
+
+        Slicer.cu
+        Slicer.cuh
+        Model.cpp
+        video/cuda_interop_helpers.cuh
+        video/cuda_interop_helpers.cu
+
 )
 
 target_include_directories(slicer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

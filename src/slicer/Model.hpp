@@ -21,12 +21,15 @@ namespace lego_builder
     {
         std::vector<Vertex> m_vertices;
         std::vector<uint32_t> m_indices;
-        glm::mat4 m_transform;
 
         int m_texture_idx;  ///< Texture index into Model's m_textures array.
 
-        glm::vec3 m_transformed_min;
-        glm::vec3 m_transformed_max;
+        glm::vec3 m_min;
+        glm::vec3 m_max;
+
+        void apply_transform(const glm::mat4& transform);
+
+        void update_min_max();
     };
 
     struct Texture
@@ -53,18 +56,14 @@ namespace lego_builder
 
         std::vector<Mesh> m_meshes;
 
-        glm::vec3 m_transformed_min = glm::vec3(INFINITY);
-        glm::vec3 m_transformed_max = glm::vec3(-INFINITY);
+        glm::vec3 m_min;
+        glm::vec3 m_max;
 
-        [[nodiscard]] inline glm::vec3 transformed_size() const
-        {
-            return m_transformed_max - m_transformed_min;
-        }
+        [[nodiscard]] inline glm::vec3 size() const { return m_max - m_min; }
 
-        /// Returns a transformation matrix that, if applied to every vertex position, normalizes the model between (0,0,0) and (1,1,1).
-        [[nodiscard]] inline glm::mat4 normalization_matrix() const
-        {
-            return create_normalization_matrix(m_transformed_min, m_transformed_max);
-        }
+        /// Applies the transform to all meshes.
+        void apply_transform(const glm::mat4& transform);
+
+        void update_min_max(bool update_mesh_minmax = true);
     };
 }
