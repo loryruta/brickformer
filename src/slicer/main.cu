@@ -10,11 +10,10 @@
 #include "video/TextureRenderer.hpp"
 #include "Slicer.cuh"
 
-
 using namespace lego_builder;
 using namespace std::chrono_literals;
 
-/// Transforms the model vertices such that the XZ axes fit the given size.
+/// Transforms the model vertices such that the maximum of XZ axes, fits the given side.
 /// Use case: used before performing slicing to fit the Model within the Slicer space.
 void fit_xz_plane(Model& model, float new_xz_side)
 {
@@ -26,7 +25,7 @@ void fit_xz_plane(Model& model, float new_xz_side)
     transform = glm::translate(transform, -model.m_min);
 
     model.apply_transform(transform);
-    model.update_min_max(true /* update_mesh_minmax */);
+    model.update_min_max(true /* update_mesh_min_max */);
 }
 
 int main(int argc, char* argv[])
@@ -68,8 +67,8 @@ int main(int argc, char* argv[])
     cam_rad *= 1.3f;
     glm::vec3 cam_position = orbit_center + glm::vec3(cam_rad, model_hsize.y / 2.0f, cam_rad);
 
-    //ViewModelApp view_model_app(window, model, orbit_center, cam_position, 100.0f);
-    //if (view_model_app.run()) exit(0);
+    ViewModelApp view_model_app(window, model, orbit_center, cam_position, 100.0f);
+    if (view_model_app.run()) exit(0);
 
     //const DeviceModel* d_model = upload_model(model);
 
@@ -77,7 +76,7 @@ int main(int argc, char* argv[])
 
     SliceT slice = SliceT::create(k_slice_side, k_slice_side);
 
-    TextureRenderer tex_renderer;
+    TextureRenderer texture_renderer;
 
     // Create a GL texture mapped to a CUDA resource. It's used to visually display the result of the slicing
     CudaMappedGlTexture frame_texture = CudaMappedGlTexture::create(k_slice_side, k_slice_side);
@@ -98,16 +97,15 @@ int main(int argc, char* argv[])
         // Render
         window.begin_frame();
 
+        glDisable(GL_DEPTH_TEST);
+
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT);
 
         frame_texture.copy_from(slice);
-        tex_renderer.render(frame_texture.gl_texture());
+        texture_renderer.render(frame_texture.gl_texture());
 
         window.end_frame();
-
-        //
-        std::this_thread::sleep_for(0.1s);
     }
 
     return 0;

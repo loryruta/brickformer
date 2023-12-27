@@ -29,12 +29,14 @@ struct Placement
     uint8_t m_brick_id;
 };
 
-__constant__ const size_t k_num_placements = MAP_WIDTH * MAP_HEIGHT * k_num_bricks;
+__constant__
+const size_t k_num_placements = MAP_WIDTH * MAP_HEIGHT * k_num_bricks;
 
 /// Iterates the brick grid within the warp and callbacks every occurrence.
 /// Important: don't perform warp sync operations within the callback.
 template<typename CALLBACK>
-__device__ void iterate_brick_grid(CALLBACK callback)
+__device__
+void iterate_brick_grid(CALLBACK callback)
 {
     uint32_t lane_i = cub::LaneId();
     uint32_t lane_x = lane_i % 5;
@@ -42,8 +44,8 @@ __device__ void iterate_brick_grid(CALLBACK callback)
 
     if (lane_y >= 5) return;
 
-    const uint32_t k_item_w = div_round_up(BRICK_MAX_WIDTH, 5);
-    const uint32_t k_item_h = div_round_up(BRICK_MAX_HEIGHT, 5);
+    const uint32_t k_item_w = div_ceil(BRICK_MAX_WIDTH, 5);
+    const uint32_t k_item_h = div_ceil(BRICK_MAX_HEIGHT, 5);
 
     for (uint32_t item_x = 0; item_x < k_item_w; item_x++)
     {
@@ -52,19 +54,19 @@ __device__ void iterate_brick_grid(CALLBACK callback)
             uint32_t bx = lane_x * k_item_w + item_x;
             uint32_t by = lane_y * k_item_h + item_y;
 
-            if (bx < BRICK_MAX_WIDTH && by < BRICK_MAX_HEIGHT)
-                callback(bx, by);
+            if (bx < BRICK_MAX_WIDTH && by < BRICK_MAX_HEIGHT) callback(bx, by);
         }
     }
 }
 
-__device__ void inspect_neighborhood(
-        const Placement& placement,
-        int32_t bx, int32_t by,
-        const PlacementMapT* placement_map,
-        size_t& num_neighbors,
-        size_t& num_connectible_sides
-        )
+__device__
+void inspect_neighborhood(
+    const Placement& placement,
+    int32_t bx, int32_t by,
+    const PlacementMapT* placement_map,
+    size_t& num_neighbors,
+    size_t& num_connectible_sides
+    )
 {
     auto& brick = k_bricks[placement.m_brick_id];
 
@@ -270,7 +272,7 @@ int main(int argc, char* argv[])
 {
     printf("Bricks: %zu\n", k_num_bricks);
 
-    std::filesystem::path resource_dir = std::filesystem::path(__FILE__).parent_path().parent_path() / "layers";
+    std::filesystem::path resource_dir = std::filesystem::path(__FILE__).parent_path().parent_path() / "resources";
     std::string color_map_path = (resource_dir / "layer1.png").string();
 
     printf("Loading color map at \"%s\"...\n", color_map_path.c_str());
@@ -283,7 +285,7 @@ int main(int argc, char* argv[])
 
     // A block processes at most 32 placements, a placement takes 32 threads (1 warp)
     // An arch of 1024 threads per block is required!
-    const size_t num_blocks = div_round_up(k_num_placements, size_t(32));
+    const size_t num_blocks = div_ceil(k_num_placements, size_t(32));
     size_t block_dim = 1024;
 
     init_placements<<<num_blocks, block_dim>>>(d_placements);  // We could use a fitter configuration
@@ -293,10 +295,10 @@ int main(int argc, char* argv[])
     CHECK_CU(cudaMalloc(&d_eval_result, k_num_placements * sizeof(float)));
 
     PlacementMapT* cur_placement_map = PlacementMapT::create_device_ptr(MAP_WIDTH, MAP_HEIGHT, nullptr);
-    cur_placement_map->fill(0);
+    to_host(cur_placement_map).fill(0);
 
     PlacementMapT* prv_placement_map = PlacementMapT::create_device_ptr(MAP_WIDTH, MAP_HEIGHT, nullptr);
-    prv_placement_map->fill(0);
+    to_host(prv_placement_map).fill(0);
 
     App app;
     app.set_color_map(color_map);

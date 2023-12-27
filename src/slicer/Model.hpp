@@ -39,17 +39,6 @@ namespace lego_builder
         std::vector<uint8_t> m_image_data;  // RGBA pixels in row-first, top-left to bottom-right fashion
     };
 
-    /// Creates a normalization matrix that fits the given bounding-box between (0,0,0) and (1,1,1).
-    inline glm::mat4 create_normalization_matrix(const glm::vec3& bb_min, const glm::vec3& bb_max)
-    {
-        glm::mat4 m = glm::identity<glm::mat4>();
-        glm::vec3 model_size = bb_max - bb_min;
-        float max_side = glm::max(model_size.x, glm::max(model_size.y, model_size.z));
-        m = glm::scale(m, glm::vec3(1.0f / max_side));
-        m = glm::translate(m, -bb_min);
-        return m;
-    }
-
     struct Model
     {
         std::vector<Texture> m_textures;

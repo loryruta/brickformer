@@ -74,6 +74,13 @@ public:
         CHECK_CU(cudaDeviceSynchronize());  // cudaMemset is async with respect to the host (according to docs)
     }
 
+    __host__
+    void copy_from(const DeviceImage<FORMAT, DATA_TYPE>& other)
+    {
+        CHECK_CU(cudaMemcpy(m_data, other.m_data, m_width * m_height * sizeof(PixelT), cudaMemcpyDeviceToDevice));
+        CHECK_CU(cudaDeviceSynchronize());
+    }
+
     /// Creates a host-local struct (still allocating its data on device).
     static DeviceImage<FORMAT, DATA_TYPE> create(uint32_t width, uint32_t height, const uint8_t* data = nullptr)
     {
@@ -93,8 +100,5 @@ public:
         return to_device(create(width, height, data));
     }
 };
-
-using ColorMapT = DeviceImage<4, uint8_t>;
-using PlacementMapT = DeviceImage<1, uint16_t>;
 
 }  // namespace lego_builder

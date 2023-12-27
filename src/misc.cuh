@@ -11,6 +11,9 @@
 #define CHECK_STATE_MSG(condition, message) \
     lego_builder::check_state(condition, #condition, __FILE__, __LINE__, message)
 
+#define CHECK_ARG(condition) \
+    CHECK_STATE(condition)
+
 #define CHECK_CU(error) \
     lego_builder::check_cuda((error), __FILE__, __LINE__)
 
@@ -98,7 +101,7 @@ namespace lego_builder
 
     template<typename IntegerT>
     __host__ __device__
-    constexpr IntegerT div_round_up(IntegerT n, IntegerT d)
+    constexpr IntegerT div_ceil(IntegerT n, IntegerT d)
     {
         // Source:
         // https://stackoverflow.com/questions/17944/how-to-round-up-the-result-of-integer-division

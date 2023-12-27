@@ -77,9 +77,18 @@ target_link_libraries(lego_builder_lib INTERFACE stb)
 add_executable(lego_builder
         src/App.cu
         src/App.cuh
-        src/main.cu
+        src/_main.cu
         src/StopWatch.hpp
-        src/Bvh.cuh)
+        src/Bvh.cuh
+        src/SpreadValue.cuh
+        src/SpreadValue.cu
+        src/Arpenteur.cuh
+        src/Arpenteur.cu
+        src/reward_func.cuh
+        src/Placement.hpp
+        src/reward_funcs.cu
+        src/color_func.cuh
+        src/ArpenteurListener.hpp)
 
 target_link_libraries(lego_builder PRIVATE lego_builder_lib)
 

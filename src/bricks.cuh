@@ -10,7 +10,8 @@ namespace lego_builder
     using BlockLayoutT = uint8_t[BRICK_MAX_WIDTH][BRICK_MAX_HEIGHT];
 
     // clang-format off
-    __constant__ const BlockLayoutT k_bricks[] = {
+    __constant__
+    const BlockLayoutT k_bricks[] = {
             // 1x1
             {{1}},
 
@@ -76,6 +77,7 @@ namespace lego_builder
     };
     // clang-format on
 
-    __constant__ const size_t k_num_bricks = sizeof(k_bricks) / sizeof(k_bricks[0]);
+    __constant__
+    const size_t k_num_bricks = sizeof(k_bricks) / sizeof(k_bricks[0]);
 }
 

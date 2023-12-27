@@ -27,8 +27,6 @@ namespace lego_builder
     private:
         void copy_accessor_data(const tinygltf::Accessor& src_accessor, int src_type, void* dst_data, size_t dst_size);
 
-        void eval_mesh_min_max(Mesh& mesh);
-
         void parse_vertices(const tinygltf::Primitive& primitive, Mesh& mesh, const glm::mat4& transform);
         void parse_indices(const tinygltf::Primitive& primitive, Mesh& mesh);
 

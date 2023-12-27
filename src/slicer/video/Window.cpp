@@ -35,6 +35,9 @@ glm::ivec2 Window::get_framebuffer_size() const
 void Window::begin_frame()
 {
     glfwPollEvents();
+
+    if (is_key_pressed(GLFW_KEY_ESCAPE))
+        glfwSetWindowShouldClose(m_glfw_window, GLFW_TRUE);
 }
 
 void Window::end_frame()
@@ -45,4 +48,9 @@ void Window::end_frame()
 bool Window::should_close() const
 {
     return glfwWindowShouldClose(m_glfw_window);
+}
+
+bool Window::is_key_pressed(int key) const
+{
+    return glfwGetKey(m_glfw_window, key) == GLFW_PRESS;
 }

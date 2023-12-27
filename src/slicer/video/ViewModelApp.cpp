@@ -37,6 +37,8 @@ bool ViewModelApp::run()
         m_model_renderer.render(*m_baked_model, m_camera, glm::identity<glm::mat4>());
 
         m_window.end_frame();
+
+        if (m_window.is_key_pressed(GLFW_KEY_ENTER)) break;
     }
 
     return m_window.should_close();

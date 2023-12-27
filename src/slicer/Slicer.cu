@@ -1,9 +1,8 @@
 #include "Slicer.cuh"
 
-#include "intersections.cuh"
-
 #include <thrust/copy.h>
-#include <thrust/execution_policy.h>
+
+#include "intersections.cuh"
 
 using namespace lego_builder;
 
@@ -15,63 +14,6 @@ Slicer::Slicer(const Model& model, uint32_t slice_side)
 
     linearize_triangles(model);
 }
-
-/*
-__global__ void voxelize_slice(
-        uint32_t slice_y,
-        uint32_t slice_side,
-        const DeviceModel* device_model,
-        glm::mat4 model_transform,  // Only translation/scale (otherwise AABB would invalidate)
-        DeviceImage<4, uint8_t>* out_slice
-        )
-{
-    size_t i = blockIdx.x * 1024 + threadIdx.x;
-
-    uint32_t warp_idx = i / 32;
-    uint32_t lane_idx = i % 32;
-
-    glm::ivec3 slice_idx;
-    slice_idx.x = warp_idx % slice_side;
-    slice_idx.y = slice_y;
-    slice_idx.z = warp_idx / slice_side;
-
-    if (slice_idx.z >= slice_side) return;  // Cube out of bounds; discard warp
-
-    // The model is supposed to fit the slicing grid (using model_transform, externally supplied).
-    // The cube is therefore a grid's cell of length 1 on every axis
-    Box box{};
-    box.m_min = slice_idx;
-    box.m_max = slice_idx + 1;
-
-    traverse_bvh(box, bvh, model_transform, [&](const Node& node)
-    {
-        // Retrieve the triangle geometry from the model
-        const DeviceMesh& mesh = model->m_meshes[node.m_mesh_idx];
-
-        const Vertex& v0 = mesh.m_vertices[mesh.m_indices[node.m_triangle_idx * 3 + 0]];
-        const Vertex& v1 = mesh.m_vertices[mesh.m_indices[node.m_triangle_idx * 3 + 1]];
-        const Vertex& v2 = mesh.m_vertices[mesh.m_indices[node.m_triangle_idx * 3 + 2]];
-
-        Triangle tri{};
-        tri.m_a = model_transform * mesh.m_transform * glm::vec4(v0.m_position, 1.0f);
-        tri.m_b = model_transform * mesh.m_transform * glm::vec4(v1.m_position, 1.0f);
-        tri.m_c = model_transform * mesh.m_transform * glm::vec4(v2.m_position, 1.0f);
-
-        if (intersect_triangle(box, tri))
-        {
-            // TODO (MUST) get the color
-
-            if (lane_idx == 0)
-            {
-                out_slice->write_pixel(slice_idx.x, slice_idx.z, {255, 255, 0, 255});
-                //printf("Slice %d; Set pixel at (%d, %d)\n", slice_idx.y, slice_idx.x, slice_idx.z);
-            }
-        }
-
-        // TODO use the warp to check intersection in a neighborhood of the cube (not just for the central cube itself)
-        //   If any of these intersects, then set the cell
-    });
-}*/
 
 void Slicer::linearize_triangles(const Model& model)
 {
@@ -229,7 +171,7 @@ void Slicer::slice(uint32_t slice_y, SliceT& out_slice)
     int32_t* min_intersections_d = to_device(INT32_MAX);
 
     const DeviceModel* model_d = m_model_d;
-    SliceT* out_slice_d = to_device(out_slice);
+    SliceT* out_slice_d = to_device(out_slice);  // TODO input already on device image (move to host for debug-only)
 
     thrust::for_each(m_triangles_d.begin(), m_triangles_d.end(), [=] __device__ (const TriRef &tri) {
         size_t num_iterations;
@@ -245,6 +187,10 @@ void Slicer::slice(uint32_t slice_y, SliceT& out_slice)
      });
 
     CHECK_CU(cudaDeviceSynchronize());
+
+    // TODO (idea): a single thread could take too many iterations (because triangle AABB is too large), and it could be
+    //  a BOTTLENECK.
+    //  Solution: consider splitting large triangles before voxelization
 
     printf("[Slicer] Slice Y: %d; Min iters: %d, Max iters: %d, Tot intersections: %d, Min intersections: %d, Max intersections: %d\n",
         slice_y,

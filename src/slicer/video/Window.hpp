@@ -21,6 +21,8 @@ namespace lego_builder
         void end_frame();
 
         [[nodiscard]] bool should_close() const;
+
+        bool is_key_pressed(int key) const;
     };
 
 }
