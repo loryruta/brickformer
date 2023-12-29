@@ -28,20 +28,24 @@ public:
     std::string elapsed_time_str()
     {
         uint64_t ns = elapsed_nanos();
-        uint64_t ms = ns / 1000;
+        double ms = double(ns / 1000.0) / 1000.0;
+        double s = ms / 1000.0;
 
-        double s = double(ms) / 1000.0;
         if (s >= 0.1)
         {
-            std::stringstream stream; // <format> header not available with g++-12
-            stream << std::fixed << std::setprecision(2) << s;
+            std::stringstream stream;  // <format> header not available with g++-12
+            stream << std::fixed << std::setprecision(1) << s;
             return stream.str() + " s";
         }
-        else if (ms > 0)
-            return std::to_string(ms) + " ms";
+        else if (ms >= 0.001)
+        {
+            std::stringstream stream;  // <format> header not available with g++-12
+            stream << std::fixed << std::setprecision(3) << ms;
+            return stream.str() + " ms";
+        }
         else
         {
-            return std::to_string(ns);
+            return std::to_string(ns) + " ns";
         }
     }
 };
