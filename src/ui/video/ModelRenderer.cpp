@@ -226,5 +226,7 @@ BakedModel ModelRenderer::bake_model(const Model& model)
         baked_model.m_meshes.emplace_back(std::move(baked_mesh));
     }
 
+    printf("[ModelRenderer] Model baked\n");
+
     return baked_model;
 }
