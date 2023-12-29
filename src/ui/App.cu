@@ -6,6 +6,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#include "util/StopWatch.hpp"
 #include "video/gl_helpers.hpp"
 
 using namespace lego_builder;
@@ -14,7 +15,7 @@ using namespace lego_builder;
 App::App(Window& window) :
     m_window(window)
 {
-    m_model_path = "/home/loryruta/CLionProjects/lego-builder/resources/models/prehistoric_planet_tyrannosaurus_rex_model.glb";
+    m_model_path = "/home/loryruta/CLionProjects/lego-builder/resources/models/shinto_shrine.glb";
     m_slice_side = 256;
 
     // Initialize imgui
@@ -30,6 +31,9 @@ App::App(Window& window) :
 
     m_color_map_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
     m_proximity_map_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
+    m_subslice0_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
+    m_subslice1_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
+    m_subslice2_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
 }
 
 App::~App()
@@ -56,30 +60,46 @@ void App::on_model_load(const Model& model)
     });
 }
 
-void App::on_slice_begin(uint32_t slice_y)
-{
-}
-
-void App::on_place(uint32_t slice_y, const Placement& placement, float reward)
-{
-}
-
-void App::on_slice_end(uint32_t slice_y)
+void App::enqueue_and_wait_copy_maps_job()
 {
     m_job_queue.push([this]()
     {
-        copy_color_map();
-        copy_proximity_map();
+         copy_color_map();
+         copy_proximity_map();
+         write_placement_maps();
     });
-
-    // Block until manually resumed (ENTER pressed)
-    m_arpenteur_should_run = false;
-    m_arpenteur_should_run.wait(false);
 
     // Wait for the pushed jobs to be executed before continuing (avoid concurrency)
     {
         std::unique_lock<std::mutex> lock(m_job_queue_mutex);
         m_job_queue_cond_var.wait(lock, [this]() { return m_job_queue.empty(); });
+    }
+}
+
+void App::on_placement_begin(uint32_t slice_y)
+{
+    enqueue_and_wait_copy_maps_job();
+    m_placement_stopwatch.reset();
+}
+
+void App::on_place(uint32_t slice_y, const Placement& placement, float reward)
+{
+    if (m_placement_stopwatch.elapsed_millis() >= 1000 * k_placement_visualization_period)
+    {
+        enqueue_and_wait_copy_maps_job();
+        m_placement_stopwatch.reset();
+    }
+}
+
+void App::on_placement_end(uint32_t slice_y)
+{
+    enqueue_and_wait_copy_maps_job();
+
+    if (!m_autorun)
+    {
+        // Block until manually resumed (ENTER pressed)
+        m_arpenteur_should_run = false;
+        m_arpenteur_should_run.wait(false);
     }
 }
 
@@ -135,9 +155,6 @@ void transform_image(
     num_blocks.z = 1;
 
     dim3 block_dim(32, 32, 1);
-
-    printf("INVOKING transform_image_kernel %d,%d,%d ; %d,%d,%d\n", num_blocks.x, num_blocks.y, num_blocks.z, block_dim.x, block_dim.y, block_dim.z);
-
     transform_image_kernel<<<num_blocks, block_dim>>>(src_image_d, dst_image_d);
     CHECK_CU(cudaDeviceSynchronize());
 }
@@ -163,6 +180,48 @@ void App::copy_proximity_map()
     transform_image(m_arpenteur->m_prev_proximity_map, tmp_image, transform_proximity_map);  // Fake CLion error :')
 
     m_proximity_map_cuda_mapping->copy_from(tmp_image);
+}
+
+void App::write_placement_maps()
+{
+    StopWatch stop_watch{};
+
+    printf("[App] Writing placements to textures for visualization...\n");
+
+    DeviceImage<4, uint8_t> tmp_subslice0_image = DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr);
+    DeviceImage<4, uint8_t> tmp_subslice1_image = DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr);
+    DeviceImage<4, uint8_t> tmp_subslice2_image = DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr);
+
+    tmp_subslice0_image.fill(0);
+    tmp_subslice1_image.fill(0);
+    tmp_subslice2_image.fill(0);
+
+    PlacementHash hash_func{};
+    for (std::pair<Placement, uint8_t> entry : m_arpenteur->m_stacked_placements)
+    {
+        Placement& placement = entry.first;
+        uint8_t subslice_mask = entry.second;
+        assert(subslice_mask);  // Shouldn't be zero
+
+        uint64_t hash = hash_func(placement);
+
+        glm::vec<4, uint8_t> v{};
+        v.x = glm::abs(glm::sin(hash * 0.147f)) * 255.0f;
+        v.y = glm::abs(glm::cos(hash * 0.843f)) * 255.0f;
+        v.z = glm::abs(glm::sin(hash * 0.239f)) * 255.0f;
+        v.w = 255;
+
+        if (subslice_mask & 0x1) tmp_subslice0_image.write_pixel(placement.m_x, placement.m_y, v);
+        if (subslice_mask & 0x2) tmp_subslice1_image.write_pixel(placement.m_x, placement.m_y, v);
+        if (subslice_mask & 0x4) tmp_subslice2_image.write_pixel(placement.m_x, placement.m_y, v);
+    }
+
+    m_subslice0_cuda_mapping->copy_from(tmp_subslice0_image);
+    m_subslice1_cuda_mapping->copy_from(tmp_subslice1_image);
+    m_subslice2_cuda_mapping->copy_from(tmp_subslice2_image);
+
+    std::string duration_str = stop_watch.elapsed_time_str();
+    printf("[App] Placements written in %s\n", duration_str.c_str());
 }
 
 void App::show_model_window()
@@ -192,31 +251,69 @@ void App::show_model_window()
     ImGui::End();
 }
 
-void App::show_color_map_window()
+void App::show_placement_map_window()
 {
-    if (ImGui::Begin("Color map"))
+    if (ImGui::Begin("Placement maps"))
     {
-        ImVec2 image_size{256, 256};
-        ImGui::Image(reinterpret_cast<void*>(m_color_map_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
-    }
-    ImGui::End();
-}
+        ImVec2 window_size = ImGui::GetWindowSize();
+        ImVec2 image_size(window_size.y, window_size.y);
 
-void App::show_proximity_map_window()
-{
-    if (ImGui::Begin("Proximity map"))
-    {
-        ImVec2 image_size{256, 256};
-        ImGui::Image(reinterpret_cast<void*>(m_proximity_map_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+        ImGui::RadioButton("Color map", (int*) &m_visualized_map, VisualizeMapType_ColorMap);
+        ImGui::SameLine();
+        ImGui::RadioButton("Placement map", (int*) &m_visualized_map, VisualizeMapType_PlacementMap);
+        ImGui::SameLine();
+        ImGui::RadioButton("Proximity map (previous slice)", (int*) &m_visualized_map, VisualizeMapType_ProximityMap);
+
+        // Color map
+        if (m_visualized_map == VisualizeMapType_ColorMap)
+        {
+            ImGui::NewLine();
+            ImGui::Image(reinterpret_cast<void*>(m_color_map_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+        }
+        // Proximity map
+        else if (m_visualized_map == VisualizeMapType_ProximityMap)
+        {
+            ImGui::NewLine();
+            ImGui::Image(reinterpret_cast<void*>(m_proximity_map_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+        }
+        // Placement map
+        else if (m_visualized_map == VisualizeMapType_PlacementMap)
+        {
+            if (ImGui::ArrowButton("subslice_left", ImGuiDir_Left) && m_visualized_subslice_idx > 0)
+            {
+                if (m_visualized_subslice_idx > 0) --m_visualized_subslice_idx;
+            }
+            ImGui::SameLine();
+            if (ImGui::ArrowButton("subslice_right", ImGuiDir_Right) && m_visualized_subslice_idx < 2)
+            {
+                if (m_visualized_subslice_idx < 2) ++m_visualized_subslice_idx;
+            }
+            ImGui::SameLine();
+            ImGui::Text("Slice %d/2", m_visualized_subslice_idx);
+
+            if (m_visualized_subslice_idx == 0)
+            {
+                ImGui::Image(reinterpret_cast<void*>(m_subslice0_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+            }
+            else if (m_visualized_subslice_idx == 1)
+            {
+                ImGui::Image(reinterpret_cast<void*>(m_subslice1_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+            }
+            else
+            {
+                ImGui::Image(reinterpret_cast<void*>(m_subslice2_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+            }
+        }
     }
     ImGui::End();
 }
 
 void App::render()
 {
+    ImGui::ShowDemoWindow();
+
     show_model_window();
-    show_color_map_window();
-    show_proximity_map_window();
+    show_placement_map_window();
 }
 
 void App::run()
@@ -226,7 +323,9 @@ void App::run()
 
     m_window.set_key_callback([&](int key, int scancode, int action, int mods)
     {
-        if (key == GLFW_KEY_ENTER && action == GLFW_PRESS)
+        bool is_space = key == GLFW_KEY_SPACE && action == GLFW_PRESS;
+
+        if ((key == GLFW_KEY_ENTER && action == GLFW_PRESS) || is_space)
         {
             // Resume the Arpenteur thread (by default it stops after a slice is completed)
             m_arpenteur_should_run = true;
@@ -234,6 +333,8 @@ void App::run()
         }
 
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) m_window.set_should_close(true);  // Bye bye! :)
+
+        if (is_space) m_autorun = !m_autorun;
     });
 
     // Loop
@@ -276,5 +377,6 @@ void App::run()
         m_job_queue_cond_var.notify_all();  // Notify arpenteur thread that the job queue is now empty
     }
 
+    // TODO STOP THE ARPENTEUR!
     arpenteur_thread.join();
 }

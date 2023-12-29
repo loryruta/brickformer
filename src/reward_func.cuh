@@ -14,21 +14,18 @@ template<typename CALLBACK>
 __device__
 inline void iterate_brick_grid(CALLBACK callback)
 {
-    uint32_t lane_i = cub::LaneId();  // TODO threadIdx.x & 0x1F ?
-    uint32_t lane_x = lane_i % 5;
-    uint32_t lane_y = lane_i / 5;
+    uint32_t tx = threadIdx.x % 5;
+    uint32_t ty = threadIdx.x / 5;
 
-    if (lane_y >= 5) return;
+    uint32_t num_items_x = div_ceil(BRICK_MAX_WIDTH, 5);
+    uint32_t num_items_y = div_ceil(BRICK_MAX_HEIGHT, 5);
 
-    const uint32_t k_item_w = div_ceil(BRICK_MAX_WIDTH, 5);
-    const uint32_t k_item_h = div_ceil(BRICK_MAX_HEIGHT, 5);
-
-    for (uint32_t item_x = 0; item_x < k_item_w; item_x++)
+    for (uint32_t item_x = 0; item_x < num_items_x; item_x++)
     {
-        for (uint32_t item_y = 0; item_y < k_item_h; item_y++)
+        for (uint32_t item_y = 0; item_y < num_items_y; item_y++)
         {
-            uint32_t bx = lane_x * k_item_w + item_x;
-            uint32_t by = lane_y * k_item_h + item_y;
+            uint32_t bx = tx * num_items_x + item_x;
+            uint32_t by = ty * num_items_y + item_y;
 
             if (bx < BRICK_MAX_WIDTH && by < BRICK_MAX_HEIGHT) callback(bx, by);
         }
@@ -81,6 +78,10 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
 {
     auto& brick = k_bricks[placement.m_bid];
 
+    bool should_print = false;
+    //should_print = (blockIdx.x == 10123 || blockIdx.x == 3648 || blockIdx.x == 1182 || blockIdx.x == 1 || blockIdx.x == 68939) && threadIdx.x == 0;
+    //should_print = placement.m_x == 134 && placement.m_y == 255 && placement.m_bid == 14;
+
     ColorMapT* color_map_d = arpenteur.m_color_map_d;
     ProximityMapT* prev_proximity_map_d = arpenteur.m_prev_proximity_map_d;
     PlacementMapT* prev_placements_d = arpenteur.m_prev_placements_d;
@@ -109,8 +110,11 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
 
         if (brick[bx][by])
         {
+            if (should_print) printf("%d : bx: %d, by: %d, mx: %d, my: %d, colormap w: %d, colormap h: %d\n",
+                       blockIdx.x, bx, by, mx, my, color_map_d->m_width, color_map_d->m_height);
+
            // Placement out of bounds
-           is_outside |= mx >= color_map_d->m_width && my >= color_map_d->m_height;
+           is_outside |= mx >= color_map_d->m_width || my >= color_map_d->m_height;
 
            // Placement would overlap a previous placement on the current layer
            is_overlapping |= cur_placements_d->read_pixel(mx, my).x != 0;
@@ -129,6 +133,7 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
            // Take the previous slice, and check the BID. If different from *the last* (heuristic to optimize), then
            // we count it as a newly connected brick
            uint16_t prev_bid = prev_placements_d->read_pixel(mx, my).x;
+           //if (should_print) printf("%d : prev_bid: %d\n", blockIdx.x, prev_bid);
            if (last_prev_bid != prev_bid)
            {
                ++num_connected_bricks;
@@ -139,12 +144,6 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
         }
     });
 
-    // Important: if the warp's thread didn't cover any grid's cell (i.e. callback wasn't invoked).
-    // The score must be zero!
-
-    bool discard = is_outside || is_overlapping;
-    discard = __any_sync(FULL_MASK, discard);
-
     // Warp reduce (loops are unrolled)
     num_covered_map_cells = warp_add(num_covered_map_cells);
     brick_size = warp_add(brick_size);
@@ -153,6 +152,15 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
     num_connected_bricks = warp_add(num_connected_bricks);
     highest_proximity = warp_max(highest_proximity);
 
+    if (should_print) printf("%d : outside: %s, overlapping: %s\n", threadIdx.x, is_outside ? "y" : "n", is_overlapping ? "y" : "n");
+
+    bool discard = false;
+    discard |= brick_size == 0;  // Empty brick
+    discard |= __any_sync(FULL_MASK, is_outside || is_overlapping);
+    if (should_print && discard) printf("%d : discard -> outside|overlapping\n", blockIdx.x);
+
+    // The brick doesn't connect to any brick of the previous subslice; note: for the very first subslice (first call),
+    // the previous placements map is expected to be filled with values >0!
     bool is_floating = num_connected_bricks == 0;
     if constexpr (IS_SUBSLICE0)
     {
@@ -160,7 +168,12 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
         // cluster is "far enough" (albeit the threshold), then accept the placement
         is_floating &= highest_proximity > arpenteur.m_proximity_threshold;
     }
+    if (should_print && is_floating) printf("%d : floating -> discard\n", blockIdx.x);
     discard |= is_floating;
+
+    if (discard) return 0.0f;  // Reward 0: the placement will be below the acceptable threshold
+
+    // Evaluate the reward: how good is this placement?
 
     float an = float(num_neighbors) / float(num_connectible_sides);
     float bn = float(brick_size) / float(BRICK_MAX_WIDTH * BRICK_MAX_HEIGHT);
@@ -168,26 +181,27 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
     float dn = float(num_connected_bricks) / float(brick_size);
     float pn = float(highest_proximity) / float(PROXIMITY_MAP_HIGH_VALUE);
 
-    float reward = 0.0f; // How good is this placement?
-    if (!discard)
+    //if (should_print) printf("%d : an: %.3f, bn: %.3f, cn: %.3f, dn: %.3f, pn: %.3f\n", blockIdx.x,an,bn,cn,dn,pn);
+
+    float a = an * an * an;                  // Adjacency factor [0.0, 1.0]
+    float b = bn;                            // Block size factor [0.0, 1.0]
+    float c = 0.7f * (cn * cn * cn) + 0.1f;  // Color factor [0.1, 0.8]
+
+    float d = dn;  // Connectivity factor [0.0, 1.0]
+    if constexpr (!IS_SUBSLICE0)
     {
-        float a = an * an * an;                  // Adjacency factor [0.0, 1.0]
-        float b = bn;                            // Block size factor [0.0, 1.0]
-        float c = 0.7f * (cn * cn * cn) + 0.1f;  // Color factor [0.1, 0.8]
-
-        float d = dn;  // Connectivity factor [0.0, 1.0]
-        if constexpr (!IS_SUBSLICE0)
-        {
-            // For subslice >0, we want to stack up bricks. So we reverse the connectivity factor!
-            d = 1.0f - dn;
-        }
-
-        // Proximity factor [0.0, 1.0]
-        // Reward the more the brick is near to the model!
-        float p = pn;
-
-        reward = glm::max(a, c) * ((b + d + p) / 3.0f);
+        // For subslice >0, we want to stack up bricks. So we reverse the connectivity factor!
+        d = 1.0f - dn;
     }
+
+    // Proximity factor [0.0, 1.0]
+    // Reward the more the brick is near to the model!
+    float p = pn;
+
+    float reward = glm::max(a, c) * ((b + d + p) / 3.0f);
+
+    //if (should_print) printf("reward -> %.3f\n", reward);
+
     return reward;
 }
 }  // namespace lego_builder
