@@ -11,10 +11,10 @@ l'Arpenteur is a tool meant to convert a 3D model (in .gltf or .glb format) to a
 
 For buildable I mean that bricks stack up, layer by layer, floating bricks aren't allowed. The model is also designed to
 strive to use larger bricks (thus using the fewest bricks as possible). Stability is guaranteed by, at a given layer, maximizing the number of
-connected bricks of the previous layer; thus avoiding "brick piles" that would possibly lead to a fragile
-construction.
+connected bricks of the previous layer; thus avoiding "brick piles" that could lead to a fragile construction.
+
 
 #### Why the name?
 
-"l'Arpenteur" means "the surveyor" in French ("il geometra" in Italian). And no, I'm not French neither I speak it, but sounded
-cool so here it is.
+"l'Arpenteur", from French, means "the surveyor" in English ("il geometra" in Italian).
+And no, I'm not French neither I speak it, but sounded cool so here it is.
