@@ -1,7 +1,6 @@
 #include "Camera.hpp"
 
-#include "glm/gtx/compatibility.hpp"
-#include "glm/gtx/transform.hpp"
+#include <glm/gtx/transform.hpp>
 
 using namespace lego_builder;
 
@@ -59,5 +58,5 @@ void Camera::look_at(const glm::vec3& position)
 {
     glm::vec3 forward = glm::normalize(position - m_position);
     m_pitch = glm::asin(forward.y);
-    m_yaw = glm::atan2(forward.x, forward.z);
+    m_yaw = glm::atan(forward.x, forward.z);
 }
