@@ -6,8 +6,8 @@
 #include <glm/glm.hpp>
 
 #include "ArpenteurListener.hpp"
+#include "Slicer.cuh"
 #include "SpreadValue.cuh"
-#include "slicer/Slicer.cuh"
 #include "types.hpp"
 
 namespace lego_builder
@@ -21,7 +21,7 @@ public:
     /// A copy of this class' data on device.
     Arpenteur* m_self_d;  // Used to avoid having kernels with many parameters
 
-    const char* m_model_path;  // More advanced types wouldn't be supported in device code
+    std::string m_model_path;
     uint32_t m_slice_side;
     ArpenteurListener* m_listener;
 
@@ -73,9 +73,9 @@ public:
 
     void run();
 
-private:
-    void init_placements();
+    void init_placements();  // TODO should be private but error...
 
+private:
     /// Transforms the model vertices such that fits the user input grid (i.e. the Slicer space).
     void transform_model_to_grid();
 
@@ -89,7 +89,7 @@ private:
     void place(const Placement& placement);
 
     template<uint32_t SUBSLICE>
-    void place_on_slice(uint32_t slice_y);
+    size_t place_on_subslice(uint32_t slice_y);
 };
 
 }

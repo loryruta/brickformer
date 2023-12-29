@@ -1,14 +1,14 @@
 #include <filesystem>
 #include <thread>
 
-#include "Model.hpp"
-#include "GltfLoader.hpp"
-#include "video/ViewModelApp.hpp"
-#include "video/gl_helpers.hpp"
-#include "video/cuda_interop_helpers.cuh"
-#include "../StopWatch.hpp"
-#include "video/TextureRenderer.hpp"
 #include "Slicer.cuh"
+#include "StopWatch.hpp"
+#include "model/GltfLoader.hpp"
+#include "model/Model.hpp"
+#include "video/TextureRenderer.hpp"
+#include "video/ViewModelApp.hpp"
+#include "video/cuda_interop_helpers.cuh"
+#include "video/gl_helpers.hpp"
 
 using namespace lego_builder;
 using namespace std::chrono_literals;

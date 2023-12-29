@@ -2,7 +2,7 @@
 
 #include <thrust/copy.h>
 
-#include "intersections.cuh"
+#include "util/intersections.cuh"
 
 using namespace lego_builder;
 
@@ -59,6 +59,8 @@ void set_voxel(int x, int z, const glm::vec4& color, SliceT* out_slice)
             if (!out_slice->is_valid_pixel(x, z)) continue;
 
             out_slice->write_pixel(nx, nz, color);
+
+            //printf("Setting voxel; (%d, %d): (%.3f, %.3f, %.3f, %.3f)\n", nx, nz, color.r, color.g, color.b, color.a);
         }
     }
 }
@@ -89,8 +91,8 @@ glm::vec4 interp_triangle_color(const glm::vec3& p, const TriRef& tri_ref, const
     // https://codeplea.com/triangular-interpolation
 
     float dn = (pv1.y - pv2.y) * (pv0.x - pv2.x) + (pv2.x - pv1.x) * (pv0.y - pv2.y);
-    float w0 = ((pv1.y - pv2.y) * (p.x - pv2.x) + (pv2.x - pv1.x) * (p.y - pv2.y)) / dn;
-    float w1 = ((pv2.y - pv0.y) * (p.x - pv2.x) + (pv0.x - pv2.x) * (p.y - pv2.y)) / dn;
+    float w0 = ((pv1.y - pv2.y) * (pp.x - pv2.x) + (pv2.x - pv1.x) * (pp.y - pv2.y)) / dn;
+    float w1 = ((pv2.y - pv0.y) * (pp.x - pv2.x) + (pv0.x - pv2.x) * (pp.y - pv2.y)) / dn;
     float w2 = 1.0f - w0 - w1;
 
     const DeviceMesh& mesh = model.m_meshes[tri_ref.m_mesh_idx];

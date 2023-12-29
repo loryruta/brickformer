@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include <glm/glm.hpp>
+#include "glm/glm.hpp"
 
 #include "Model.hpp"
 

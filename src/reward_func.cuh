@@ -1,9 +1,9 @@
 #pragma once
 
-#include "types.hpp"
+#include "Arpenteur.cuh"
 #include "bricks.cuh"
 #include "primitives.cuh"
-#include "Arpenteur.cuh"
+#include "types.hpp"
 
 namespace lego_builder
 {

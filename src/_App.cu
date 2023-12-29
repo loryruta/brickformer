@@ -1,4 +1,4 @@
-#include "App.cuh"
+#include "_App.cuh"
 
 #include <cinttypes>
 
@@ -70,8 +70,7 @@ namespace
 
 } // namespace
 
-
-App::App()
+_App::_App()
 {
     InitWindow(800, 800, "lego_builder   ¯\\_(ツ)_/¯");
 
@@ -83,19 +82,19 @@ App::App()
     m_prv_placement_map_texture = create_texture(MAP_WIDTH, MAP_HEIGHT);
 }
 
-App::~App()
+_App::~_App()
 {
     UnloadTexture(m_color_map_texture);
 
     CloseWindow();
 }
 
-bool App::should_close() const
+bool _App::should_close() const
 {
     return WindowShouldClose();
 }
 
-void App::set_color_map(const ColorMapT* d_color_map)
+void _App::set_color_map(const ColorMapT* d_color_map)
 {
     copy_to_gl_texture(to_host(d_color_map), m_color_map_texture);
 }
@@ -132,7 +131,7 @@ __global__ void convert_placement_map(const PlacementMapT* d_placement_map, Devi
     }
 }
 
-void App::set_placement_map(const PlacementMapT* d_placement_map)
+void _App::set_placement_map(const PlacementMapT* d_placement_map)
 {
     auto image_info = to_host(d_placement_map);
     size_t num_blocks = (image_info.m_width * image_info.m_height) << 10;
@@ -143,7 +142,7 @@ void App::set_placement_map(const PlacementMapT* d_placement_map)
     copy_to_gl_texture(to_host(m_tmp_image), m_cur_placement_map_texture);
 }
 
-void App::draw()
+void _App::draw()
 {
     int screen_w = GetScreenWidth();
     int screen_h = GetScreenHeight();

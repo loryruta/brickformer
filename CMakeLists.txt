@@ -7,20 +7,20 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${CMAKE_CXX_COMPILER}")
 
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 
+# Allow calling __host__ constexpr functions from __device__ code
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 #   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -g")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
 
-project(lego_builder LANGUAGES C CXX CUDA)
+project(arpenteur LANGUAGES C CXX CUDA)
 
-# -----------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
 # External libraries
-# -----------------------------------------------------------------------------------------------
-
-# bvh
-add_subdirectory(external/bvh)
+# ------------------------------------------------------------------------------------------------
 
 # cccl
 set(CCCL_ENABLE_LIBCUDACXX OFF)
@@ -35,70 +35,54 @@ add_subdirectory(external/cccl)
 add_library(glad STATIC external/glad/src/gl.c)
 target_include_directories(glad PUBLIC external/glad/include/)
 
+# glfw
+set(BUILD_SHARED_LIBS OFF)
+set(GLFW_BUILD_EXAMPLES OFF)
+set(GLFW_BUILD_TESTS OFF)
+set(GLFW_BUILD_DOCS OFF)
+set(GLFW_INSTALL OFF)
+add_subdirectory(external/glfw)
+
 # GLM
 add_library(glm INTERFACE)
 target_include_directories(glm INTERFACE external/glm)
 
-# raylib
-set(BUILD_EXAMPLES OFF)
-add_subdirectory(external/raylib)
+# imgui
+add_library(imgui STATIC
+    external/imgui/imgui.cpp
+    external/imgui/imgui_demo.cpp
+    external/imgui/imgui_draw.cpp
+    external/imgui/imgui_tables.cpp
+    external/imgui/imgui_widgets.cpp
+    )
+
+target_include_directories(imgui PUBLIC external/imgui)
 
 # stb
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE external/stb)
 
 # tinygltf
-option(TINYGLTF_BUILD_LOADER_EXAMPLE  OFF)
-option(TINYGLTF_BUILD_GL_EXAMPLES OFF)
-option(TINYGLTF_BUILD_VALIDATOR_EXAMPLE OFF)
-option(TINYGLTF_BUILD_BUILDER_EXAMPLE OFF)
-option(TINYGLTF_HEADER_ONLY OFF)
-option(TINYGLTF_INSTALL OFF)
+set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF)
+set(TINYGLTF_BUILD_GL_EXAMPLES OFF)
+set(TINYGLTF_BUILD_VALIDATOR_EXAMPLE OFF)
+set(TINYGLTF_BUILD_BUILDER_EXAMPLE OFF)
+set(TINYGLTF_HEADER_ONLY OFF)
+set(TINYGLTF_INSTALL OFF)
 add_subdirectory(external/tinygltf)
 
-# -----------------------------------------------------------------------------------------------
-# Targets
-# -----------------------------------------------------------------------------------------------
+# imgui backend OpenGL3+GLFW
+add_library(imgui_backend_opengl3_glfw STATIC
+    external/imgui/backends/imgui_impl_opengl3.cpp
+    external/imgui/backends/imgui_impl_glfw.cpp
+    )
 
-# lego_builder_lib
-add_library(lego_builder_lib INTERFACE
-        src/bricks.cuh
-        src/DeviceImage.cuh
-        src/misc.cuh
-        src/primitives.cuh
-)
+target_include_directories(imgui_backend_opengl3_glfw PUBLIC external/imgui/backends)
 
-target_link_libraries(lego_builder_lib INTERFACE CCCL::CCCL)
-target_link_libraries(lego_builder_lib INTERFACE glm)
-target_link_libraries(lego_builder_lib INTERFACE raylib)
-target_link_libraries(lego_builder_lib INTERFACE stb)
+target_link_libraries(imgui_backend_opengl3_glfw PRIVATE glfw)
+target_link_libraries(imgui_backend_opengl3_glfw PRIVATE imgui)
 
-# lego_builder
-add_executable(lego_builder
-        src/App.cu
-        src/App.cuh
-        src/_main.cu
-        src/StopWatch.hpp
-        src/Bvh.cuh
-        src/SpreadValue.cuh
-        src/SpreadValue.cu
-        src/Arpenteur.cuh
-        src/Arpenteur.cu
-        src/reward_func.cuh
-        src/Placement.hpp
-        src/reward_funcs.cu
-        src/color_func.cuh
-        src/ArpenteurListener.hpp)
+# ------------------------------------------------------------------------------------------------
 
-target_link_libraries(lego_builder PRIVATE lego_builder_lib)
-
-# lego_builder_test
-add_executable(lego_builder_test
-        test/main.cu
-)
-
-target_include_directories(lego_builder_test PRIVATE ./src)
-target_link_libraries(lego_builder_test PRIVATE lego_builder_lib)
-
-# slicer
-add_subdirectory(src/slicer)
+add_subdirectory(src)
+add_subdirectory(test)

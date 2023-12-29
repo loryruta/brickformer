@@ -5,8 +5,8 @@
 #include <glm/glm.hpp>
 #include <thrust/device_vector.h>
 
-#include "../DeviceImage.cuh"
-#include "DeviceModel.cuh"
+#include "DeviceImage.cuh"
+#include "model/DeviceModel.cuh"
 
 namespace lego_builder
 {

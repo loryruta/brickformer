@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "Window.hpp"
 #include "ModelRenderer.hpp"
+#include "Window.hpp"
 
 namespace lego_builder
 {

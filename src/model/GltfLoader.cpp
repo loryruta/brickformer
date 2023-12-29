@@ -1,7 +1,7 @@
 #include "GltfLoader.hpp"
 
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/quaternion.hpp"
 
 using namespace lego_builder;
 
@@ -110,12 +110,29 @@ void GltfLoader::parse_indices(const tinygltf::Primitive& primitive, Mesh& mesh)
 
     tinygltf::Accessor& indices_accessor = m_gltf_model.accessors[primitive.indices];
     assert(indices_accessor.count % 3 == 0);
-    assert(indices_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT);
+    assert(indices_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ||
+           indices_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT
+           );
     assert(indices_accessor.type == TINYGLTF_TYPE_SCALAR);
 
     mesh.m_indices.resize(indices_accessor.count);
 
-    copy_accessor_data(indices_accessor, TINYGLTF_TYPE_SCALAR, (uint8_t*) mesh.m_indices.data(), 0);
+    if (indices_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+    {
+        copy_accessor_data(indices_accessor, TINYGLTF_TYPE_SCALAR, (uint8_t*) mesh.m_indices.data(), 0);
+    }
+    else if (indices_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+    {
+        std::vector<uint16_t> indices16(indices_accessor.count);
+        copy_accessor_data(indices_accessor, TINYGLTF_TYPE_SCALAR, (uint8_t*) indices16.data(), 0);
+
+        // Yay! Iterate them... :')
+        for (size_t i = 0; i < indices_accessor.count; i++) mesh.m_indices[i] = indices16[i];
+    }
+    else
+    {
+        assert(false); // TODO throw an exception or smth
+    }
 }
 
 void GltfLoader::parse_mesh(const tinygltf::Mesh& gltf_mesh, const glm::mat4& transform)
@@ -175,7 +192,7 @@ void GltfLoader::parse_node(const tinygltf::Node& gltf_node, glm::mat4 transform
         }
     }
 
-    if (gltf_node.mesh > 0) parse_mesh(m_gltf_model.meshes.at(gltf_node.mesh), transform);
+    if (gltf_node.mesh >= 0) parse_mesh(m_gltf_model.meshes.at(gltf_node.mesh), transform);
 
     for (int child_idx : gltf_node.children)
     {
@@ -210,7 +227,7 @@ void GltfLoader::load_textures()
         texture.m_height = gltf_image.height;
         texture.m_image_data = gltf_image.image;
 
-        printf("[GltfParser] Texture loaded; Width: %d, Height: %d, Data size: %zu\n",
+        printf("[GltfLoader] Texture loaded; Width: %d, Height: %d, Data size: %zu\n",
                texture.m_width, texture.m_height, texture.m_image_data.size());
 
         m_model.m_textures.emplace_back(texture);

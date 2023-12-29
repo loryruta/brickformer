@@ -1,5 +1,6 @@
 #pragma once
 
+#include "model/Model.hpp"
 #include "types.hpp"
 
 namespace lego_builder
@@ -10,8 +11,12 @@ public:
     explicit ArpenteurListener() = default;
     ~ArpenteurListener() = default;
 
-    virtual void on_place(uint32_t slice_y, const Placement& placement, float reward) {}
+    virtual void on_model_load(const Model& model) {};
 
-    virtual void on_slice_end(uint32_t slice_y);
+    virtual void on_slice_begin(uint32_t slice_y) {};
+
+    virtual void on_place(uint32_t slice_y, const Placement& placement, float reward) {};
+
+    virtual void on_slice_end(uint32_t slice_y) {};
 };
 } // namespace lego_builder

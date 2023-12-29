@@ -1,11 +1,12 @@
 #pragma once
 
+#include <memory>
 #include <unordered_map>
 
 #include <glad/gl.h>
 
-#include "Model.hpp"
 #include "Camera.hpp"
+#include "model/Model.hpp"
 
 namespace lego_builder
 {

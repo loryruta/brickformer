@@ -12,11 +12,11 @@
 #include <thrust/extrema.h>
 #include <stb_image.h> // STB_IMAGE_IMPLEMENTATION already by raylib
 
-#include "bricks.cuh"
 #include "DeviceImage.cuh"
+#include "_App.cuh"
+#include "bricks.cuh"
 #include "primitives.cuh"
-#include "App.cuh"
-#include "StopWatch.hpp"
+#include "util/StopWatch.hpp"
 
 #define MAP_WIDTH  256
 #define MAP_HEIGHT 256

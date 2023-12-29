@@ -1,6 +1,6 @@
 #pragma once
 
-#include <glm/glm.hpp>
+#include "glm/glm.hpp"
 
 namespace lego_builder
 {
@@ -32,108 +32,6 @@ namespace lego_builder
         return (a.m_min.x <= b.m_max.x && a.m_max.x >= b.m_min.x) &&
                (a.m_min.y <= b.m_max.y && a.m_max.y >= b.m_min.y) &&
                (a.m_min.z <= b.m_max.z && a.m_max.z >= b.m_min.z);
-    }
-
-    __host__ __device__
-    inline bool intersect_triangle2(Box const& box, Triangle const& tri)
-    {
-        // Source:
-        // https://omnigoat.github.io/2015/03/09/box-triangle-intersection/
-
-        // bounding-box test
-        Box tri_box{};
-        tri_box.m_min = tri.min();
-        tri_box.m_max = tri.max();
-        if (!intersect_box(box, tri_box)) return false;
-
-        // TODO not working :(
-
-        const glm::vec3 k_tri_edges[]{
-            tri.m_b - tri.m_a,
-            tri.m_c - tri.m_b,
-            tri.m_a - tri.m_c
-        };
-
-        const glm::vec3 k_tri_normal = glm::cross(k_tri_edges[0], k_tri_edges[1]);
-
-        // triangle-normal
-        auto n = k_tri_normal;
-
-        // p & delta-p
-        auto p  = box.m_min;
-        auto dp = box.m_max - p;
-
-        // test for triangle-plane/box overlap
-        glm::vec3 c = glm::vec3(
-                n.x > 0.0f ? dp.x : 0.0f,
-                n.y > 0.0f ? dp.y : 0.0f,
-                n.z > 0.0f ? dp.z : 0.0f
-                );
-
-        auto d1 = glm::dot(n, c - tri.m_a);
-        auto d2 = glm::dot(n, dp - c - tri.m_a);
-
-        if ((glm::dot(n, p) + d1) * (glm::dot(n, p) + d2) > 0.0f)
-            return false;
-
-        // xy-plane projection-overlap
-        auto xym = (n.z < 0.0f ? -1.0f : 1.0f);
-        auto ne0xy = glm::vec4{-k_tri_edges[0].y, k_tri_edges[0].x, 0.0f, 0.0f} * xym;
-        auto ne1xy = glm::vec4{-k_tri_edges[1].y, k_tri_edges[1].x, 0.0f, 0.0f} * xym;
-        auto ne2xy = glm::vec4{-k_tri_edges[2].y, k_tri_edges[2].x, 0.0f, 0.0f} * xym;
-
-        auto v0xy = glm::vec4{tri.m_a.x, tri.m_a.y, 0.0f, 0.0f};
-        auto v1xy = glm::vec4{tri.m_b.x, tri.m_b.y, 0.0f, 0.0f};
-        auto v2xy = glm::vec4{tri.m_c.x, tri.m_c.y, 0.0f, 0.0f};
-
-        float de0xy = -glm::dot(ne0xy, v0xy) + std::max(0.0f, dp.x * ne0xy.x) + std::max(0.0f, dp.y * ne0xy.y);
-        float de1xy = -glm::dot(ne1xy, v1xy) + std::max(0.0f, dp.x * ne1xy.x) + std::max(0.0f, dp.y * ne1xy.y);
-        float de2xy = -glm::dot(ne2xy, v2xy) + std::max(0.0f, dp.x * ne2xy.x) + std::max(0.0f, dp.y * ne2xy.y);
-
-        auto pxy = glm::vec4(p.x, p.y, 0.0f, 0.0f);
-
-        if ((glm::dot(ne0xy, pxy) + de0xy) < 0.0f || (glm::dot(ne1xy, pxy) + de1xy) < 0.0f || (glm::dot(ne2xy, pxy) + de2xy) < 0.0f)
-            return false;
-
-        // yz-plane projection overlap
-        auto yzm = (n.x < 0.0f ? -1.0f : 1.0f);
-        auto ne0yz = glm::vec4{-k_tri_edges[0].z, k_tri_edges[0].y, 0.0f, 0.0f} * yzm;
-        auto ne1yz = glm::vec4{-k_tri_edges[1].z, k_tri_edges[1].y, 0.0f, 0.0f} * yzm;
-        auto ne2yz = glm::vec4{-k_tri_edges[2].z, k_tri_edges[2].y, 0.0f, 0.0f} * yzm;
-
-        auto v0yz = glm::vec4{tri.m_a.y, tri.m_a.z, 0.0f, 0.0f};
-        auto v1yz = glm::vec4{tri.m_b.y, tri.m_b.z, 0.0f, 0.0f};
-        auto v2yz = glm::vec4{tri.m_c.y, tri.m_c.z, 0.0f, 0.0f};
-
-        float de0yz = -glm::dot(ne0yz, v0yz) + std::max(0.0f, dp.y * ne0yz.x) + std::max(0.0f, dp.z * ne0yz.y);
-        float de1yz = -glm::dot(ne1yz, v1yz) + std::max(0.0f, dp.y * ne1yz.x) + std::max(0.0f, dp.z * ne1yz.y);
-        float de2yz = -glm::dot(ne2yz, v2yz) + std::max(0.0f, dp.y * ne2yz.x) + std::max(0.0f, dp.z * ne2yz.y);
-
-        auto pyz = glm::vec4(p.y, p.z, 0.0f, 0.0f);
-
-        if ((glm::dot(ne0yz, pyz) + de0yz) < 0.0f || (glm::dot(ne1yz, pyz) + de1yz) < 0.0f || (glm::dot(ne2yz, pyz) + de2yz) < 0.0f)
-            return false;
-
-        // zx-plane projection overlap
-        auto zxm = (n.y < 0.0f ? -1.0f : 1.0f);
-        auto ne0zx = glm::vec4{-k_tri_edges[0].x, k_tri_edges[0].z, 0.0f, 0.0f} * zxm;
-        auto ne1zx = glm::vec4{-k_tri_edges[1].x, k_tri_edges[1].z, 0.0f, 0.0f} * zxm;
-        auto ne2zx = glm::vec4{-k_tri_edges[2].x, k_tri_edges[2].z, 0.0f, 0.0f} * zxm;
-
-        auto v0zx = glm::vec4{tri.m_a.z, tri.m_a.x, 0.0f, 0.0f};
-        auto v1zx = glm::vec4{tri.m_b.z, tri.m_b.x, 0.0f, 0.0f};
-        auto v2zx = glm::vec4{tri.m_c.z, tri.m_c.x, 0.0f, 0.0f};
-
-        float de0zx = -glm::dot(ne0zx, v0zx) + std::max(0.0f, dp.y * ne0zx.x) + std::max(0.0f, dp.z * ne0zx.y);
-        float de1zx = -glm::dot(ne1zx, v1zx) + std::max(0.0f, dp.y * ne1zx.x) + std::max(0.0f, dp.z * ne1zx.y);
-        float de2zx = -glm::dot(ne2zx, v2zx) + std::max(0.0f, dp.y * ne2zx.x) + std::max(0.0f, dp.z * ne2zx.y);
-
-        auto pzx = glm::vec4(p.z, p.x, 0.0f, 0.0f);
-
-        if ((glm::dot(ne0zx, pzx) + de0zx) < 0.0f || (glm::dot(ne1zx, pzx) + de1zx) < 0.0f || (glm::dot(ne2zx, pzx) + de2zx) < 0.0f)
-            return false;
-
-        return true;
     }
 
     __host__ __device__
@@ -216,5 +114,107 @@ namespace lego_builder
         }
 
         return true;  // No separating axis found, they intersect!
+    }
+
+    __host__ __device__
+    inline bool intersect_triangle2(Box const& box, Triangle const& tri)
+    {
+        // Source:
+        // https://omnigoat.github.io/2015/03/09/box-triangle-intersection/
+
+        // bounding-box test
+        Box tri_box{};
+        tri_box.m_min = tri.min();
+        tri_box.m_max = tri.max();
+        if (!intersect_box(box, tri_box)) return false;
+
+        // TODO not working :(
+
+        const glm::vec3 k_tri_edges[]{
+            tri.m_b - tri.m_a,
+            tri.m_c - tri.m_b,
+            tri.m_a - tri.m_c
+        };
+
+        const glm::vec3 k_tri_normal = glm::cross(k_tri_edges[0], k_tri_edges[1]);
+
+        // triangle-normal
+        auto n = k_tri_normal;
+
+        // p & delta-p
+        auto p  = box.m_min;
+        auto dp = box.m_max - p;
+
+        // test for triangle-plane/box overlap
+        glm::vec3 c = glm::vec3(
+            n.x > 0.0f ? dp.x : 0.0f,
+            n.y > 0.0f ? dp.y : 0.0f,
+            n.z > 0.0f ? dp.z : 0.0f
+        );
+
+        auto d1 = glm::dot(n, c - tri.m_a);
+        auto d2 = glm::dot(n, dp - c - tri.m_a);
+
+        if ((glm::dot(n, p) + d1) * (glm::dot(n, p) + d2) > 0.0f)
+            return false;
+
+        // xy-plane projection-overlap
+        auto xym = (n.z < 0.0f ? -1.0f : 1.0f);
+        auto ne0xy = glm::vec4{-k_tri_edges[0].y, k_tri_edges[0].x, 0.0f, 0.0f} * xym;
+        auto ne1xy = glm::vec4{-k_tri_edges[1].y, k_tri_edges[1].x, 0.0f, 0.0f} * xym;
+        auto ne2xy = glm::vec4{-k_tri_edges[2].y, k_tri_edges[2].x, 0.0f, 0.0f} * xym;
+
+        auto v0xy = glm::vec4{tri.m_a.x, tri.m_a.y, 0.0f, 0.0f};
+        auto v1xy = glm::vec4{tri.m_b.x, tri.m_b.y, 0.0f, 0.0f};
+        auto v2xy = glm::vec4{tri.m_c.x, tri.m_c.y, 0.0f, 0.0f};
+
+        float de0xy = -glm::dot(ne0xy, v0xy) + std::max(0.0f, dp.x * ne0xy.x) + std::max(0.0f, dp.y * ne0xy.y);
+        float de1xy = -glm::dot(ne1xy, v1xy) + std::max(0.0f, dp.x * ne1xy.x) + std::max(0.0f, dp.y * ne1xy.y);
+        float de2xy = -glm::dot(ne2xy, v2xy) + std::max(0.0f, dp.x * ne2xy.x) + std::max(0.0f, dp.y * ne2xy.y);
+
+        auto pxy = glm::vec4(p.x, p.y, 0.0f, 0.0f);
+
+        if ((glm::dot(ne0xy, pxy) + de0xy) < 0.0f || (glm::dot(ne1xy, pxy) + de1xy) < 0.0f || (glm::dot(ne2xy, pxy) + de2xy) < 0.0f)
+            return false;
+
+        // yz-plane projection overlap
+        auto yzm = (n.x < 0.0f ? -1.0f : 1.0f);
+        auto ne0yz = glm::vec4{-k_tri_edges[0].z, k_tri_edges[0].y, 0.0f, 0.0f} * yzm;
+        auto ne1yz = glm::vec4{-k_tri_edges[1].z, k_tri_edges[1].y, 0.0f, 0.0f} * yzm;
+        auto ne2yz = glm::vec4{-k_tri_edges[2].z, k_tri_edges[2].y, 0.0f, 0.0f} * yzm;
+
+        auto v0yz = glm::vec4{tri.m_a.y, tri.m_a.z, 0.0f, 0.0f};
+        auto v1yz = glm::vec4{tri.m_b.y, tri.m_b.z, 0.0f, 0.0f};
+        auto v2yz = glm::vec4{tri.m_c.y, tri.m_c.z, 0.0f, 0.0f};
+
+        float de0yz = -glm::dot(ne0yz, v0yz) + std::max(0.0f, dp.y * ne0yz.x) + std::max(0.0f, dp.z * ne0yz.y);
+        float de1yz = -glm::dot(ne1yz, v1yz) + std::max(0.0f, dp.y * ne1yz.x) + std::max(0.0f, dp.z * ne1yz.y);
+        float de2yz = -glm::dot(ne2yz, v2yz) + std::max(0.0f, dp.y * ne2yz.x) + std::max(0.0f, dp.z * ne2yz.y);
+
+        auto pyz = glm::vec4(p.y, p.z, 0.0f, 0.0f);
+
+        if ((glm::dot(ne0yz, pyz) + de0yz) < 0.0f || (glm::dot(ne1yz, pyz) + de1yz) < 0.0f || (glm::dot(ne2yz, pyz) + de2yz) < 0.0f)
+            return false;
+
+        // zx-plane projection overlap
+        auto zxm = (n.y < 0.0f ? -1.0f : 1.0f);
+        auto ne0zx = glm::vec4{-k_tri_edges[0].x, k_tri_edges[0].z, 0.0f, 0.0f} * zxm;
+        auto ne1zx = glm::vec4{-k_tri_edges[1].x, k_tri_edges[1].z, 0.0f, 0.0f} * zxm;
+        auto ne2zx = glm::vec4{-k_tri_edges[2].x, k_tri_edges[2].z, 0.0f, 0.0f} * zxm;
+
+        auto v0zx = glm::vec4{tri.m_a.z, tri.m_a.x, 0.0f, 0.0f};
+        auto v1zx = glm::vec4{tri.m_b.z, tri.m_b.x, 0.0f, 0.0f};
+        auto v2zx = glm::vec4{tri.m_c.z, tri.m_c.x, 0.0f, 0.0f};
+
+        float de0zx = -glm::dot(ne0zx, v0zx) + std::max(0.0f, dp.y * ne0zx.x) + std::max(0.0f, dp.z * ne0zx.y);
+        float de1zx = -glm::dot(ne1zx, v1zx) + std::max(0.0f, dp.y * ne1zx.x) + std::max(0.0f, dp.z * ne1zx.y);
+        float de2zx = -glm::dot(ne2zx, v2zx) + std::max(0.0f, dp.y * ne2zx.x) + std::max(0.0f, dp.z * ne2zx.y);
+
+        auto pzx = glm::vec4(p.z, p.x, 0.0f, 0.0f);
+
+        if ((glm::dot(ne0zx, pzx) + de0zx) < 0.0f || (glm::dot(ne1zx, pzx) + de1zx) < 0.0f || (glm::dot(ne2zx, pzx) + de2zx) < 0.0f)
+            return false;
+
+        return true;
     }
 }

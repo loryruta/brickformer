@@ -1,23 +1,23 @@
 #include "Arpenteur.cuh"
 
-#include <cstring>
-
 #include <thrust/extrema.h>
 
 #include "bricks.cuh"
+#include "model/GltfLoader.hpp"
 #include "reward_func.cuh"
-#include "slicer/GltfLoader.hpp"
+#include "util/StopWatch.hpp"
 
 using namespace lego_builder;
 
 Arpenteur::Arpenteur(const std::filesystem::path& model_path, uint32_t slice_side, ArpenteurListener& listener)
 {
-    m_model_path = strdup((char*) model_path.u8string().c_str());
+    m_model_path = model_path;
     m_slice_side = slice_side;
     m_listener = &listener;
 
     m_num_placements = slice_side * slice_side * k_num_bricks;
 
+    CHECK_CU(cudaMalloc(&m_placements_d, m_num_placements * sizeof(Placement)));
     init_placements();
 
     CHECK_CU(cudaMalloc(&m_rewards_d, m_num_placements * sizeof(float)));
@@ -35,20 +35,27 @@ Arpenteur::Arpenteur(const std::filesystem::path& model_path, uint32_t slice_sid
     m_cur_placements_d = to_device(m_cur_placements);
 }
 
-void Arpenteur::init_placements()
+__global__
+void init_placements_kernel(Arpenteur* self)
 {
-    CHECK_CU(cudaMalloc(&m_placements_d, m_num_placements * sizeof(Placement)));
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    uint32_t slice_side = m_slice_side;
+    uint32_t slice_side = self->m_slice_side;
 
-    thrust::for_each(m_placements_d, m_placements_d + m_num_placements, [=] __device__ (Placement& placement)
+    if (i < self->m_num_placements)
     {
-        size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+        Placement& placement = self->m_placements_d[i];
 
         placement.m_bid = i % k_num_bricks;
         placement.m_x = (i / k_num_bricks) % slice_side;
         placement.m_y = i / (slice_side * k_num_bricks);
-    });
+    }
+}
+
+void Arpenteur::init_placements()
+{
+    size_t num_blocks = div_ceil<size_t>(m_num_placements, 1024);
+    init_placements_kernel<<<num_blocks, 1024>>>(to_device(*this));  // this to device, even if some fields aren't initialized yet
 }
 
 void Arpenteur::transform_model_to_grid()
@@ -75,12 +82,19 @@ void init_proximity_map_from_color_map_kernel(const ColorMapT* color_map, Proxim
     if (px < color_map->m_width && py < color_map->m_height)
     {
         bool colored = color_map->read_pixel(px, py).a > 0;
-        if (colored) out_proximity_map->write_pixel(px, py, glm::vec<1, uint8_t>{PROXIMITY_MAP_HIGH_VALUE});
+        if (colored)
+        {
+            uint8_t v = PROXIMITY_MAP_HIGH_VALUE;
+            v |= 0x80;
+            out_proximity_map->write_pixel(px, py, glm::vec<1, uint8_t>{v});
+        }
     }
 }
 
 void Arpenteur::init_proximity_map_from_color_map()
 {
+    m_prev_proximity_map.fill(0);
+
     dim3 num_blocks{};
     num_blocks.x = div_ceil<size_t>(m_slice_side, 32);
     num_blocks.y = div_ceil<size_t>(m_slice_side, 32);
@@ -144,9 +158,9 @@ void Arpenteur::place(const Placement& placement)
 }
 
 template<uint32_t SUBSLICE>
-void Arpenteur::place_on_slice(uint32_t slice_y)
+size_t Arpenteur::place_on_subslice(uint32_t slice_y)
 {
-    size_t iteration = 0;
+    size_t placed_bricks = 0;
 
     while (true)
     {
@@ -160,22 +174,37 @@ void Arpenteur::place_on_slice(uint32_t slice_y)
         if (!inserted) iterator->second |= subslice_bit;
         // If the placement is stacked 3 times (3 equal placements for the slice), then can be compacted
 
-        m_listener->on_place(slice_y, placement, reward);
+        if (m_listener) m_listener->on_place(slice_y, placement, reward);
 
-        ++iteration;
+        ++placed_bricks;
     }
+
+    return placed_bricks;
 }
 
 void Arpenteur::run()
 {
     m_self_d = to_device(*this);  // Make a screenshot of "this" and transfer it on device
 
-    // Load model
+    StopWatch stop_watch{};
+    std::string dur_str;
+
+    // LOAD MODEL
+    printf("[Arpenteur] Loading model: %s\n", m_model_path.c_str());
+
+    stop_watch.reset();
+
     GltfLoader gltf_loader{};
     m_model = std::make_unique<Model>(gltf_loader.load_file(m_model_path));
 
     transform_model_to_grid();
 
+    if (m_listener) m_listener->on_model_load(*m_model);
+
+    dur_str = stop_watch.elapsed_time_str();
+    printf("[Arpenteur] Model loaded in %s\n", dur_str.c_str());
+
+    //
     uint32_t num_slices = glm::ceil(m_model->size().y);
 
     m_slicer = std::make_unique<Slicer>(*m_model, m_slice_side);
@@ -187,38 +216,66 @@ void Arpenteur::run()
 
     for (uint32_t slice_y = 0; slice_y < num_slices; slice_y++)
     {
+        printf("[Arpenteur] Slice %d\n", slice_y);
+
         m_stacked_placements.clear();
         m_next_pid = 0;
 
-        // FOREACH SLICE
+        // SLICE BEGIN
+        if (m_listener) m_listener->on_slice_begin(slice_y);
 
-        // COMPUTE SLICE
-        // Obtain the color map from the model (i.e. voxelization)
+        // COMPUTE SLICE (i.e. voxelization)
+        stop_watch.reset();
+
         m_slicer->slice(slice_y, m_color_map);
 
+        printf("[Arpenteur]   COMPUTE SLICE; %s\n", stop_watch.elapsed_time_str().c_str());
+
+        //
+        size_t num_placed_bricks;
+
         // PLACE0
+        stop_watch.reset();
+
         m_prev_placements.copy_from(m_cur_placements);
         m_cur_placements.fill(0);
 
-        place_on_slice<0>(slice_y);
+        num_placed_bricks = place_on_subslice<0>(slice_y);
+
+        printf("[Arpenteur]   PLACE 0; Placed bricks: %zu, Elapsed: %s\n",
+               num_placed_bricks, stop_watch.elapsed_time_str().c_str());
 
         // PLACE1
+        stop_watch.reset();
+
         m_prev_placements.copy_from(m_cur_placements);
         m_cur_placements.fill(0);
 
-        place_on_slice<1>(slice_y);
+        num_placed_bricks = place_on_subslice<1>(slice_y);
+
+        printf("[Arpenteur]   PLACE 1; Placed bricks: %zu, Elapsed: %s\n",
+               num_placed_bricks, stop_watch.elapsed_time_str().c_str());
 
         // PLACE2
+        stop_watch.reset();
+
         m_prev_placements.copy_from(m_cur_placements);
         m_cur_placements.fill(0);
 
-        place_on_slice<2>(slice_y);
+        num_placed_bricks = place_on_subslice<2>(slice_y);
+
+        printf("[Arpenteur]   PLACE 2; Placed bricks: %zu, Elapsed: %s\n",
+               num_placed_bricks, stop_watch.elapsed_time_str().c_str());
 
         // SLICE END
-        m_listener->on_slice_end(slice_y);
+        if (m_listener) m_listener->on_slice_end(slice_y);
 
         // COMPUTE PROXIMITY MAP
+        stop_watch.reset();
+
         init_proximity_map_from_color_map();          // Init colored cells to PROXIMITY_MAP_HIGH_VALUE
         m_spread_value.spread(m_prev_proximity_map);  // Spread the init values on the proximity map
+
+        printf("[Arpenteur]   COMPUTE PROXIMITY MAP; %s\n", stop_watch.elapsed_time_str().c_str());
     }
 }

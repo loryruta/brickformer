@@ -6,8 +6,8 @@
 
 namespace lego_builder
 {
-    class App
-    {
+    class _App
+{
     private:
         Texture m_color_map_texture;
 
@@ -18,8 +18,8 @@ namespace lego_builder
         Texture m_prv_placement_map_texture;
 
     public:
-        explicit App();
-        ~App();
+        explicit _App();
+        ~_App();
 
         [[nodiscard]] bool should_close() const;
 
