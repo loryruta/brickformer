@@ -166,7 +166,7 @@ void SpreadValue::spread(DeviceImage<1, uint8_t>& image)
     uint32_t* changes_d = to_device<uint32_t>(0);
 
     const uint32_t k_kernel_size = 3;
-    const uint32_t k_num_iterations = 64;
+    const uint32_t k_num_iterations = 16;
 
     size_t i = 0;
 
@@ -191,7 +191,7 @@ void SpreadValue::spread(DeviceImage<1, uint8_t>& image)
         // TODO (improvement) exit when no change is done! (now leads to infinite loop :( )
 
         //if (changes == 0) break;
-        if (i > 100) break;
+        if (i > k_num_iterations) break;
 
         ++i;
     }
