@@ -101,7 +101,7 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     int brick_size = 0;              // The number of set cells of the brick's grid
     int num_neighbors = 0;           // A number *proportional* to the number of bricks adjacent to the placement (likely >=)
     int num_connectible_sides = 0;   // A number *proportional* to the number of connectible sides
-    int num_connected_bricks = 0;    // A number *proportional* to the number of bricks connected in the previous subslice
+    int num_connected_bricks = 0;    // A number *proportional* to the number of different connected bricks in the previous subslice
     int last_prev_bid = 0;
     int highest_proximity = 0;
 
@@ -135,7 +135,6 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
            // Take the previous slice, and check the BID. If different from *the last* (heuristic to optimize), then
            // we count it as a newly connected brick
            uint16_t prev_bid = prev_placements_d->read_pixel(mx, my).x;
-           //if (should_print) printf("%d : prev_bid: %d\n", blockIdx.x, prev_bid);
            if (last_prev_bid != prev_bid)
            {
                ++num_connected_bricks;
@@ -204,22 +203,17 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
 
     //if (should_print) printf("%d : an: %.3f, bn: %.3f, cn: %.3f, dn: %.3f, pn: %.3f\n", blockIdx.x,an,bn,cn,dn,pn);
 
-    float a = an * an * an;                  // Adjacency factor [0.0, 1.0]
-    float b = bn;                            // Block size factor [0.0, 1.0]
-    float c = 0.7f * (cn * cn * cn) + 0.1f;  // Color factor [0.1, 0.8]
+    float a = 0.8f * an * an * an;  // Adjacency factor [0.0, 0.8]
+    float c = 0.7f * cn * cn + 0.1f;  // Color factor [0.1, 0.8]
 
-    float d = dn;  // Connectivity factor [0.0, 1.0]
+    // Connectivity factor [0.0, 1.0]
     if constexpr (!IS_SUBSLICE0)
     {
         // For subslice >0, we want to stack up bricks. So we reverse the connectivity factor!
-        d = 1.0f - dn;
+        dn = 1.0f - dn;
     }
 
-    // Proximity factor [0.0, 1.0]
-    // Reward the more the brick is near to the model!
-    float p = pn;
-
-    out_reward = glm::max(a, c) * ((b + d + p) / 3.0f);
+    out_reward = glm::max(a, c) + 0.2f * (bn + pn) / 2.0f;  // TODO dn
 
     return true;
 }

@@ -23,42 +23,47 @@ void spread_kernel(
 
     if (px >= src_image->m_width || py >= src_image->m_height) return;  // Discard the warp
 
-    uint8_t pv = src_image->read_pixel(px, py).x;
-    if ((pv & 0x80) != 0)
-    {
-        // Already processed, write the value as is
-        dst_image->write_pixel(px, py, glm::vec<1, uint8_t>{pv});
-        return;
-    }
-
     int32_t half_k = kernel_size >> 1;
 
-    int32_t lane_x = threadIdx.x;
-    int32_t lane_y = threadIdx.y;
-
-    int32_t num_items_x = div_ceil<int32_t>(kernel_size, 5);
-    int32_t num_items_y = div_ceil<int32_t>(kernel_size,5);
+    int32_t lane_x = threadIdx.x % 5;
+    int32_t lane_y = threadIdx.x / 5;
 
     uint8_t max_val = 0;
-    for (int32_t ix = lane_x * num_items_x - half_k; ix < (lane_x + 1) * num_items_x - half_k; ix++)
+    if (lane_y < 5)
     {
-        for (int32_t iy = lane_y * num_items_y - half_k; iy < (lane_y + 1) * num_items_y - half_k; iy++)
+        int32_t num_items_x = div_ceil<int32_t>(kernel_size, 5);
+        int32_t num_items_y = div_ceil<int32_t>(kernel_size,5);
+
+        for (int32_t ix = lane_x * num_items_x - half_k; ix < (lane_x + 1) * num_items_x - half_k; ix++)
         {
-            int32_t nx = px + ix;
-            int32_t ny = py + iy;
+            for (int32_t iy = lane_y * num_items_y - half_k; iy < (lane_y + 1) * num_items_y - half_k; iy++)
+            {
+                int32_t nx = px + ix;
+                int32_t ny = py + iy;
 
-            uint8_t nv = 0;
-            if (nx < src_image->m_width && ny < src_image->m_height)
-                nv = src_image->read_pixel(nx, ny).x & 0x7F;
+                uint8_t nv = 0;
+                if (nx < src_image->m_width && ny < src_image->m_height)
+                    nv = src_image->read_pixel(nx, ny).x & 0x7F;
 
-            max_val = glm::max(max_val, nv);
+                max_val = glm::max(max_val, nv);
+            }
         }
     }
 
     max_val = warp_max(max_val);
 
-    uint8_t new_val = max_val > 0 ? max_val - 1 : 0;
-    if (pv != new_val) atomicAdd(changes, 1);
+    uint8_t new_val;
+    uint8_t cur_val = src_image->read_pixel(px, py).x;
+    if ((cur_val & 0x80) != 0)
+    {
+        // Already processed, write the value as is. Doing the check at the end to allow warp operations
+        new_val = cur_val;
+    }
+    else
+    {
+        new_val = max_val > 0 ? max_val - 1 : 0;
+        if (cur_val != new_val) atomicAdd(changes, 1);
+    }
     dst_image->write_pixel(px, py, glm::vec<1, uint8_t>{uint8_t(new_val)});
 }
 
@@ -180,7 +185,7 @@ void SpreadValue::spread(DeviceImage<1, uint8_t>& image)
         num_blocks.y = image.m_height;
         num_blocks.z = 1;
 
-        dim3 block_dim(5, 5, 1);  // Each pixel is fit in a warp (used to visit the kernel)
+        size_t block_dim = 32;  // Each pixel is fit in a warp (used to visit the kernel)
         spread_kernel<<<num_blocks, block_dim>>>(paired_images[i % 2], paired_images[(i + 1) % 2], k_kernel_size, changes_d);
         CHECK_CU(cudaDeviceSynchronize());
 

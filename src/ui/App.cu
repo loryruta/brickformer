@@ -6,6 +6,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#include "bricks.cuh"
 #include "util/StopWatch.hpp"
 #include "video/gl_helpers.hpp"
 
@@ -16,7 +17,7 @@ App::App(Window& window) :
     m_window(window)
 {
     m_model_path = "/home/loryruta/CLionProjects/lego-builder/resources/models/shinto_shrine.glb";
-    m_slice_side = 256;
+    m_slice_side = 64;
 
     // Initialize imgui
     ImGui::CreateContext();
@@ -211,9 +212,19 @@ void App::write_placement_maps()
         v.z = glm::abs(glm::sin(hash * 0.239f)) * 255.0f;
         v.w = 255;
 
-        if (subslice_mask & 0x1) tmp_subslice0_image.write_pixel(placement.m_x, placement.m_y, v);
-        if (subslice_mask & 0x2) tmp_subslice1_image.write_pixel(placement.m_x, placement.m_y, v);
-        if (subslice_mask & 0x4) tmp_subslice2_image.write_pixel(placement.m_x, placement.m_y, v);
+        auto& brick = k_bricks[placement.m_bid];
+        for (int by = 0; by < BRICK_MAX_HEIGHT; by++)
+        {
+            for (int bx = 0; bx < BRICK_MAX_WIDTH; bx++)
+            {
+                if (brick[by][bx])
+                {
+                    if (subslice_mask & 0x1) tmp_subslice0_image.write_pixel(placement.m_x + bx, placement.m_y + by, v);
+                    if (subslice_mask & 0x2) tmp_subslice1_image.write_pixel(placement.m_x + bx, placement.m_y + by, v);
+                    if (subslice_mask & 0x4) tmp_subslice2_image.write_pixel(placement.m_x + bx, placement.m_y + by, v);
+                }
+            }
+        }
     }
 
     m_subslice0_cuda_mapping->copy_from(tmp_subslice0_image);
