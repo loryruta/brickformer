@@ -24,20 +24,24 @@ namespace lego_builder
         __host__ __device__ T operator()(const T& a, const T& b) const { return a + b; }
     };
 
+    /// Perform a reduction within a warp. We expect all threads to run this function.
+    /// @return the reduced value for the current lane. The aggregated value is held by the lane 0
     template<typename T, typename OPERATION>
     __device__ T warp_reduce(T val)
     {
         static const OPERATION op; // TODO better constraint between T and OPERATION
 
+        assert(__activemask() == FULL_MASK);
+
         // Reference:
         // https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/
 
-        for (int off = 16; off > 0; off /= 2)
+#pragma unroll
+        for (int offset = 16; offset > 0; offset /= 2)
         {
-            T other_val = __shfl_down_sync(FULL_MASK, val, off);
+            T other_val = __shfl_down_sync(FULL_MASK, val, offset);
             val = op(other_val, val);
         }
-        return val;
     }
 
     template<typename T>

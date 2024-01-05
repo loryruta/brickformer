@@ -38,6 +38,8 @@ public:
     Placement* m_placements_d;  ///< Device array containing all possible placements.
     float* m_rewards_d;         ///< Device array of rewards, each corresponding to a placement.
 
+    bool* m_valid_placements_d;  ///< Device array telling if the i-th placement is valid (optimization).
+
     ColorMapT m_color_map;
     ColorMapT* m_color_map_d;
 

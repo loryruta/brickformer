@@ -14,18 +14,19 @@ template<typename CALLBACK>
 __device__
 inline void iterate_brick_grid(CALLBACK callback)
 {
-    uint32_t tx = threadIdx.x % 5;
-    uint32_t ty = threadIdx.x / 5;
+    int lane_i = threadIdx.x & 0x1f;
+    int lane_x = lane_i % 5;
+    int lane_y = lane_i / 5;
 
-    uint32_t num_items_x = div_ceil(BRICK_MAX_WIDTH, 5);
-    uint32_t num_items_y = div_ceil(BRICK_MAX_HEIGHT, 5);
+    int num_items_x = div_ceil(BRICK_MAX_WIDTH, 5);   // 2
+    int num_items_y = div_ceil(BRICK_MAX_HEIGHT, 5);  // 2
 
-    for (uint32_t item_x = 0; item_x < num_items_x; item_x++)
+    for (int ix = 0; ix < num_items_x; ix++)
     {
-        for (uint32_t item_y = 0; item_y < num_items_y; item_y++)
+        for (int iy = 0; iy < num_items_y; iy++)
         {
-            uint32_t bx = tx * num_items_x + item_x;
-            uint32_t by = ty * num_items_y + item_y;
+            int bx = lane_x * num_items_x + ix;
+            int by = lane_y * num_items_y + iy;
 
             if (bx < BRICK_MAX_WIDTH && by < BRICK_MAX_HEIGHT) callback(bx, by);
         }
@@ -35,12 +36,11 @@ inline void iterate_brick_grid(CALLBACK callback)
 __device__
 inline void inspect_neighborhood(
     const Placement& placement,
-    int32_t bx,
-    int32_t by,
+    int bx, int by,
     const PlacementMapT* placement_map,
-    size_t& num_neighbors,
-    size_t& num_connectible_sides
-)
+    int& inout_num_neighbors,
+    int& inout_num_connectible_sides
+    )
 {
     auto& brick = k_bricks[placement.m_bid];
 
@@ -49,36 +49,38 @@ inline void inspect_neighborhood(
 
     if (mx + 1 < placement_map->m_width && (bx + 1 >= BRICK_MAX_WIDTH || !brick[bx + 1][by]))
     {
-        if (placement_map->read_pixel(mx + 1, my).x > 0) ++num_neighbors;
-        ++num_connectible_sides;
+        if (placement_map->read_pixel(mx + 1, my).x > 0) ++inout_num_neighbors;
+        ++inout_num_connectible_sides;
     }
 
     if (my + 1 < placement_map->m_width && (by + 1 >= BRICK_MAX_HEIGHT || !brick[bx][by + 1]))
     {
-        if (placement_map->read_pixel(mx, my + 1).x > 0) ++num_neighbors;
-        ++num_connectible_sides;
+        if (placement_map->read_pixel(mx, my + 1).x > 0) ++inout_num_neighbors;
+        ++inout_num_connectible_sides;
     }
 
     if (mx - 1 >= 0 && (bx - 1 < 0 || !brick[bx - 1][by]))
     {
-        if (placement_map->read_pixel(mx - 1, my).x > 0) ++num_neighbors;
-        ++num_connectible_sides;
+        if (placement_map->read_pixel(mx - 1, my).x > 0) ++inout_num_neighbors;
+        ++inout_num_connectible_sides;
     }
 
     if (my - 1 >= 0 && (by - 1 < 0 || !brick[bx][by - 1]))
     {
-        if (placement_map->read_pixel(mx, my - 1).x > 0) ++num_neighbors;
-        ++num_connectible_sides;
+        if (placement_map->read_pixel(mx, my - 1).x > 0) ++inout_num_neighbors;
+        ++inout_num_connectible_sides;
     }
 }
 
 template<bool IS_SUBSLICE0>
 __device__
-inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
+inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, float& out_reward)
 {
+    uint32_t warp_i = blockIdx.x * 32 + (threadIdx.x >> 5);
+
     auto& brick = k_bricks[placement.m_bid];
 
-    bool should_print = false;
+    const bool should_print = warp_i == 10938;
     //should_print = (blockIdx.x == 10123 || blockIdx.x == 3648 || blockIdx.x == 1182 || blockIdx.x == 1 || blockIdx.x == 68939) && threadIdx.x == 0;
     //should_print = placement.m_x == 134 && placement.m_y == 255 && placement.m_bid == 14;
 
@@ -95,23 +97,23 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
     // - if not subslice0, the similarity to previous slice placements covered (we want to stack them)
     bool is_outside = false;
     bool is_overlapping = false;
-    size_t num_covered_map_cells = 0;   // The number of cells of the underlying color_map being covered by the placement
-    size_t brick_size = 0;              // The number of set cells of the brick's grid
-    size_t num_neighbors = 0;           // A number *proportional* to the number of bricks adjacent to the placement (likely >=)
-    size_t num_connectible_sides = 0;   // A number *proportional* to the number of connectible sides
-    size_t num_connected_bricks = 0;    // A number *proportional* to the number of bricks connected in the previous subslice
-    uint32_t last_prev_bid = 0;
-    uint8_t highest_proximity = 0.0f;
+    int num_covered_map_cells = 0;   // The number of cells of the underlying color_map being covered by the placement
+    int brick_size = 0;              // The number of set cells of the brick's grid
+    int num_neighbors = 0;           // A number *proportional* to the number of bricks adjacent to the placement (likely >=)
+    int num_connectible_sides = 0;   // A number *proportional* to the number of connectible sides
+    int num_connected_bricks = 0;    // A number *proportional* to the number of bricks connected in the previous subslice
+    int last_prev_bid = 0;
+    int highest_proximity = 0;
 
     iterate_brick_grid([&](int32_t bx, int32_t by)
     {
-        uint32_t mx = placement.m_x + bx;
-        uint32_t my = placement.m_y + by;
+        int mx = placement.m_x + bx;
+        int my = placement.m_y + by;
 
         if (brick[bx][by])
         {
-            if (should_print) printf("%d : bx: %d, by: %d, mx: %d, my: %d, colormap w: %d, colormap h: %d\n",
-                       blockIdx.x, bx, by, mx, my, color_map_d->m_width, color_map_d->m_height);
+//            if (should_print) printf("%d : bx: %d, by: %d, mx: %d, my: %d, colormap w: %d, colormap h: %d\n",
+//                       blockIdx.x, bx, by, mx, my, color_map_d->m_width, color_map_d->m_height);
 
            // Placement out of bounds
            is_outside |= mx >= color_map_d->m_width || my >= color_map_d->m_height;
@@ -140,24 +142,33 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
                last_prev_bid = prev_bid;
            }
 
-           highest_proximity = glm::max(highest_proximity, prev_proximity_map_d->read_pixel(mx, my).x);
+           int proximity_val = prev_proximity_map_d->read_pixel(mx, my).x;
+           highest_proximity = glm::max(highest_proximity, proximity_val);
         }
     });
 
-    // Warp reduce (loops are unrolled)
-    num_covered_map_cells = warp_add(num_covered_map_cells);
-    brick_size = warp_add(brick_size);
-    num_neighbors = warp_add(num_neighbors);
-    num_connectible_sides = warp_add(num_connectible_sides);
-    num_connected_bricks = warp_add(num_connected_bricks);
-    highest_proximity = warp_max(highest_proximity);
+    // WARP REDUCTION
+    bool is_outside_or_overlapping = __any_sync(FULL_MASK, is_outside || is_overlapping);
 
-    if (should_print) printf("%d : outside: %s, overlapping: %s\n", threadIdx.x, is_outside ? "y" : "n", is_overlapping ? "y" : "n");
+    for (int offset = 16; offset > 0; offset /= 2)
+    {
+        num_covered_map_cells += __shfl_down_sync(FULL_MASK, num_covered_map_cells, offset);
+        brick_size += __shfl_down_sync(FULL_MASK, brick_size, offset);
+        num_neighbors += __shfl_down_sync(FULL_MASK, num_neighbors, offset);
+        num_connectible_sides += __shfl_down_sync(FULL_MASK, num_connectible_sides, offset);
+        num_connected_bricks += __shfl_down_sync(FULL_MASK, num_connected_bricks, offset);
+        highest_proximity = glm::max(highest_proximity, __shfl_down_sync(FULL_MASK, highest_proximity, offset));
+    }
+
+    // After reduction, only the first thread holds the aggregated values:
+    // it's the only one able to compute validity/reward!
+    if ((threadIdx.x & 0x1f) != 0) return false;
+
+    // ONLY THREAD 0 IS VALID FROM NOW ON
 
     bool discard = false;
     discard |= brick_size == 0;  // Empty brick
-    discard |= __any_sync(FULL_MASK, is_outside || is_overlapping);
-    if (should_print && discard) printf("%d : discard -> outside|overlapping\n", blockIdx.x);
+    discard |= is_outside_or_overlapping;
 
     // The brick doesn't connect to any brick of the previous subslice; note: for the very first subslice (first call),
     // the previous placements map is expected to be filled with values >0!
@@ -168,10 +179,20 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
         // cluster is "far enough" (albeit the threshold), then accept the placement
         is_floating &= highest_proximity > arpenteur.m_proximity_threshold;
     }
-    if (should_print && is_floating) printf("%d : floating -> discard\n", blockIdx.x);
     discard |= is_floating;
 
-    if (discard) return 0.0f;  // Reward 0: the placement will be below the acceptable threshold
+//    if (should_print)
+//    {
+//        printf("AFTER REDUCTION - WARP IDX: %d , THREAD IDX: %d, (%d, %d) -> BID: %d, Brick size: %d, Num neighbors: %d, "
+//               "Num connectible sides: %d, Num connected bricks: %d, Highest proximity: %d, Outside OR overlapping: %d, "
+//               "Floating: %d, Discard: %d\n",
+//               warp_i, threadIdx.x, placement.m_x, placement.m_y, placement.m_bid, brick_size,
+//               num_neighbors, num_connectible_sides, num_connected_bricks, highest_proximity, is_outside_or_overlapping,
+//               is_floating, discard
+//               );
+//    }
+
+    if (discard) return false; // Invalid!
 
     // Evaluate the reward: how good is this placement?
 
@@ -198,10 +219,8 @@ inline float eval_placement(const Arpenteur& arpenteur, Placement& placement)
     // Reward the more the brick is near to the model!
     float p = pn;
 
-    float reward = glm::max(a, c) * ((b + d + p) / 3.0f);
+    out_reward = glm::max(a, c) * ((b + d + p) / 3.0f);
 
-    //if (should_print) printf("reward -> %.3f\n", reward);
-
-    return reward;
+    return true;
 }
 }  // namespace lego_builder

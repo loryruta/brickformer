@@ -1,6 +1,7 @@
 #include "Arpenteur.cuh"
 
 #include <thrust/extrema.h>
+#include <cuda_profiler_api.h>
 
 #include "bricks.cuh"
 #include "model/GltfLoader.hpp"
@@ -21,6 +22,8 @@ Arpenteur::Arpenteur(const std::filesystem::path& model_path, uint32_t slice_sid
     init_placements();
 
     CHECK_CU(cudaMalloc(&m_rewards_d, m_num_placements * sizeof(float)));
+
+    CHECK_CU(cudaMalloc(&m_valid_placements_d, m_num_placements * sizeof(bool)));
 
     m_color_map = ColorMapT::create(slice_side, slice_side, nullptr);
     m_color_map_d = to_device(m_color_map);
@@ -109,33 +112,47 @@ template<bool IS_SUBSLICE0>
 __global__
 void eval_placements_kernel(Arpenteur* self)
 {
-    size_t i = blockIdx.x;
+    uint32_t warp_i = blockIdx.x * 32 + (threadIdx.x >> 5);
 
-    if (i < self->m_num_placements)
+    if (warp_i < self->m_num_placements)
     {
-        Placement& placement = self->m_placements_d[i];
+        if (!self->m_valid_placements_d[warp_i]) return;
 
-        float reward = eval_placement<IS_SUBSLICE0>(*self, placement);
-        self->m_rewards_d[i] = reward;
+        Placement& placement = self->m_placements_d[warp_i];
+
+        float reward;
+        bool is_valid = eval_placement<IS_SUBSLICE0>(*self, placement, reward);
+
+        if ((threadIdx.x & 0x1F) == 0)
+        {
+            if (!is_valid) self->m_valid_placements_d[warp_i] = false;
+            self->m_rewards_d[warp_i] = is_valid ? reward : 0.0f;
+        }
     }
 }
 
 template<uint32_t SUBSLICE>
 std::pair<Placement, float> Arpenteur::compute_next_placement()
 {
-    CHECK_CU(cudaMemset(m_rewards_d, 0, m_num_placements * sizeof(float)));
-    CHECK_CU(cudaDeviceSynchronize());
+    // Not necessary because every placement will write its reward
+    //CHECK_CU(cudaMemset(m_rewards_d, 0, m_num_placements * sizeof(float)));
+    //CHECK_CU(cudaDeviceSynchronize());
 
-    size_t num_blocks = m_num_placements;
-    size_t dim_block = 32;
+    CHECK_CU(cudaProfilerStart());
+
+    size_t num_blocks = div_ceil<size_t>(m_num_placements, 32);
+    size_t dim_block = 1024;
     eval_placements_kernel<SUBSLICE == 0><<<num_blocks, dim_block>>>(m_self_d);
     CHECK_CU(cudaDeviceSynchronize());
+
+    CHECK_CU(cudaProfilerStop());
 
     float* max_reward_d = thrust::max_element(
         thrust::device, m_rewards_d, m_rewards_d + m_num_placements);  // Fake IDE error on CLion :')
     size_t max_i = max_reward_d - m_rewards_d;
 
-    return {to_host(&m_placements_d[max_i]), to_host(max_reward_d)};
+    std::pair<Placement, float> result = {to_host(&m_placements_d[max_i]), to_host(max_reward_d)};
+    return result;
 }
 
 void Arpenteur::place(const Placement& placement)
@@ -163,13 +180,18 @@ size_t Arpenteur::place_on_subslice(uint32_t slice_y)
 {
     size_t num_placed_bricks = 0;
 
-    StopWatch log_stop_watch{};
+    StopWatch log_stopwatch{};
+
+    CHECK_CU(cudaMemset(m_valid_placements_d, true, m_num_placements * sizeof(bool)));
+    CHECK_CU(cudaDeviceSynchronize());
 
     while (true)
     {
         auto [placement, reward] = compute_next_placement<SUBSLICE>();
 
-        //printf("PLACEMENT %zu; Placement: (%d, %d) -> BID %d; Reward: %.3f\n", i + 1, placement.m_x, placement.m_y, placement.m_bid, reward);
+//        printf("PLACEMENT %zu; Placement: (%d, %d) -> BID %d; Reward: %.3f; Elapsed time: %s\n",
+//               num_placed_bricks + 1, placement.m_x, placement.m_y, placement.m_bid, reward,
+//               stopwatch.elapsed_time_str().c_str());
 
         if (reward < m_min_reward) break;
 
@@ -182,7 +204,7 @@ size_t Arpenteur::place_on_subslice(uint32_t slice_y)
 
         if (m_listener) m_listener->on_place(slice_y, placement, reward);
 
-        if (log_stop_watch.elapsed_millis() >= 5000)
+        if (log_stopwatch.elapsed_millis() >= 5000)
         {
             printf("[Arpenteur] PLACE %d; Placed bricks: %zu, Last placement: (%d, %d) -> BID %d, Last reward: %.3f, Reward threshold: %.3f\n",
                    SUBSLICE, num_placed_bricks,
@@ -190,7 +212,7 @@ size_t Arpenteur::place_on_subslice(uint32_t slice_y)
                    reward,
                    m_min_reward
                    );
-            log_stop_watch.reset();
+            log_stopwatch.reset();
         }
 
         ++num_placed_bricks;
