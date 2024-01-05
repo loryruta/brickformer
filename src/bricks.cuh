@@ -66,7 +66,7 @@ namespace lego_builder
              {1}},
 
             // 2x4
-            {{1, 1, 1, 1},  // TODO on the first dimension there's Y!!!
+            {{1, 1, 1, 1},
              {1, 1, 1, 1}},
 
             // 4x2

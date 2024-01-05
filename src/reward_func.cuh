@@ -47,25 +47,25 @@ inline void inspect_neighborhood(
     int32_t mx = placement.m_x + bx;
     int32_t my = placement.m_y + by;
 
-    if (mx + 1 < placement_map->m_width && (bx + 1 >= BRICK_MAX_WIDTH || !brick[bx + 1][by]))
+    if (mx + 1 < placement_map->m_width && (bx + 1 >= BRICK_MAX_WIDTH || !brick[by][bx + 1]))
     {
         if (placement_map->read_pixel(mx + 1, my).x > 0) ++inout_num_neighbors;
         ++inout_num_connectible_sides;
     }
 
-    if (my + 1 < placement_map->m_width && (by + 1 >= BRICK_MAX_HEIGHT || !brick[bx][by + 1]))
+    if (my + 1 < placement_map->m_width && (by + 1 >= BRICK_MAX_HEIGHT || !brick[by + 1][bx]))
     {
         if (placement_map->read_pixel(mx, my + 1).x > 0) ++inout_num_neighbors;
         ++inout_num_connectible_sides;
     }
 
-    if (mx - 1 >= 0 && (bx - 1 < 0 || !brick[bx - 1][by]))
+    if (mx - 1 >= 0 && (bx - 1 < 0 || !brick[by][bx - 1]))
     {
         if (placement_map->read_pixel(mx - 1, my).x > 0) ++inout_num_neighbors;
         ++inout_num_connectible_sides;
     }
 
-    if (my - 1 >= 0 && (by - 1 < 0 || !brick[bx][by - 1]))
+    if (my - 1 >= 0 && (by - 1 < 0 || !brick[by - 1][bx]))
     {
         if (placement_map->read_pixel(mx, my - 1).x > 0) ++inout_num_neighbors;
         ++inout_num_connectible_sides;
@@ -110,7 +110,7 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
         int mx = placement.m_x + bx;
         int my = placement.m_y + by;
 
-        if (brick[bx][by])
+        if (brick[by][bx])
         {
 //            if (should_print) printf("%d : bx: %d, by: %d, mx: %d, my: %d, colormap w: %d, colormap h: %d\n",
 //                       blockIdx.x, bx, by, mx, my, color_map_d->m_width, color_map_d->m_height);

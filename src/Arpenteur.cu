@@ -167,7 +167,7 @@ void Arpenteur::place(const Placement& placement)
     {
         for (uint8_t by = 0; by < BRICK_MAX_HEIGHT; by++)
         {
-            if (brick[bx][by])
+            if (brick[by][bx])
             {
                 m_cur_placements.write_pixel(placement.m_x + bx, placement.m_y + by, glm::vec<1, uint16_t>{pid});
             }
