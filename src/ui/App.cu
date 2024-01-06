@@ -199,10 +199,10 @@ void App::write_placement_maps()
     tmp_subslice2_image.fill(0);
 
     PlacementHash hash_func{};
-    for (std::pair<Placement, uint8_t> entry : m_arpenteur->m_stacked_placements)
+    for (ColoredPlacement& entry : m_arpenteur->m_colored_placements)
     {
-        Placement& placement = entry.first;
-        uint8_t subslice_mask = entry.second;
+        Placement& placement = entry.m_placement;
+        uint8_t subslice_mask = entry.m_subslice_mask;
         assert(subslice_mask);  // Shouldn't be zero
 
         uint64_t hash = hash_func(placement);
@@ -240,24 +240,22 @@ void App::add_placements_to_construction_model()
 {
     printf("[App] UPDATE CONSTRUCTION MODEL; Updating vertices...\n");
 
-    PlacementHash hash_func{};
-
-    for (auto& [placement, subslice_mask] : m_arpenteur->m_stacked_placements)
+    for (ColoredPlacement& colored_placement : m_arpenteur->m_colored_placements)
     {
-        uint64_t hash = hash_func(placement);
+//        uint64_t hash = hash_func(colored_placement);
 
-        glm::vec<4, float> color{};
-        color.x = glm::abs(glm::sin(hash * 0.147f));
-        color.y = glm::abs(glm::cos(hash * 0.843f));
-        color.z = glm::abs(glm::sin(hash * 0.239f));
-        color.w = 1.0f;
+//        glm::vec<4, float> color{};
+//        color.x = glm::abs(glm::sin(hash * 0.147f));
+//        color.y = glm::abs(glm::cos(hash * 0.843f));
+//        color.z = glm::abs(glm::sin(hash * 0.239f));
+//        color.w = 1.0f;
 
         m_brick_model_builder.place(
             m_arpenteur->m_slice_y,
-            placement.m_x, placement.m_y,
-            placement.m_bid,
-            subslice_mask,
-            color
+            colored_placement.m_placement.m_x, colored_placement.m_placement.m_y,
+            colored_placement.m_placement.m_bid,
+            colored_placement.m_subslice_mask,
+            glm::vec4{colored_placement.m_color} / 255.0f
             );
     }
 

@@ -49,4 +49,13 @@ using ProximityMapT = DeviceImage<1, uint8_t>;
 /// meaningless and only useful to identify the occupied region.
 using PlacementMapT = DeviceImage<1, uint16_t>;
 
+/// A placement with exact information about its location within the slice (e.g. the subslice; possibly stacked), and
+/// the color.
+struct ColoredPlacement
+{
+    Placement m_placement;
+    uint8_t m_subslice_mask;
+    glm::vec<4, uint8_t> m_color;
+};
+
 }  // namespace lego_builder

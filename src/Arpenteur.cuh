@@ -59,10 +59,11 @@ public:
     std::unique_ptr<Slicer> m_slicer;
     SpreadValue m_spread_value;
 
-    /// Stores the placements per slice.
-    /// Every placement is paired with a bitmask indicating to which subslices it belongs. Once the slice is processed,
-    /// this allows compaction.
     std::unordered_map<Placement, uint8_t, PlacementHash> m_stacked_placements;
+
+    const size_t k_max_colored_placements = 1024 * 1024;  // >1MB
+    std::vector<ColoredPlacement> m_colored_placements;
+    ColoredPlacement* m_colored_placements_d;
 
     /// The placement ID used for filling the Placement map.
     uint32_t m_next_pid = 0;
@@ -94,6 +95,9 @@ private:
 
     template<uint32_t SUBSLICE>
     size_t place_on_subslice(uint32_t slice_y);
+
+    /// Linearizes the placements list (for faster iteration), and colorizes them according to the Color map.
+    void linearize_and_colorize();
 };
 
 }

@@ -4,6 +4,7 @@
 #include <cuda_profiler_api.h>
 
 #include "bricks.hpp"
+#include "colorize_placements.cuh"
 #include "model/GltfLoader.hpp"
 #include "reward_func.cuh"
 #include "util/StopWatch.hpp"
@@ -36,6 +37,9 @@ Arpenteur::Arpenteur(const std::filesystem::path& model_path, uint32_t slice_sid
 
     m_cur_placements = PlacementMapT::create(slice_side, slice_side, nullptr);
     m_cur_placements_d = to_device(m_cur_placements);
+
+    m_colored_placements.reserve(k_max_colored_placements);
+    CHECK_CU(cudaMalloc(&m_colored_placements_d, k_max_colored_placements * sizeof(ColoredPlacement)));
 }
 
 __global__
@@ -176,7 +180,7 @@ void Arpenteur::place(const Placement& placement)
 }
 
 template<uint32_t SUBSLICE>
-size_t Arpenteur::place_on_subslice(uint32_t m_slice_y)
+size_t Arpenteur::place_on_subslice(uint32_t slice_y)
 {
     size_t num_placed_bricks = 0;
 
@@ -188,10 +192,6 @@ size_t Arpenteur::place_on_subslice(uint32_t m_slice_y)
     while (true)
     {
         auto [placement, reward] = compute_next_placement<SUBSLICE>();
-
-//        printf("PLACEMENT %zu; Placement: (%d, %d) -> BID %d; Reward: %.3f; Elapsed time: %s\n",
-//               num_placed_bricks + 1, placement.m_x, placement.m_y, placement.m_bid, reward,
-//               stopwatch.elapsed_time_str().c_str());
 
         if (reward < m_min_reward) break;
 
@@ -219,6 +219,38 @@ size_t Arpenteur::place_on_subslice(uint32_t m_slice_y)
     }
 
     return num_placed_bricks;
+}
+
+void Arpenteur::linearize_and_colorize()
+{
+    m_colored_placements.clear();
+
+    CHECK_STATE_MSG(m_stacked_placements.size() < k_max_colored_placements,
+                    "Too many placements! You must increase the buffer size");
+
+    // Empty the stacked placements hashmap into a vector
+    for (auto& [placement, subslice_mask] : m_stacked_placements)
+    {
+        ColoredPlacement colored_placement{};
+        colored_placement.m_placement = placement;
+        colored_placement.m_subslice_mask = subslice_mask;
+        m_colored_placements.emplace_back(colored_placement);
+    }
+
+    // Copy the vector to device
+    CHECK_CU(cudaMemcpy(m_colored_placements_d, m_colored_placements.data(), m_colored_placements.size() * sizeof(ColoredPlacement), cudaMemcpyHostToDevice));
+
+    // Colorize!
+    const size_t num_blocks = div_ceil<size_t>(m_colored_placements.size(), 32);
+    const size_t dim_block = 1024;
+    compute_placements_color_kernel<<<num_blocks, dim_block>>>(m_self_d, m_colored_placements_d, m_colored_placements.size());
+    CHECK_CU(cudaDeviceSynchronize());
+
+    // Copy the vector back to host
+    CHECK_CU(cudaMemcpy(m_colored_placements.data(), m_colored_placements_d, m_colored_placements.size() * sizeof(ColoredPlacement), cudaMemcpyDeviceToHost));
+
+    // TODO There could be placements without a color!
+    //   Because not all placements cover at least one colored cell of the Color map.
 }
 
 void Arpenteur::run()
@@ -259,6 +291,7 @@ void Arpenteur::run()
         printf("[Arpenteur] Slice %d/%d\n", m_slice_y, num_slices);
 
         m_stacked_placements.clear();
+        m_colored_placements.clear();
         m_next_pid = 0;
 
         // COMPUTE SLICE (i.e. voxelization)
@@ -305,6 +338,9 @@ void Arpenteur::run()
 
         printf("[Arpenteur]   PLACE 2; Placed bricks: %zu, Elapsed: %s\n",
                num_placed_bricks, stop_watch.elapsed_time_str().c_str());
+
+        // LINEARIZE & COLORIZE
+        linearize_and_colorize();
 
         // SLICE END
         if (m_listener) m_listener->on_placement_end(m_slice_y);
