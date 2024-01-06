@@ -6,7 +6,7 @@
 #include <cuda_gl_interop.h>
 
 #include "DeviceImage.cuh"
-#include "misc.cuh"
+#include "util/misc.cuh"
 
 namespace lego_builder
 {

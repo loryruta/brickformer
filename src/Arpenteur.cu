@@ -3,7 +3,7 @@
 #include <thrust/extrema.h>
 #include <cuda_profiler_api.h>
 
-#include "bricks.cuh"
+#include "bricks.hpp"
 #include "model/GltfLoader.hpp"
 #include "reward_func.cuh"
 #include "util/StopWatch.hpp"
@@ -176,7 +176,7 @@ void Arpenteur::place(const Placement& placement)
 }
 
 template<uint32_t SUBSLICE>
-size_t Arpenteur::place_on_subslice(uint32_t slice_y)
+size_t Arpenteur::place_on_subslice(uint32_t m_slice_y)
 {
     size_t num_placed_bricks = 0;
 
@@ -202,7 +202,7 @@ size_t Arpenteur::place_on_subslice(uint32_t slice_y)
         if (!inserted) iterator->second |= subslice_bit;
         // If the placement is stacked 3 times (3 equal placements for the slice), then can be compacted
 
-        if (m_listener) m_listener->on_place(slice_y, placement, reward);
+        if (m_listener) m_listener->on_place(m_slice_y, placement, reward);
 
         if (log_stopwatch.elapsed_millis() >= 5000)
         {
@@ -254,9 +254,9 @@ void Arpenteur::run()
     m_cur_placements.fill(0);
     m_prev_proximity_map.fill(PROXIMITY_MAP_HIGH_VALUE);
 
-    for (uint32_t slice_y = 0; slice_y < num_slices; slice_y++)
+    for (m_slice_y = 0; m_slice_y < num_slices; m_slice_y++)
     {
-        printf("[Arpenteur] Slice %d/%d\n", slice_y, num_slices);
+        printf("[Arpenteur] Slice %d/%d\n", m_slice_y, num_slices);
 
         m_stacked_placements.clear();
         m_next_pid = 0;
@@ -264,19 +264,19 @@ void Arpenteur::run()
         // COMPUTE SLICE (i.e. voxelization)
         stop_watch.reset();
 
-        m_slicer->slice(slice_y, m_color_map);
+        m_slicer->slice(m_slice_y, m_color_map);
 
         printf("[Arpenteur]   COMPUTE SLICE; %s\n", stop_watch.elapsed_time_str().c_str());
 
         // PLACEMENT BEGIN
-        if (m_listener) m_listener->on_placement_begin(slice_y);
+        if (m_listener) m_listener->on_placement_begin(m_slice_y);
 
         size_t num_placed_bricks;
 
         // PLACE0
         stop_watch.reset();
 
-        num_placed_bricks = place_on_subslice<0>(slice_y);
+        num_placed_bricks = place_on_subslice<0>(m_slice_y);
 
         m_prev_placements.copy_from(m_cur_placements);
         m_cur_placements.fill(0);
@@ -287,7 +287,7 @@ void Arpenteur::run()
         // PLACE1
         stop_watch.reset();
 
-        num_placed_bricks = place_on_subslice<1>(slice_y);
+        num_placed_bricks = place_on_subslice<1>(m_slice_y);
 
         m_prev_placements.copy_from(m_cur_placements);
         m_cur_placements.fill(0);
@@ -298,7 +298,7 @@ void Arpenteur::run()
         // PLACE2
         stop_watch.reset();
 
-        num_placed_bricks = place_on_subslice<2>(slice_y);
+        num_placed_bricks = place_on_subslice<2>(m_slice_y);
 
         m_prev_placements.copy_from(m_cur_placements);
         m_cur_placements.fill(0);
@@ -307,7 +307,7 @@ void Arpenteur::run()
                num_placed_bricks, stop_watch.elapsed_time_str().c_str());
 
         // SLICE END
-        if (m_listener) m_listener->on_placement_end(slice_y);
+        if (m_listener) m_listener->on_placement_end(m_slice_y);
 
         // COMPUTE PROXIMITY MAP
         stop_watch.reset();

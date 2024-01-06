@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "Arpenteur.cuh"
+#include "BrickModelBuilder.hpp"
 #include "Queue.hpp"
 #include "ui/video/CustomFramebuffer.hpp"
 #include "ui/video/cuda_interop_helpers.cuh"
@@ -35,6 +36,9 @@ private:
     std::optional<CudaMappedGlTexture> m_subslice1_cuda_mapping;
     std::optional<CudaMappedGlTexture> m_subslice2_cuda_mapping;
 
+    BrickModelBuilder m_brick_model_builder; // TODO rename
+    std::unique_ptr<BakedModel> m_baked_construction_model;
+
     enum VisualizeMapType : uint8_t
     {
         VisualizeMapType_ColorMap = 0, VisualizeMapType_ProximityMap, VisualizeMapType_PlacementMap
@@ -42,6 +46,9 @@ private:
 
     VisualizeMapType m_visualized_map = VisualizeMapType_ColorMap;
     int32_t m_visualized_subslice_idx = 0; ///< The subslice being visualized
+
+    bool m_visualize_model = true;
+    bool m_visualize_construction = true;
 
     /// If the placement takes too long, this stopwatch is used to visualize intermediate result at fixed intervals.
     StopWatch m_placement_stopwatch;
@@ -82,15 +89,21 @@ private:
 
     void copy_color_map();
     void copy_proximity_map();
+
+    /// Having the placements for the current slice, fills the placement maps for visualization (one for each subslice).
     void write_placement_maps();
+
+    /// Having the placements for the current slice, adds the vertices of them to create the 3d model of the construction (for visualization).
+    void add_placements_to_construction_model();
 
     /// Function meant to be called from the Arpenteur's thread:
     /// Enqueues a job to copy the color map, proximity map and placement maps; and blocks the thread until executed.
     void enqueue_and_wait_copy_maps_job();
 
+    /// Renders a 3d scene displaying the model and the LEGO construction while it's building up.
+    void render_3d_scene();
+
     void show_model_window();
-    void show_color_map_window();
-    void show_proximity_map_window();
     void show_placement_map_window();
 };
 }

@@ -4,7 +4,7 @@
 
 #include <glm/glm.hpp>
 
-#include "misc.cuh"
+#include "util/misc.cuh"
 
 namespace lego_builder
 {

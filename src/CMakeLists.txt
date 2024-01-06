@@ -14,16 +14,19 @@ add_library(arpenteur STATIC
     Arpenteur.cu
     Arpenteur.cuh
     ArpenteurListener.hpp
-    bricks.cuh
+    bricks.hpp
     DeviceImage.cuh
-    misc.cuh
+    util/misc.cuh
     primitives.cuh
     reward_func.cuh
     Slicer.cu
     Slicer.cuh
     SpreadValue.cu
     SpreadValue.cuh
-    types.hpp
+    types.cuh
+    ui/BrickModelBuilder.hpp
+    util/misc.hpp
+    colorize_placements.cuh
     )
 
 target_include_directories(arpenteur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

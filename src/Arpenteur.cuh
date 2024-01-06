@@ -8,7 +8,7 @@
 #include "ArpenteurListener.hpp"
 #include "Slicer.cuh"
 #include "SpreadValue.cuh"
-#include "types.hpp"
+#include "types.cuh"
 
 namespace lego_builder
 {
@@ -51,6 +51,8 @@ public:
 
     PlacementMapT m_cur_placements;
     PlacementMapT* m_cur_placements_d;
+
+    int m_slice_y;
 
     std::unique_ptr<Model> m_model;
 

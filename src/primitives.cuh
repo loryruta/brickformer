@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#define FULL_MASK 0xffffffff
+#include "util/misc.cuh"
 
 namespace lego_builder
 {

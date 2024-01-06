@@ -1,7 +1,7 @@
 #pragma once
 
 #include "model/Model.hpp"
-#include "types.hpp"
+#include "types.cuh"
 
 namespace lego_builder
 {

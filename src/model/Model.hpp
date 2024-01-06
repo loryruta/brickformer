@@ -14,7 +14,7 @@ namespace lego_builder
         glm::vec3 m_position; float p0;
         glm::vec3 m_normal;   float p1;
         glm::vec2 m_texcoord; float p2[2];
-        glm::vec4 m_color{1};
+        glm::vec4 m_color{1.0f};  ///< The vertex color (multiplied to the texture); ranged in [0, 1]
     };
 
     struct Mesh
@@ -22,7 +22,7 @@ namespace lego_builder
         std::vector<Vertex> m_vertices;
         std::vector<uint32_t> m_indices;
 
-        int m_texture_idx;  ///< Texture index into Model's m_textures array.
+        int m_texture_idx = -1;  ///< Texture index into Model's m_textures array.
 
         glm::vec3 m_min;
         glm::vec3 m_max;

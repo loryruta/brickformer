@@ -1,0 +1,39 @@
+#pragma once
+
+#include <string>
+
+#define CHECK_STATE(condition) \
+    lego_builder::check_state(condition, #condition, __FILE__, __LINE__, nullptr)
+
+#define CHECK_STATE_MSG(condition, message) \
+    lego_builder::check_state(condition, #condition, __FILE__, __LINE__, message)
+
+#define CHECK_ARG(condition) \
+    CHECK_STATE(condition)
+
+namespace lego_builder
+{
+
+inline void check_state(
+    bool condition,
+    char const* check_str,
+    char const* file,
+    int line,
+    char const* message
+)
+{
+    if (!condition)  // TODO Mark as unlikely path
+    {
+        fprintf(stderr, "Invalid state: %s (file: %s, line: %d)", check_str, file, line);
+        if (message) fprintf(stderr, "; %s", message);
+        fprintf(stderr, "\n");
+        exit(1);
+    }
+}
+
+template<typename T>
+std::string to_string(const T& element)
+{
+    return std::to_string(element);
+}
+}

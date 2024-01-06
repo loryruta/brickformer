@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Arpenteur.cuh"
-#include "bricks.cuh"
+#include "bricks.hpp"
 #include "primitives.cuh"
-#include "types.hpp"
+#include "types.cuh"
 
 namespace lego_builder
 {
@@ -76,13 +76,7 @@ template<bool IS_SUBSLICE0>
 __device__
 inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, float& out_reward)
 {
-    uint32_t warp_i = blockIdx.x * 32 + (threadIdx.x >> 5);
-
     auto& brick = k_bricks[placement.m_bid];
-
-    const bool should_print = warp_i == 10938;
-    //should_print = (blockIdx.x == 10123 || blockIdx.x == 3648 || blockIdx.x == 1182 || blockIdx.x == 1 || blockIdx.x == 68939) && threadIdx.x == 0;
-    //should_print = placement.m_x == 134 && placement.m_y == 255 && placement.m_bid == 14;
 
     ColorMapT* color_map_d = arpenteur.m_color_map_d;
     ProximityMapT* prev_proximity_map_d = arpenteur.m_prev_proximity_map_d;
@@ -112,9 +106,6 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
 
         if (brick[by][bx])
         {
-//            if (should_print) printf("%d : bx: %d, by: %d, mx: %d, my: %d, colormap w: %d, colormap h: %d\n",
-//                       blockIdx.x, bx, by, mx, my, color_map_d->m_width, color_map_d->m_height);
-
            // Placement out of bounds
            is_outside |= mx >= color_map_d->m_width || my >= color_map_d->m_height;
 
@@ -180,17 +171,6 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     }
     discard |= is_floating;
 
-//    if (should_print)
-//    {
-//        printf("AFTER REDUCTION - WARP IDX: %d , THREAD IDX: %d, (%d, %d) -> BID: %d, Brick size: %d, Num neighbors: %d, "
-//               "Num connectible sides: %d, Num connected bricks: %d, Highest proximity: %d, Outside OR overlapping: %d, "
-//               "Floating: %d, Discard: %d\n",
-//               warp_i, threadIdx.x, placement.m_x, placement.m_y, placement.m_bid, brick_size,
-//               num_neighbors, num_connectible_sides, num_connected_bricks, highest_proximity, is_outside_or_overlapping,
-//               is_floating, discard
-//               );
-//    }
-
     if (discard) return false; // Invalid!
 
     // Evaluate the reward: how good is this placement?
@@ -200,8 +180,6 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     float cn = float(num_covered_map_cells) / float(brick_size);
     float dn = float(num_connected_bricks) / float(brick_size);
     float pn = float(highest_proximity) / float(PROXIMITY_MAP_HIGH_VALUE);
-
-    //if (should_print) printf("%d : an: %.3f, bn: %.3f, cn: %.3f, dn: %.3f, pn: %.3f\n", blockIdx.x,an,bn,cn,dn,pn);
 
     float a = 0.8f * an * an * an;  // Adjacency factor [0.0, 0.8]
     float c = 0.7f * cn * cn + 0.1f;  // Color factor [0.1, 0.8]

@@ -6,7 +6,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
-#include "bricks.cuh"
+#include "bricks.hpp"
 #include "util/StopWatch.hpp"
 #include "video/gl_helpers.hpp"
 
@@ -68,6 +68,7 @@ void App::enqueue_and_wait_copy_maps_job()
          copy_color_map();
          copy_proximity_map();
          write_placement_maps();
+         add_placements_to_construction_model();
     });
 
     // Wait for the pushed jobs to be executed before continuing (avoid concurrency)
@@ -213,15 +214,15 @@ void App::write_placement_maps()
         v.w = 255;
 
         auto& brick = k_bricks[placement.m_bid];
-        for (int by = 0; by < BRICK_MAX_HEIGHT; by++)
+        for (int bz = 0; bz < BRICK_MAX_HEIGHT; bz++)
         {
             for (int bx = 0; bx < BRICK_MAX_WIDTH; bx++)
             {
-                if (brick[by][bx])
+                if (brick[bz][bx])
                 {
-                    if (subslice_mask & 0x1) tmp_subslice0_image.write_pixel(placement.m_x + bx, placement.m_y + by, v);
-                    if (subslice_mask & 0x2) tmp_subslice1_image.write_pixel(placement.m_x + bx, placement.m_y + by, v);
-                    if (subslice_mask & 0x4) tmp_subslice2_image.write_pixel(placement.m_x + bx, placement.m_y + by, v);
+                    if (subslice_mask & 0x1) tmp_subslice0_image.write_pixel(placement.m_x + bx, placement.m_y + bz, v);
+                    if (subslice_mask & 0x2) tmp_subslice1_image.write_pixel(placement.m_x + bx, placement.m_y + bz, v);
+                    if (subslice_mask & 0x4) tmp_subslice2_image.write_pixel(placement.m_x + bx, placement.m_y + bz, v);
                 }
             }
         }
@@ -235,29 +236,74 @@ void App::write_placement_maps()
     printf("[App] Placements written in %s\n", duration_str.c_str());
 }
 
+void App::add_placements_to_construction_model()
+{
+    printf("[App] UPDATE CONSTRUCTION MODEL; Updating vertices...\n");
+
+    PlacementHash hash_func{};
+
+    for (auto& [placement, subslice_mask] : m_arpenteur->m_stacked_placements)
+    {
+        uint64_t hash = hash_func(placement);
+
+        glm::vec<4, float> color{};
+        color.x = glm::abs(glm::sin(hash * 0.147f));
+        color.y = glm::abs(glm::cos(hash * 0.843f));
+        color.z = glm::abs(glm::sin(hash * 0.239f));
+        color.w = 1.0f;
+
+        m_brick_model_builder.place(
+            m_arpenteur->m_slice_y,
+            placement.m_x, placement.m_y,
+            placement.m_bid,
+            subslice_mask,
+            color
+            );
+    }
+
+    printf("[App] UPDATE CONSTRUCTION MODEL; Baking...\n");
+
+    m_baked_construction_model = std::make_unique<BakedModel>(m_model_renderer.bake_model(m_brick_model_builder.model()));
+
+    printf("[App] UPDATE CONSTRUCTION MODEL; Done\n");
+}
+
+void App::render_3d_scene()
+{
+    glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    if (m_visualize_model)
+    {
+        if (m_baked_model) m_model_renderer.render(*m_baked_model, m_camera, glm::mat4{1.0f});
+    }
+
+    if (m_visualize_construction)
+    {
+        if (m_baked_construction_model) m_model_renderer.render(*m_baked_construction_model, m_camera, glm::mat4{1.0f});
+    }
+
+    // Update the camera to orbit around the model
+    m_camera.m_position += m_camera.right() * m_dt * m_camera_speed;
+    m_camera.look_at(m_look_at_position);
+}
+
 void App::show_model_window()
 {
     if (ImGui::Begin("Model"))
     {
         ImGui::Text("Model path: %s", m_arpenteur->m_model_path.c_str());
 
-        if (m_baked_model)
-        {
-            m_model_view_framebuffer.render([&]()
-            {
-                glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        ImGui::Checkbox("Model", &m_visualize_model);
+        ImGui::SameLine();
+        ImGui::Checkbox("Construction", &m_visualize_construction);
 
-                m_model_renderer.render(*m_baked_model, m_camera, glm::identity<glm::mat4>());
-            });
+        ImGui::NewLine();
 
-            ImVec2 image_size{256, 256};
-            ImGui::Image(reinterpret_cast<void*>(m_model_view_framebuffer.m_texture), image_size, ImVec2(0, 1), ImVec2(1, 0));
-
-            // Update the camera to orbit around the model
-            m_camera.m_position += m_camera.right() * m_dt * m_camera_speed;
-            m_camera.look_at(m_look_at_position);
-        }
+        ImVec2 image_size;
+        image_size.y = ImGui::GetContentRegionAvail().y;
+        image_size.x = image_size.y;
+        ImGui::Image(reinterpret_cast<void*>(m_model_view_framebuffer.m_texture), image_size, ImVec2(0, 1), ImVec2(1, 0));
     }
     ImGui::End();
 }
@@ -266,26 +312,25 @@ void App::show_placement_map_window()
 {
     if (ImGui::Begin("Placement maps"))
     {
-        ImVec2 window_size = ImGui::GetWindowSize();
-        ImVec2 image_size(window_size.y, window_size.y);
-
         ImGui::RadioButton("Color map", (int*) &m_visualized_map, VisualizeMapType_ColorMap);
         ImGui::SameLine();
         ImGui::RadioButton("Placement map", (int*) &m_visualized_map, VisualizeMapType_PlacementMap);
         ImGui::SameLine();
         ImGui::RadioButton("Proximity map (previous slice)", (int*) &m_visualized_map, VisualizeMapType_ProximityMap);
 
+        GLuint placement_map_texture;
+
         // Color map
         if (m_visualized_map == VisualizeMapType_ColorMap)
         {
             ImGui::NewLine();
-            ImGui::Image(reinterpret_cast<void*>(m_color_map_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+            placement_map_texture = m_color_map_cuda_mapping->texture();
         }
         // Proximity map
         else if (m_visualized_map == VisualizeMapType_ProximityMap)
         {
             ImGui::NewLine();
-            ImGui::Image(reinterpret_cast<void*>(m_proximity_map_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+            placement_map_texture = m_proximity_map_cuda_mapping->texture();
         }
         // Placement map
         else if (m_visualized_map == VisualizeMapType_PlacementMap)
@@ -304,25 +349,32 @@ void App::show_placement_map_window()
 
             if (m_visualized_subslice_idx == 0)
             {
-                ImGui::Image(reinterpret_cast<void*>(m_subslice0_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+                placement_map_texture = m_subslice0_cuda_mapping->texture();
             }
             else if (m_visualized_subslice_idx == 1)
             {
-                ImGui::Image(reinterpret_cast<void*>(m_subslice1_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+                placement_map_texture = m_subslice1_cuda_mapping->texture();
             }
             else
             {
-                ImGui::Image(reinterpret_cast<void*>(m_subslice2_cuda_mapping->texture()), image_size, ImVec2(0, 1), ImVec2(1, 0));
+                placement_map_texture = m_subslice2_cuda_mapping->texture();
             }
         }
+
+        ImVec2 image_size;
+        image_size.y = ImGui::GetContentRegionAvail().y;
+        image_size.x = image_size.y;
+
+        ImGui::Image(reinterpret_cast<void*>(placement_map_texture), image_size, ImVec2(0, 1), ImVec2(1, 0));
     }
     ImGui::End();
 }
 
 void App::render()
 {
-    ImGui::ShowDemoWindow();
+    m_model_view_framebuffer.render([&]() { render_3d_scene(); });
 
+    //ImGui::ShowDemoWindow();
     show_model_window();
     show_placement_map_window();
 }

@@ -154,7 +154,7 @@ void ModelRenderer::render(const BakedModel& baked_model, const Camera& camera, 
         glm::mat4 camera_mat = camera.matrix();
         glUniformMatrix4fv(get_uniform_location(m_program, "u_camera"), 1, GL_FALSE, glm::value_ptr(camera_mat));
 
-        GLuint texture = baked_mesh.m_texture_idx >= 0 ? baked_model.m_textures.at(baked_mesh.m_texture_idx) : m_white_texture;
+        GLuint texture = baked_mesh.m_texture_idx >= 0 ? baked_model.m_textures[baked_mesh.m_texture_idx] : m_white_texture;
         glBindTexture(GL_TEXTURE_2D, texture);
 
         glBindVertexArray(baked_mesh.m_vao);
@@ -184,8 +184,11 @@ BakedMesh ModelRenderer::bake_mesh(const Mesh& mesh)
     GLint attrib_loc;
 
     attrib_loc = get_attrib_location(m_program, "a_position");
-    glEnableVertexAttribArray(attrib_loc);
-    glVertexAttribPointer(attrib_loc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_position));
+    if (attrib_loc >= 0)
+    {
+        glEnableVertexAttribArray(attrib_loc);
+        glVertexAttribPointer(attrib_loc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_position));
+    }
 
     attrib_loc = get_attrib_location(m_program, "a_normal", false);
     if (attrib_loc >= 0)
@@ -194,13 +197,19 @@ BakedMesh ModelRenderer::bake_mesh(const Mesh& mesh)
         glVertexAttribPointer(attrib_loc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_normal));
     }
 
-    attrib_loc = get_attrib_location(m_program, "a_texcoord");
-    glEnableVertexAttribArray(attrib_loc);
-    glVertexAttribPointer(attrib_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_texcoord));
+    attrib_loc = get_attrib_location(m_program, "a_texcoord", true);
+    if (attrib_loc >= 0)
+    {
+        glEnableVertexAttribArray(attrib_loc);
+        glVertexAttribPointer(attrib_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_texcoord));
+    }
 
-    attrib_loc = get_attrib_location(m_program, "a_color");
-    glEnableVertexAttribArray(attrib_loc);
-    glVertexAttribPointer(attrib_loc, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_color));
+    attrib_loc = get_attrib_location(m_program, "a_color", true);
+    if (attrib_loc >= 0)
+    {
+        glEnableVertexAttribArray(attrib_loc);
+        glVertexAttribPointer(attrib_loc, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_color));
+    }
 
     glBindVertexArray(0);
 

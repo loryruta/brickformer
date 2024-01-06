@@ -21,6 +21,8 @@ add_executable(arpenteur_ui
         Queue.hpp
         video/CustomFramebuffer.hpp
         video/CustomFramebuffer.cpp
+        BrickModelBuilder.cpp
+        brick_models.hpp
 )
 
 target_link_libraries(arpenteur_ui PRIVATE arpenteur)

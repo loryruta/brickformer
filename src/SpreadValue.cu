@@ -1,7 +1,8 @@
 #include "SpreadValue.cuh"
-#include "primitives.cuh"
 
 #include <glm/ext/scalar_constants.hpp>
+
+#include "primitives.cuh"
 
 using namespace lego_builder;
 

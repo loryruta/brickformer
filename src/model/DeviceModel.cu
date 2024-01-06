@@ -1,6 +1,6 @@
 #include "DeviceModel.cuh"
 
-#include "../misc.cuh"
+#include "util/misc.cuh"
 
 using namespace lego_builder;
 
