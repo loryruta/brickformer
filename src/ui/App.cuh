@@ -32,9 +32,8 @@ private:
     std::optional<CudaMappedGlTexture> m_color_map_cuda_mapping;
     std::optional<CudaMappedGlTexture> m_proximity_map_cuda_mapping;
 
-    std::optional<CudaMappedGlTexture> m_subslice0_cuda_mapping;
-    std::optional<CudaMappedGlTexture> m_subslice1_cuda_mapping;
-    std::optional<CudaMappedGlTexture> m_subslice2_cuda_mapping;
+    std::vector<CudaMappedGlTexture> m_hashed_placement_map_cuda_mappings;
+    std::vector<CudaMappedGlTexture> m_colored_placement_map_cuda_mappings;
 
     BrickModelBuilder m_brick_model_builder; // TODO rename
     std::unique_ptr<BakedModel> m_baked_construction_model;
@@ -45,7 +44,8 @@ private:
     };
 
     VisualizeMapType m_visualized_map = VisualizeMapType_ColorMap;
-    int32_t m_visualized_subslice_idx = 0; ///< The subslice being visualized
+    int32_t m_visualized_subslice_idx = 0;  ///< The subslice being visualized
+    bool m_visualize_colored_placement_map = false;
 
     bool m_visualize_model = true;
     bool m_visualize_construction = true;
@@ -90,8 +90,9 @@ private:
     void copy_color_map();
     void copy_proximity_map();
 
-    /// Having the placements for the current slice, fills the placement maps for visualization (one for each subslice).
-    void write_placement_maps();
+    /// Takes the slice placements and writes them to the given images (either by using their colors or hashed colors).
+    /// The images are then expected to be used for visualization.
+    void write_placement_maps(std::vector<CudaMappedGlTexture>& out_images, bool use_hashed_color);
 
     /// Having the placements for the current slice, adds the vertices of them to create the 3d model of the construction (for visualization).
     void add_placements_to_construction_model();

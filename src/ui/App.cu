@@ -32,9 +32,14 @@ App::App(Window& window) :
 
     m_color_map_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
     m_proximity_map_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
-    m_subslice0_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
-    m_subslice1_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
-    m_subslice2_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
+
+    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
+    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
+    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
+
+    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
+    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
+    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
 }
 
 App::~App()
@@ -67,7 +72,8 @@ void App::enqueue_and_wait_copy_maps_job()
     {
          copy_color_map();
          copy_proximity_map();
-         write_placement_maps();
+         write_placement_maps(m_hashed_placement_map_cuda_mappings, true);
+         write_placement_maps(m_colored_placement_map_cuda_mappings, false);
          add_placements_to_construction_model();
     });
 
@@ -103,6 +109,19 @@ void App::on_placement_end(uint32_t slice_y)
         m_arpenteur_should_run = false;
         m_arpenteur_should_run.wait(false);
     }
+}
+
+glm::vec<4, uint8_t> eval_placement_hashed_color(const Placement& placement)
+{
+    static const PlacementHash k_hash_func{};
+    uint64_t hash = k_hash_func(placement);
+
+    glm::vec4 v{};
+    v.x = glm::abs(glm::sin(hash * 0.147f)) * 255.0f;
+    v.y = glm::abs(glm::cos(hash * 0.843f)) * 255.0f;
+    v.z = glm::abs(glm::sin(hash * 0.239f)) * 255.0f;
+    v.w = 255.0f;
+    return v;
 }
 
 void App::copy_color_map()
@@ -184,34 +203,29 @@ void App::copy_proximity_map()
     m_proximity_map_cuda_mapping->copy_from(tmp_image);
 }
 
-void App::write_placement_maps()
+void App::write_placement_maps(std::vector<CudaMappedGlTexture>& out_images, bool use_hashed_color)
 {
     StopWatch stop_watch{};
 
     printf("[App] Writing placements to textures for visualization...\n");
 
-    DeviceImage<4, uint8_t> tmp_subslice0_image = DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr);
-    DeviceImage<4, uint8_t> tmp_subslice1_image = DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr);
-    DeviceImage<4, uint8_t> tmp_subslice2_image = DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr);
+    DeviceImage<4, uint8_t> tmp_images[3]{
+        DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr),
+        DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr),
+        DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr)
+    };
 
-    tmp_subslice0_image.fill(0);
-    tmp_subslice1_image.fill(0);
-    tmp_subslice2_image.fill(0);
+    tmp_images[0].fill(0);
+    tmp_images[1].fill(0);
+    tmp_images[2].fill(0);
 
-    PlacementHash hash_func{};
     for (ColoredPlacement& entry : m_arpenteur->m_colored_placements)
     {
         Placement& placement = entry.m_placement;
         uint8_t subslice_mask = entry.m_subslice_mask;
         assert(subslice_mask);  // Shouldn't be zero
 
-        uint64_t hash = hash_func(placement);
-
-        glm::vec<4, uint8_t> v{};
-        v.x = glm::abs(glm::sin(hash * 0.147f)) * 255.0f;
-        v.y = glm::abs(glm::cos(hash * 0.843f)) * 255.0f;
-        v.z = glm::abs(glm::sin(hash * 0.239f)) * 255.0f;
-        v.w = 255;
+        glm::vec<4, uint8_t> color = use_hashed_color ? eval_placement_hashed_color(placement) : entry.m_color;
 
         auto& brick = k_bricks[placement.m_bid];
         for (int bz = 0; bz < BRICK_MAX_HEIGHT; bz++)
@@ -220,17 +234,17 @@ void App::write_placement_maps()
             {
                 if (brick[bz][bx])
                 {
-                    if (subslice_mask & 0x1) tmp_subslice0_image.write_pixel(placement.m_x + bx, placement.m_y + bz, v);
-                    if (subslice_mask & 0x2) tmp_subslice1_image.write_pixel(placement.m_x + bx, placement.m_y + bz, v);
-                    if (subslice_mask & 0x4) tmp_subslice2_image.write_pixel(placement.m_x + bx, placement.m_y + bz, v);
+                    if (subslice_mask & 0x1) tmp_images[0].write_pixel(placement.m_x + bx, placement.m_y + bz, color);
+                    if (subslice_mask & 0x2) tmp_images[1].write_pixel(placement.m_x + bx, placement.m_y + bz, color);
+                    if (subslice_mask & 0x4) tmp_images[2].write_pixel(placement.m_x + bx, placement.m_y + bz, color);
                 }
             }
         }
     }
 
-    m_subslice0_cuda_mapping->copy_from(tmp_subslice0_image);
-    m_subslice1_cuda_mapping->copy_from(tmp_subslice1_image);
-    m_subslice2_cuda_mapping->copy_from(tmp_subslice2_image);
+    out_images[0].copy_from(tmp_images[0]);
+    out_images[1].copy_from(tmp_images[1]);
+    out_images[2].copy_from(tmp_images[2]);
 
     std::string duration_str = stop_watch.elapsed_time_str();
     printf("[App] Placements written in %s\n", duration_str.c_str());
@@ -345,18 +359,11 @@ void App::show_placement_map_window()
             ImGui::SameLine();
             ImGui::Text("Slice %d/2", m_visualized_subslice_idx);
 
-            if (m_visualized_subslice_idx == 0)
-            {
-                placement_map_texture = m_subslice0_cuda_mapping->texture();
-            }
-            else if (m_visualized_subslice_idx == 1)
-            {
-                placement_map_texture = m_subslice1_cuda_mapping->texture();
-            }
-            else
-            {
-                placement_map_texture = m_subslice2_cuda_mapping->texture();
-            }
+            ImGui::SameLine();
+            ImGui::Checkbox("Color", &m_visualize_colored_placement_map);
+
+            std::vector<CudaMappedGlTexture>& placement_maps = m_visualize_colored_placement_map ? m_colored_placement_map_cuda_mappings : m_hashed_placement_map_cuda_mappings;
+            placement_map_texture = placement_maps.at(m_visualized_subslice_idx).texture();
         }
 
         ImVec2 image_size;
