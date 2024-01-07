@@ -42,6 +42,8 @@ namespace lego_builder
             T other_val = __shfl_down_sync(FULL_MASK, val, offset);
             val = op(other_val, val);
         }
+
+        return val;
     }
 
     template<typename T>

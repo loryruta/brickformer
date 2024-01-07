@@ -4,7 +4,7 @@
 
 #include "DeviceImage.cuh"
 
-#define PROXIMITY_MAP_HIGH_VALUE 16
+#define PROXIMITY_MAP_HIGH_VALUE 16  // TODO should be related to slice size
 
 static_assert(PROXIMITY_MAP_HIGH_VALUE <= 0xFF, "PROXIMITY_MAP_HIGH_VALUE must be <= 0xFF");
 
