@@ -25,9 +25,7 @@ public:
     uint32_t m_slice_side;
     ArpenteurListener* m_listener;
 
-    /// How much far away a placement should be to the voxel cluster to be considered valid?
-    /// Placements with a proximity value less than the threshold won't be considered floating.
-    uint8_t m_proximity_threshold = 6;
+    uint8_t m_proximity_threshold = 1;  ///< If floating placement proximity is below this value, then it's allowed
 
     /// The minimum accepted reward.
     /// If the best placement for a subslice has its reward lower than this threshold, the subslice is completed.

@@ -28,10 +28,11 @@ namespace
     }
 }  // namespace
 
-GLuint lego_builder::create_shader(GLenum type, const char* src)
+GLuint lego_builder::create_shader(GLenum type, const std::string& src)
 {
     GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &src, nullptr);
+    const char* src_ptr = src.c_str();
+    glShaderSource(shader, 1, &src_ptr, nullptr);
     glCompileShader(shader);
 
     GLint compile_status = 0;

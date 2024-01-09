@@ -40,13 +40,24 @@ namespace lego_builder
 
     class ModelRenderer
     {
+    public:
+        struct DirectionalLight { glm::vec3 m_direction; glm::vec3 m_color; };
+
     private:
         GLuint m_white_texture;
         GLuint m_program;
+        GLuint m_program_no_shading;
+
+        std::vector<DirectionalLight> m_directional_lights;
 
     public:
+        bool m_shading = true;
+
         explicit ModelRenderer();
         ~ModelRenderer();
+
+        void clear_directional_lights() { m_directional_lights.clear(); };
+        void add_directional_light(DirectionalLight directional_light);
 
         void render(const BakedModel& model, const Camera& camera, const glm::mat4& transform);
 

@@ -16,8 +16,8 @@ using namespace lego_builder;
 App::App(Window& window) :
     m_window(window)
 {
-    m_model_path = "/home/loryruta/CLionProjects/lego-builder/resources/models/shinto_shrine.glb";
-    m_slice_side = 64;
+    m_model_path = "/home/loryruta/CLionProjects/lego-builder/resources/models/polka-dot_man.glb";
+    m_slice_side = 60;
 
     // Initialize imgui
     ImGui::CreateContext();
@@ -40,6 +40,12 @@ App::App(Window& window) :
     m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
     m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
     m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
+
+    m_model_renderer = std::make_unique<ModelRenderer>();
+    m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{-1.0f, -1.0f, 0.0f}), .m_color = glm::vec3{1.0f}});
+    m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{0.0f, -1.0f, -1.0f}), .m_color = glm::vec3{1.0f}});
+    m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{-1.0f, 0.0f, -1.0f}), .m_color = glm::vec3{1.0f}});
+    m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{0.0f, -1.0f, -1.0f}), .m_color = glm::vec3{1.0f}});
 }
 
 App::~App()
@@ -54,7 +60,7 @@ void App::on_model_load(const Model& model)
 {
     m_job_queue.push([this, model]()
     {
-        m_baked_model = std::make_unique<BakedModel>(m_model_renderer.bake_model(model));
+        m_baked_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(model));
 
         glm::vec3 model_hsize = model.size() / 2.0f;
         m_look_at_position = model.m_min + model_hsize;
@@ -225,7 +231,16 @@ void App::write_placement_maps(std::vector<CudaMappedGlTexture>& out_images, boo
         uint8_t subslice_mask = entry.m_subslice_mask;
         assert(subslice_mask);  // Shouldn't be zero
 
-        glm::vec<4, uint8_t> color = use_hashed_color ? eval_placement_hashed_color(placement) : entry.m_color;
+        glm::vec<4, uint8_t> color{};
+        if (use_hashed_color)
+        {
+            color = eval_placement_hashed_color(placement);
+        }
+        else
+        {
+            color = entry.m_color;
+            color.a = 255.0f;
+        }
 
         auto& brick = k_bricks[placement.m_bid];
         for (int bz = 0; bz < BRICK_MAX_HEIGHT; bz++)
@@ -275,7 +290,7 @@ void App::add_placements_to_construction_model()
 
     printf("[App] UPDATE CONSTRUCTION MODEL; Baking...\n");
 
-    m_baked_construction_model = std::make_unique<BakedModel>(m_model_renderer.bake_model(m_brick_model_builder.model()));
+    m_baked_construction_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(m_brick_model_builder.model()));
 
     printf("[App] UPDATE CONSTRUCTION MODEL; Done\n");
 }
@@ -287,12 +302,12 @@ void App::render_3d_scene()
 
     if (m_visualize_model)
     {
-        if (m_baked_model) m_model_renderer.render(*m_baked_model, m_camera, glm::mat4{1.0f});
+        if (m_baked_model) m_model_renderer->render(*m_baked_model, m_camera, glm::mat4{1.0f});
     }
 
     if (m_visualize_construction)
     {
-        if (m_baked_construction_model) m_model_renderer.render(*m_baked_construction_model, m_camera, glm::mat4{1.0f});
+        if (m_baked_construction_model) m_model_renderer->render(*m_baked_construction_model, m_camera, glm::mat4{1.0f});
     }
 
     // Update the camera to orbit around the model
@@ -309,6 +324,8 @@ void App::show_model_window()
         ImGui::Checkbox("Model", &m_visualize_model);
         ImGui::SameLine();
         ImGui::Checkbox("Construction", &m_visualize_construction);
+        ImGui::SameLine();
+        ImGui::Checkbox("Shading", &m_model_renderer->m_shading);
 
         ImGui::NewLine();
 
@@ -358,7 +375,6 @@ void App::show_placement_map_window()
             }
             ImGui::SameLine();
             ImGui::Text("Slice %d/2", m_visualized_subslice_idx);
-
             ImGui::SameLine();
             ImGui::Checkbox("Color", &m_visualize_colored_placement_map);
 

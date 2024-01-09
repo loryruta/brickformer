@@ -25,7 +25,7 @@ private:
 
     std::unique_ptr<Arpenteur> m_arpenteur;
 
-    ModelRenderer m_model_renderer;
+    std::unique_ptr<ModelRenderer> m_model_renderer;
     TextureRenderer m_texture_renderer;
 
     CustomFramebuffer m_model_view_framebuffer{512, 512};

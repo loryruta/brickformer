@@ -130,9 +130,9 @@ void voxelize_triangle_to_slice(const TriRef& tri_ref,
     size_t num_iterations = 0;
     size_t num_intersections = 0;
 
-    for (int x = glm::max(tri_min.x, 0); x < glm::min<int>(tri_max.x, out_slice->m_width); x++)
+    for (int x = glm::max(tri_min.x, 0); x <= glm::min<int>(tri_max.x, out_slice->m_width); x++)
     {
-        for (int z = glm::max(tri_min.z, 0); z < glm::min<int>(tri_max.z, out_slice->m_height); z++)
+        for (int z = glm::max(tri_min.z, 0); z <= glm::min<int>(tri_max.z, out_slice->m_height); z++)
         {
             Box int_box{};
             int_box.m_min = glm::vec3(x, slice_y, z);

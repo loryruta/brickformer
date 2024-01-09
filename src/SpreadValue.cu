@@ -64,16 +64,7 @@ void spread_kernel(
     }
     else
     {
-        if (max_val > 0)
-        {
-            // This should be in relation to the size of the slice
-            new_val = max_val / 2;
-        }
-        else
-        {
-            new_val = 0;
-        }
-
+        new_val = max_val > 0 ? max_val - 1 : 0;
         if (cur_val != new_val) atomicAdd(changes, 1);
     }
     dst_image->write_pixel(px, py, glm::vec<1, uint8_t>{uint8_t(new_val)});
@@ -93,7 +84,7 @@ void SpreadValue::spread(DeviceImage<1, uint8_t>& image)
     uint32_t* changes_d = to_device<uint32_t>(0);
 
     const uint32_t k_kernel_size = 3;
-    const uint32_t k_num_iterations = 8;
+    const uint32_t k_num_iterations = 16;
 
     size_t i = 0;
     while (true)
@@ -111,7 +102,7 @@ void SpreadValue::spread(DeviceImage<1, uint8_t>& image)
         CHECK_CU(cudaDeviceSynchronize());
 
         uint32_t changes = to_host(changes_d);
-        printf("[SpreadValue] Iteration %zu; Changes: %d\n", i, changes);
+        //printf("[SpreadValue] Iteration %zu; Changes: %d\n", i, changes);
 
         // TODO (improvement) exit when no change is done! (now leads to infinite loop ... why? ... :( )
 

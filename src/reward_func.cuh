@@ -98,6 +98,8 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     int num_connected_bricks = 0;    // A number *proportional* to the number of different connected bricks in the previous subslice
     int last_prev_bid = 0;
     int highest_proximity = 0;
+    glm::vec<4, uint8_t> min_color{UINT8_MAX};
+    glm::vec<4, uint8_t> max_color{};
 
     iterate_brick_grid([&](int32_t bx, int32_t by)
     {
@@ -112,8 +114,11 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
            // Placement would overlap a previous placement on the current layer
            is_overlapping |= cur_placements_d->read_pixel(mx, my).x != 0;
 
-           // Count the number of colored cells covered
-           num_covered_map_cells += color_map_d->read_pixel(mx, my).a > 0;
+           glm::vec<4, uint8_t> color = color_map_d->read_pixel(mx, my);
+
+           min_color = glm::min(color, min_color);
+           max_color = glm::max(color, max_color);
+           if (color.a > 0) ++num_covered_map_cells;  // Count the number of colored cells covered
 
            // Count the size of the brick (number of cells set in brick's grid)
            ++brick_size;
@@ -147,6 +152,15 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
         num_neighbors += __shfl_down_sync(FULL_MASK, num_neighbors, offset);
         num_connectible_sides += __shfl_down_sync(FULL_MASK, num_connectible_sides, offset);
         num_connected_bricks += __shfl_down_sync(FULL_MASK, num_connected_bricks, offset);
+
+        min_color.r = glm::min<uint8_t>(min_color.r, __shfl_down_sync(FULL_MASK, min_color.r, offset));
+        min_color.g = glm::min<uint8_t>(min_color.g, __shfl_down_sync(FULL_MASK, min_color.g, offset));
+        min_color.b = glm::min<uint8_t>(min_color.b, __shfl_down_sync(FULL_MASK, min_color.b, offset));
+
+        max_color.r = glm::max<uint8_t>(max_color.r, __shfl_down_sync(FULL_MASK, max_color.r, offset));
+        max_color.g = glm::max<uint8_t>(max_color.g, __shfl_down_sync(FULL_MASK, max_color.g, offset));
+        max_color.b = glm::max<uint8_t>(max_color.b, __shfl_down_sync(FULL_MASK, max_color.b, offset));
+
         highest_proximity = glm::max(highest_proximity, __shfl_down_sync(FULL_MASK, highest_proximity, offset));
     }
 
@@ -181,8 +195,16 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     float dn = float(num_connected_bricks) / float(brick_size);
     float pn = float(highest_proximity) / float(PROXIMITY_MAP_HIGH_VALUE);
 
+    static constexpr float max_color_diff = 260100.0f;  // 255^2 + 255^2 + 255^2 + 255^2
+    glm::vec4 minmax_color_diff = max_color - min_color;
+
+    // Color homogeneity factor [0.0, 1.0] (0.0 -> low, 1.0 -> high)
+    float ch = glm::dot(minmax_color_diff, minmax_color_diff) / max_color_diff;
+    ch = 1.0f - ch;
+    ch = ch * ch * ch;
+
     float a = 0.8f * an * an * an;  // Adjacency factor [0.0, 0.8]
-    float c = 0.7f * cn * cn + 0.1f;  // Color factor [0.1, 0.8]
+    float c = 0.8f * cn * ch;
 
     // Connectivity factor [0.0, 1.0]
     if constexpr (!IS_SUBSLICE0)
@@ -191,7 +213,7 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
         dn = 1.0f - dn;
     }
 
-    out_reward = glm::max(a, c) + 0.2f * (bn + pn) / 2.0f;  // TODO dn
+    out_reward = glm::max(cn * a, c) + 0.2f * (cn * bn);  // TODO dn
 
     return true;
 }

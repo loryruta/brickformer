@@ -3,6 +3,7 @@
 #include "glm/gtc/type_ptr.hpp"
 
 #include "gl_helpers.hpp"
+#include "util/misc.hpp"
 
 using namespace lego_builder;
 
@@ -23,8 +24,7 @@ GLuint bake_texture(const Texture& texture)
     return gl_texture;
 }
 
-const char* k_vert_shader_src = R"(#version 460 core
-
+const char* k_vert_shader_src = R"(
     layout(location = 0) in vec3 a_position;
     layout(location = 1) in vec3 a_normal;
     layout(location = 2) in vec2 a_texcoord;
@@ -52,8 +52,7 @@ const char* k_vert_shader_src = R"(#version 460 core
     }
 )";
 
-const char* k_frag_shader_src = R"(#version 460 core
-
+const char* k_frag_shader_src = R"(
     in vec3 v_position;
     in vec3 v_normal;
     in vec2 v_texcoord;
@@ -61,11 +60,44 @@ const char* k_frag_shader_src = R"(#version 460 core
 
     uniform sampler2D u_texture;
 
+    uniform vec3 u_camera_position;
+
+    struct DirectionalLight { vec3 direction; vec3 color; };
+
+    uniform DirectionalLight u_directional_lights[8];
+    uniform uint u_num_directional_lights;
+
     layout(location = 0) out vec4 f_color;
+
+    vec3 eval_phong_shading(vec3 light_dir, vec3 light_color)
+    {
+        vec3 ambient = 0.3 * light_color;
+        vec3 diffuse = max(dot(v_normal, light_dir), 0.0) * light_color;
+
+        vec3 view_dir = normalize(v_position - u_camera_position);
+        vec3 reflect_dir = reflect(-light_dir, v_normal);
+        vec3 specular = 0.5 * pow(max(dot(view_dir, reflect_dir), 0.0), 32) * light_color;
+
+        return ambient + diffuse + specular;
+    }
 
     void main()
     {
-        f_color = texture(u_texture, v_texcoord) * v_color;
+        vec3 color = (texture(u_texture, v_texcoord) * v_color).xyz;
+
+#ifndef NO_SHADING
+        vec3 shading;
+        for (int i = 0; i < u_num_directional_lights; i++)
+        {
+            shading = max(
+                shading,
+                eval_phong_shading(u_directional_lights[i].direction, u_directional_lights[i].color)
+                );
+        }
+        color *= shading;
+#endif
+
+        f_color = vec4(color, 1.0);
     }
 )";
 }  // namespace
@@ -100,10 +132,16 @@ ModelRenderer::ModelRenderer()
 {
     m_white_texture = create_white_texture();  // Create a white texture, used in case of missing texture
 
-    // Create program
-    GLuint vert_shader = create_shader(GL_VERTEX_SHADER, k_vert_shader_src);
-    GLuint frag_shader = create_shader(GL_FRAGMENT_SHADER, k_frag_shader_src);
+    std::string version_str = "#version 460 core\n";
 
+    // Create program
+    GLuint vert_shader = create_shader(GL_VERTEX_SHADER, version_str + k_vert_shader_src);
+    GLuint frag_shader = create_shader(GL_FRAGMENT_SHADER, version_str + k_frag_shader_src);
+
+    std::string frag_shader_src = version_str + "#define NO_SHADING\n" + k_frag_shader_src;
+    GLuint frag_shader_no_shading = create_shader(GL_FRAGMENT_SHADER, frag_shader_src);
+
+    // Create program
     m_program = glCreateProgram();
 
     glAttachShader(m_program, vert_shader);
@@ -111,8 +149,18 @@ ModelRenderer::ModelRenderer()
 
     link_program(m_program);
 
+    // Create program, no shading
+    m_program_no_shading = glCreateProgram();
+
+    glAttachShader(m_program_no_shading, vert_shader);
+    glAttachShader(m_program_no_shading, frag_shader_no_shading);
+
+    link_program(m_program_no_shading);
+
+    //
     glDeleteShader(vert_shader);
     glDeleteShader(frag_shader);
+    glDeleteShader(frag_shader_no_shading);
 }
 
 ModelRenderer::~ModelRenderer()
@@ -120,6 +168,7 @@ ModelRenderer::~ModelRenderer()
     glDeleteTextures(1, &m_white_texture);
 
     glDeleteProgram(m_program);
+    glDeleteProgram(m_program_no_shading);
 }
 
 GLuint ModelRenderer::create_white_texture()
@@ -139,9 +188,16 @@ GLuint ModelRenderer::create_white_texture()
     return texture;
 }
 
+void ModelRenderer::add_directional_light(DirectionalLight directional_light)
+{
+    CHECK_STATE_MSG(m_directional_lights.size() < 8, "Reached max number of directional lights");
+    m_directional_lights.emplace_back(std::move(directional_light));
+}
+
 void ModelRenderer::render(const BakedModel& baked_model, const Camera& camera, const glm::mat4& transform)
 {
-    glUseProgram(m_program);
+    GLuint program = m_shading ? m_program : m_program_no_shading;
+    glUseProgram(program);
 
     glEnable(GL_DEPTH_TEST);
 
@@ -149,16 +205,33 @@ void ModelRenderer::render(const BakedModel& baked_model, const Camera& camera, 
     {
         if (baked_mesh.m_num_elements == 0) continue;
 
-        glUniformMatrix4fv(get_uniform_location(m_program, "u_transform"), 1, GL_FALSE, glm::value_ptr(transform));
+        // Transform
+        glUniformMatrix4fv(get_uniform_location(program, "u_transform"), 1, GL_FALSE, glm::value_ptr(transform));
 
+        // Camera
         glm::mat4 camera_mat = camera.matrix();
-        glUniformMatrix4fv(get_uniform_location(m_program, "u_camera"), 1, GL_FALSE, glm::value_ptr(camera_mat));
+        glUniformMatrix4fv(get_uniform_location(program, "u_camera"), 1, GL_FALSE, glm::value_ptr(camera_mat));
 
+        // Texture
         GLuint texture = baked_mesh.m_texture_idx >= 0 ? baked_model.m_textures[baked_mesh.m_texture_idx] : m_white_texture;
         glBindTexture(GL_TEXTURE_2D, texture);
 
-        glBindVertexArray(baked_mesh.m_vao);
+        if (m_shading)
+        {
+            // Camera position
+            glUniform3fv(get_uniform_location(program, "u_camera_position", false), 1, glm::value_ptr(camera.m_position));
 
+            // Directional lights
+            glUniform1ui(get_uniform_location(program, "u_num_directional_lights"), m_directional_lights.size());
+            for (int i = 0; i < m_directional_lights.size(); i++)
+            {
+                std::string uniform_name = "u_directional_lights[" + std::to_string(i) + "]";
+                glUniform3fv(get_uniform_location(program, uniform_name + ".direction"), 1, glm::value_ptr(m_directional_lights[i].m_direction));
+                glUniform3fv(get_uniform_location(program, uniform_name + ".color"), 1, glm::value_ptr(m_directional_lights[i].m_color));
+            }
+        }
+
+        glBindVertexArray(baked_mesh.m_vao);
         glDrawElements(GL_TRIANGLES, baked_mesh.m_num_elements, GL_UNSIGNED_INT, nullptr);
     }
 }
@@ -181,36 +254,23 @@ BakedMesh ModelRenderer::bake_mesh(const Mesh& mesh)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.m_indices.size() * sizeof(uint32_t), mesh.m_indices.data(), GL_STATIC_DRAW);
     baked_mesh.m_num_elements = mesh.m_indices.size();
 
-    GLint attrib_loc;
+    // Position
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_position));
 
-    attrib_loc = get_attrib_location(m_program, "a_position");
-    if (attrib_loc >= 0)
-    {
-        glEnableVertexAttribArray(attrib_loc);
-        glVertexAttribPointer(attrib_loc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_position));
-    }
+    // Normal
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_normal));
 
-    attrib_loc = get_attrib_location(m_program, "a_normal", false);
-    if (attrib_loc >= 0)
-    {
-        glEnableVertexAttribArray(attrib_loc);
-        glVertexAttribPointer(attrib_loc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_normal));
-    }
+    // Texcoord
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_texcoord));
 
-    attrib_loc = get_attrib_location(m_program, "a_texcoord", true);
-    if (attrib_loc >= 0)
-    {
-        glEnableVertexAttribArray(attrib_loc);
-        glVertexAttribPointer(attrib_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_texcoord));
-    }
+    // Color
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_color));
 
-    attrib_loc = get_attrib_location(m_program, "a_color", true);
-    if (attrib_loc >= 0)
-    {
-        glEnableVertexAttribArray(attrib_loc);
-        glVertexAttribPointer(attrib_loc, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_color));
-    }
-
+    //
     glBindVertexArray(0);
 
     baked_mesh.m_texture_idx = mesh.m_texture_idx;
