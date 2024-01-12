@@ -61,9 +61,12 @@ private:
     const float k_placement_visualization_period = 5.0f;  // In seconds
 
     std::unique_ptr<BakedModel> m_baked_model;
+
     Camera m_camera;
     glm::vec3 m_look_at_position;
     float m_camera_speed = 40.0f;
+    bool m_freecam = true;  // TODO default false
+
     glm::mat4 m_undo_brick_height_adjustment_matrix{1.0f};
 
     float m_dt;

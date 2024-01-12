@@ -348,8 +348,11 @@ void App::render_3d_scene()
     }
 
     // Update the camera to orbit around the model
-    m_camera.m_position += m_camera.right() * m_dt * m_camera_speed;
-    m_camera.look_at(m_look_at_position);
+    if (!m_freecam)
+    {
+        m_camera.m_position += m_camera.right() * m_dt * m_camera_speed;
+        m_camera.look_at(m_look_at_position);
+    }
 }
 
 void App::show_model_window()
@@ -375,6 +378,46 @@ void App::show_model_window()
         image_size.y = ImGui::GetContentRegionAvail().y;
         image_size.x = image_size.y;
         ImGui::Image(reinterpret_cast<void*>(m_model_view_framebuffer.m_texture), image_size, ImVec2(0, 1), ImVec2(1, 0));
+
+        static bool s_captured = false;
+        static std::optional<glm::dvec2> s_last_cursor_pos;
+
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left) && !s_captured)
+        {
+            s_captured = true;
+            ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
+            glfwSetInputMode(m_window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && s_captured)
+        {
+            s_captured = false;
+            s_last_cursor_pos.reset();
+            ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = false;
+            glfwSetInputMode(m_window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+
+        if (s_captured)
+        {
+            if (m_window.is_key_pressed(GLFW_KEY_W)) m_camera.m_position += m_camera.forward();
+            if (m_window.is_key_pressed(GLFW_KEY_S)) m_camera.m_position -= m_camera.forward();
+            if (m_window.is_key_pressed(GLFW_KEY_A)) m_camera.m_position -= m_camera.right();
+            if (m_window.is_key_pressed(GLFW_KEY_D)) m_camera.m_position += m_camera.right();
+            if (m_window.is_key_pressed(GLFW_KEY_LEFT_SHIFT)) m_camera.m_position -= m_camera.up();
+            if (m_window.is_key_pressed(GLFW_KEY_SPACE)) m_camera.m_position += m_camera.up();
+
+            glm::dvec2 cursor;
+            glfwGetCursorPos(m_window.handle(), &cursor.x, &cursor.y);
+
+            if (s_last_cursor_pos)
+            {
+                glm::dvec2 drotation = cursor - *s_last_cursor_pos;
+                m_camera.m_yaw += drotation.x * 0.004f;
+                m_camera.m_pitch -= drotation.y * 0.004f;
+            }
+
+            s_last_cursor_pos = cursor;
+        }
     }
     ImGui::End();
 }
@@ -449,9 +492,9 @@ void App::run()
 
     m_window.set_key_callback([&](int key, int scancode, int action, int mods)
     {
-        bool is_space = key == GLFW_KEY_SPACE && action == GLFW_PRESS;
+        bool is_autorun_pressed = key == GLFW_KEY_F1 && action == GLFW_PRESS;
 
-        if ((key == GLFW_KEY_ENTER && action == GLFW_PRESS) || is_space)
+        if ((key == GLFW_KEY_ENTER && action == GLFW_PRESS) || is_autorun_pressed)
         {
             // Resume the Arpenteur thread (by default it stops after a slice is completed)
             m_arpenteur_should_run = true;
@@ -460,7 +503,7 @@ void App::run()
 
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) m_window.set_should_close(true);  // Bye bye! :)
 
-        if (is_space) m_autorun = !m_autorun;
+        if (is_autorun_pressed) m_autorun = !m_autorun;
     });
 
     // Loop
