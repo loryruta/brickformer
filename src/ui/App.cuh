@@ -52,6 +52,7 @@ private:
     bool m_visualize_colored_placement_map = false;
 
     bool m_visualize_model = true;
+    bool m_visualize_brick_height_adjustment = false;
     bool m_visualize_construction = true;
     bool m_visualize_voxels = false;
 
@@ -63,6 +64,7 @@ private:
     Camera m_camera;
     glm::vec3 m_look_at_position;
     float m_camera_speed = 40.0f;
+    glm::mat4 m_undo_brick_height_adjustment_matrix{1.0f};
 
     float m_dt;
     double m_last_frame_t;

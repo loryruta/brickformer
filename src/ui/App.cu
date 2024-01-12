@@ -46,6 +46,8 @@ App::App(Window& window) :
     m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{0.0f, -1.0f, -1.0f}), .m_color = glm::vec3{1.0f}});
     m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{-1.0f, 0.0f, -1.0f}), .m_color = glm::vec3{1.0f}});
     m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{0.0f, -1.0f, -1.0f}), .m_color = glm::vec3{1.0f}});
+
+    m_undo_brick_height_adjustment_matrix[1][1] *= 1.2f;
 }
 
 App::~App()
@@ -325,12 +327,24 @@ void App::render_3d_scene()
 
     if (m_visualize_model)
     {
-        if (m_baked_model) m_model_renderer->render(*m_baked_model, m_camera, glm::mat4{1.0f});
+        if (m_baked_model)
+        {
+            m_model_renderer->render(
+                *m_baked_model,
+                m_camera,
+                m_visualize_brick_height_adjustment ? glm::mat4{1.0f} : m_undo_brick_height_adjustment_matrix
+                );
+        }
     }
 
     if (m_visualize_construction)
     {
         if (m_baked_construction_model) m_model_renderer->render(*m_baked_construction_model, m_camera, glm::mat4{1.0f});
+    }
+
+    if (m_visualize_voxels)
+    {
+        if (m_baked_voxel_model) m_model_renderer->render(*m_baked_voxel_model, m_camera, glm::mat4{1.0f});
     }
 
     // Update the camera to orbit around the model
@@ -347,6 +361,9 @@ void App::show_model_window()
 
         ImGui::Checkbox("Model", &m_visualize_model);
         ImGui::SameLine();
+        ImGui::Checkbox("Brick height adjustment", &m_visualize_brick_height_adjustment);
+        ImGui::NewLine();
+
         ImGui::Checkbox("Construction", &m_visualize_construction);
         ImGui::SameLine();
         ImGui::Checkbox("Voxels", &m_visualize_voxels);

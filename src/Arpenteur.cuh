@@ -80,7 +80,8 @@ public:
 
 private:
     /// Transforms the model vertices such that fits the user input grid (i.e. the Slicer space).
-    void transform_model_to_grid();
+    /// Also applies a correction for brick height.
+    void transform_model();
 
     /// Initializes the proximity map so that colored cells have a high value (others zero).
     void init_proximity_map_from_color_map();

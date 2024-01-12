@@ -65,13 +65,16 @@ void Arpenteur::init_placements()
     init_placements_kernel<<<num_blocks, 1024>>>(to_device(*this));  // this to device, even if some fields aren't initialized yet
 }
 
-void Arpenteur::transform_model_to_grid()
+void Arpenteur::transform_model()
 {
     glm::vec3 model_size = m_model->size();
     float max_xz_side = glm::max(model_size.x, model_size.z);
 
+    glm::vec3 scale_factor{m_slice_side / max_xz_side};
+    scale_factor.y /= 1.2f;  // Brick height adjustment
+
     glm::mat4 transform = glm::identity<glm::mat4>();
-    transform = glm::scale(transform, glm::vec3(m_slice_side / max_xz_side));
+    transform = glm::scale(transform, scale_factor);
     transform = glm::translate(transform, -m_model->m_min);
 
     m_model->apply_transform(transform);
@@ -268,7 +271,7 @@ void Arpenteur::run()
     GltfLoader gltf_loader{};
     m_model = std::make_unique<Model>(gltf_loader.load_file(m_model_path));
 
-    transform_model_to_grid();
+    transform_model();
 
     if (m_listener) m_listener->on_model_load(*m_model);
 
