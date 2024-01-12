@@ -23,6 +23,8 @@ add_executable(arpenteur_ui
         video/CustomFramebuffer.cpp
         BrickModelBuilder.cpp
         brick_models.hpp
+        video/VoxelModelBuilder.hpp
+        video/VoxelModelBuilder.cpp
 )
 
 target_link_libraries(arpenteur_ui PRIVATE arpenteur)

@@ -20,7 +20,7 @@ namespace lego_builder
         glm::vec3 m_min, m_max;
 
         __host__ __device__
-        glm::vec3 centroid() const { return m_max - m_min; } // TODO is it called "centroid"?
+        glm::vec3 centroid() const { return (m_min + m_max) / 2.0f; } // TODO is it called "centroid"?
     };
 
     __host__ __device__

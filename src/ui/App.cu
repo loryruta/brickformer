@@ -81,6 +81,7 @@ void App::enqueue_and_wait_copy_maps_job()
          write_placement_maps(m_hashed_placement_map_cuda_mappings, true);
          write_placement_maps(m_colored_placement_map_cuda_mappings, false);
          add_placements_to_construction_model();
+         add_color_map_voxels(); // TODO slow down too much
     });
 
     // Wait for the pushed jobs to be executed before continuing (avoid concurrency)
@@ -295,6 +296,28 @@ void App::add_placements_to_construction_model()
     printf("[App] UPDATE CONSTRUCTION MODEL; Done\n");
 }
 
+void App::add_color_map_voxels()
+{
+    const ColorMapT& color_map = m_arpenteur->m_color_map;
+    int slice_y = m_arpenteur->m_slice_y;
+
+    std::vector<ColorMapT::PixelT> data(color_map.m_width * color_map.m_height);
+    CHECK_CU(cudaMemcpy(data.data(), color_map.m_data, data.size() * sizeof(ColorMapT::PixelT), cudaMemcpyDeviceToHost));
+
+    for (size_t i = 0; i < data.size(); i++)
+    {
+        if (data[i].a > 0)
+        {
+            int x = i % color_map.m_width;
+            int z = i / color_map.m_width;
+            glm::vec4 color = glm::vec4{data[i]} / 255.0f;
+            m_voxel_model_builder.set_voxel(x, slice_y, z, color);
+        }
+    }
+
+    m_baked_voxel_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(m_voxel_model_builder.model()));
+}
+
 void App::render_3d_scene()
 {
     glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
@@ -320,13 +343,15 @@ void App::show_model_window()
     if (ImGui::Begin("Model"))
     {
         ImGui::Text("Model path: %s", m_arpenteur->m_model_path.c_str());
+        ImGui::NewLine();
 
         ImGui::Checkbox("Model", &m_visualize_model);
         ImGui::SameLine();
         ImGui::Checkbox("Construction", &m_visualize_construction);
         ImGui::SameLine();
+        ImGui::Checkbox("Voxels", &m_visualize_voxels);
+        ImGui::SameLine();
         ImGui::Checkbox("Shading", &m_model_renderer->m_shading);
-
         ImGui::NewLine();
 
         ImVec2 image_size;

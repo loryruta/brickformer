@@ -13,6 +13,7 @@ namespace lego_builder
 template<uint32_t FORMAT, typename DATA_TYPE>
 class DeviceImage
 {
+public:
     using PixelT = glm::vec<FORMAT, DATA_TYPE>;
     static_assert(sizeof(PixelT) == sizeof(DATA_TYPE) * FORMAT);  // No unexpected padding please :/
 

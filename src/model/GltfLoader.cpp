@@ -161,13 +161,15 @@ void GltfLoader::parse_node(const tinygltf::Node& gltf_node, glm::mat4 transform
 {
     if (!gltf_node.matrix.empty())
     {
+        glm::mat4 matrix{};
         for (int i = 0; i < 4; i++)
         {
-            transform[i][0] = gltf_node.matrix[i * 4 + 0];
-            transform[i][1] = gltf_node.matrix[i * 4 + 1];
-            transform[i][2] = gltf_node.matrix[i * 4 + 2];
-            transform[i][3] = gltf_node.matrix[i * 4 + 3];
+            matrix[i][0] = gltf_node.matrix[i * 4];
+            matrix[i][1] = gltf_node.matrix[i * 4 + 1];
+            matrix[i][2] = gltf_node.matrix[i * 4 + 2];
+            matrix[i][3] = gltf_node.matrix[i * 4 + 3];
         }
+        transform = transform * matrix;
     }
     else
     {

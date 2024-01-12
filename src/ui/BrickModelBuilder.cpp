@@ -29,8 +29,7 @@ std::vector<Vertex> transform_vertices(
 
 BrickModelBuilder::BrickModelBuilder()
 {
-    m_model.m_meshes.emplace_back();
-    m_mesh = &m_model.m_meshes[0];
+    m_mesh = &m_model.m_meshes.emplace_back();
 }
 
 void BrickModelBuilder::place(int slice_y, int x, int z, int bid, uint8_t subslice_mask, const glm::vec4& color)

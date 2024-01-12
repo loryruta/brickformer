@@ -7,6 +7,7 @@
 #include "BrickModelBuilder.hpp"
 #include "Queue.hpp"
 #include "ui/video/CustomFramebuffer.hpp"
+#include "ui/video/VoxelModelBuilder.hpp"
 #include "ui/video/cuda_interop_helpers.cuh"
 #include "util/StopWatch.hpp"
 #include "video/ModelRenderer.hpp"
@@ -38,6 +39,9 @@ private:
     BrickModelBuilder m_brick_model_builder; // TODO rename
     std::unique_ptr<BakedModel> m_baked_construction_model;
 
+    VoxelModelBuilder m_voxel_model_builder;
+    std::unique_ptr<BakedModel> m_baked_voxel_model;
+
     enum VisualizeMapType : uint8_t
     {
         VisualizeMapType_ColorMap = 0, VisualizeMapType_ProximityMap, VisualizeMapType_PlacementMap
@@ -49,6 +53,7 @@ private:
 
     bool m_visualize_model = true;
     bool m_visualize_construction = true;
+    bool m_visualize_voxels = false;
 
     /// If the placement takes too long, this stopwatch is used to visualize intermediate result at fixed intervals.
     StopWatch m_placement_stopwatch;
@@ -96,6 +101,9 @@ private:
 
     /// Having the placements for the current slice, adds the vertices of them to create the 3d model of the construction (for visualization).
     void add_placements_to_construction_model();
+
+    /// Converts the pixels of the Color map to voxels shown in the 3d scene.
+    void add_color_map_voxels();
 
     /// Function meant to be called from the Arpenteur's thread:
     /// Enqueues a job to copy the color map, proximity map and placement maps; and blocks the thread until executed.
