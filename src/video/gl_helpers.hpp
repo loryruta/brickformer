@@ -3,7 +3,7 @@
 #include <cassert>
 #include <string>
 
-#include <glad/gl.h>
+#include "glad/gl.h"
 
 namespace lego_builder
 {

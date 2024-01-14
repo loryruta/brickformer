@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include <glad/gl.h>
+#include "glad/gl.h"
 #include <cuda_gl_interop.h>
 
 #include "DeviceImage.cuh"

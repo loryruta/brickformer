@@ -83,7 +83,7 @@ const char* k_frag_shader_src = R"(
 
     void main()
     {
-        vec3 color = (texture(u_texture, v_texcoord) * v_color).xyz;
+        vec4 color = texture(u_texture, v_texcoord) * v_color;
 
 #ifndef NO_SHADING
         vec3 shading;
@@ -94,10 +94,10 @@ const char* k_frag_shader_src = R"(
                 eval_phong_shading(u_directional_lights[i].direction, u_directional_lights[i].color)
                 );
         }
-        color *= shading;
+        color.xyz *= shading;
 #endif
 
-        f_color = vec4(color, 1.0);
+        f_color = color;
     }
 )";
 }  // namespace
@@ -201,6 +201,9 @@ void ModelRenderer::render(const BakedModel& baked_model, const Camera& camera, 
 
     glEnable(GL_DEPTH_TEST);
 
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     for (const BakedMesh& baked_mesh : baked_model.m_meshes)
     {
         if (baked_mesh.m_num_elements == 0) continue;
@@ -282,20 +285,20 @@ BakedModel ModelRenderer::bake_model(const Model& model)
 {
     BakedModel baked_model{};
 
-    printf("[ModelRenderer] Baking %zu textures...\n", model.m_textures.size());
+    //printf("[ModelRenderer] Baking %zu textures...\n", model.m_textures.size());
     for (const Texture& texture : model.m_textures)
     {
         baked_model.m_textures.emplace_back(bake_texture(texture));
     }
 
-    printf("[ModelRenderer] Baking %zu meshes...\n", model.m_meshes.size());
+    //printf("[ModelRenderer] Baking %zu meshes...\n", model.m_meshes.size());
     for (const Mesh& mesh : model.m_meshes)
     {
         BakedMesh baked_mesh = bake_mesh(mesh);
         baked_model.m_meshes.emplace_back(std::move(baked_mesh));
     }
 
-    printf("[ModelRenderer] Model baked\n");
+    //printf("[ModelRenderer] Model baked\n");
 
     return baked_model;
 }

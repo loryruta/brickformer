@@ -117,7 +117,7 @@ namespace lego_builder
     }
 
     __host__ __device__
-    inline bool intersect_triangle2(Box const& box, Triangle const& tri)
+    inline bool intersect_triangle2(const Box& box, const Triangle& tri)
     {
         // Source:
         // https://omnigoat.github.io/2015/03/09/box-triangle-intersection/
@@ -127,8 +127,6 @@ namespace lego_builder
         tri_box.m_min = tri.min();
         tri_box.m_max = tri.max();
         if (!intersect_box(box, tri_box)) return false;
-
-        // TODO not working :(
 
         const glm::vec3 k_tri_edges[]{
             tri.m_b - tri.m_a,

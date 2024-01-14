@@ -37,3 +37,5 @@ target_link_libraries(arpenteur PUBLIC stb)
 target_link_libraries(arpenteur PUBLIC tinygltf)
 
 add_subdirectory(ui)
+add_subdirectory(video)
+add_subdirectory(voxel)
