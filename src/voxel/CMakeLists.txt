@@ -1,0 +1,4 @@
+
+add_executable(triboxclipping main_TriBoxClipping.cpp)
+
+target_link_libraries(triboxclipping PRIVATE arpenteur_video)

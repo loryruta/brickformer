@@ -117,15 +117,46 @@ glm::vec4 interp_triangle_color(const glm::vec3& p, const TriRef& tri_ref, const
 }
 
 __device__
+int8_t eval_cut_centrality(
+    glm::vec3 bm, glm::vec3 bM,
+    const glm::vec3& ta, const glm::vec3& tb, const glm::vec3& tc
+    )
+{
+    const glm::vec3& p0 = ta;
+    glm::vec3 d1 = glm::normalize(tb - ta);
+    glm::vec3 d2 = glm::normalize(tc - ta);
+
+    glm::vec3 abc = glm::cross(d1, d2);
+    bm -= p0, bM -= p0;
+
+    int8_t result = 0;
+    result += abc.x * bm.x + abc.y * bm.y + abc.z * bm.z > 0 ? 1 : -1;  // 000
+    result += abc.x * bm.x + abc.y * bm.y + abc.z * bM.z > 0 ? 1 : -1;  // 001
+    result += abc.x * bm.x + abc.y * bM.y + abc.z * bm.z > 0 ? 1 : -1;  // 010
+    result += abc.x * bm.x + abc.y * bM.y + abc.z * bM.z > 0 ? 1 : -1;  // 011
+    result += abc.x * bM.x + abc.y * bm.y + abc.z * bm.z > 0 ? 1 : -1;  // 100
+    result += abc.x * bM.x + abc.y * bm.y + abc.z * bM.z > 0 ? 1 : -1;  // 101
+    result += abc.x * bM.x + abc.y * bM.y + abc.z * bm.z > 0 ? 1 : -1;  // 110
+    result += abc.x * bM.x + abc.y * bM.y + abc.z * bM.z > 0 ? 1 : -1;  // 111
+    if (result < 0) result = -result;
+    return result;
+}
+
+__device__
 void voxelize_triangle_to_slice(const TriRef& tri_ref,
                                 const DeviceModel& model,
-                                uint32_t slice_y, SliceT* out_slice,
+                                uint32_t slice_y,
+                                SliceT* out_slice,
                                 size_t& out_num_iterations,
                                 size_t& out_num_intersections
                                 )
 {
-    glm::ivec3 tri_min = glm::min(tri_ref.m_vertices[0], glm::min(tri_ref.m_vertices[1], tri_ref.m_vertices[2]));
-    glm::ivec3 tri_max = glm::max(tri_ref.m_vertices[0], glm::max(tri_ref.m_vertices[1], tri_ref.m_vertices[2]));
+    const glm::vec3& a = tri_ref.m_vertices[0];
+    const glm::vec3& b = tri_ref.m_vertices[1];
+    const glm::vec3& c = tri_ref.m_vertices[2];
+
+    glm::ivec3 tri_min = glm::floor(glm::min(a, glm::min(b, c)));
+    glm::ivec3 tri_max = glm::floor(glm::max(a, glm::max(b, c)));
 
     size_t num_iterations = 0;
     size_t num_intersections = 0;
@@ -134,21 +165,16 @@ void voxelize_triangle_to_slice(const TriRef& tri_ref,
     {
         for (int z = glm::max(tri_min.z, 0); z <= glm::min<int>(tri_max.z, out_slice->m_height); z++)
         {
-            Box int_box{};
-            int_box.m_min = glm::vec3(x, slice_y, z);
-            int_box.m_max = int_box.m_min + 1.0f;
-
-            Triangle int_tri{};
-            int_tri.m_a = tri_ref.m_vertices[0];
-            int_tri.m_b = tri_ref.m_vertices[1];
-            int_tri.m_c = tri_ref.m_vertices[2];
-
-            if (intersect_triangle(int_box, int_tri))
+            glm::vec3 bmin{x, slice_y, z};
+            if (intersect_triangle(Box{bmin, bmin + 1.0f}, Triangle{a, b, c}))
             {
-                glm::vec4 color = interp_triangle_color(int_box.centroid(), tri_ref, model);
-
-                set_voxel(x, z, color, out_slice);
-                num_intersections++;
+                int8_t cc = eval_cut_centrality(bmin, bmin + 1.0f, a, b, c);
+                if (cc == 0)
+                {
+                    glm::vec4 color = interp_triangle_color(bmin + 0.5f, tri_ref, model);
+                    set_voxel(x, z, color, out_slice);
+                    num_intersections++;
+                }
             }
 
             num_iterations++;
@@ -175,7 +201,7 @@ void Slicer::slice(uint32_t slice_y, SliceT& out_slice)
     const DeviceModel* model_d = m_model_d;
     SliceT* out_slice_d = to_device(out_slice);  // TODO input already on device image (move to host for debug-only)
 
-    thrust::for_each(m_triangles_d.begin(), m_triangles_d.end(), [=] __device__ (const TriRef &tri) {
+    thrust::for_each(m_triangles_d.begin(), m_triangles_d.end(), [=] __device__ (const TriRef& tri) {
         size_t num_iterations;
         size_t num_intersections;
         voxelize_triangle_to_slice(tri, *model_d, slice_y, out_slice_d, num_iterations, num_intersections);

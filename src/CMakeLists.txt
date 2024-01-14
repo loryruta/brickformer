@@ -27,6 +27,7 @@ add_library(arpenteur STATIC
     ui/BrickModelBuilder.hpp
     util/misc.hpp
     colorize_placements.cuh
+    voxel/TriBoxClipping.hpp
     )
 
 target_include_directories(arpenteur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
