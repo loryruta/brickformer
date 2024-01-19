@@ -6,9 +6,9 @@
 #include <glm/glm.hpp>
 
 #include "ArpenteurListener.hpp"
-#include "Slicer.cuh"
 #include "SpreadValue.cuh"
 #include "types.cuh"
+#include "voxel/Slicer.cuh"
 
 namespace lego_builder
 {

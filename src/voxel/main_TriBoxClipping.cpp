@@ -94,7 +94,7 @@ void clip_triangle_with_aabb(  // TODO not only triangles actually...
 }
 */
 
-int pmod(int i, int n)
+int pmod(int i, int n)  // TODO already defined in misc.cuh
 {
     return (i % n + n) % n;
 }
@@ -142,15 +142,12 @@ void clip_face_by_plane(
         bool v0i = glm::dot(v0 - po, pn) < k_epsilon;  // v0 inside
         bool v1i = glm::dot(v1 - po, pn) < k_epsilon;  // v1 inside
 
-        if (v0i)
-        {
-            add_if_not_duplicated(out_face, v0, 0.01f);
-        }
+        if (v0i) out_face.push_back(v0);
 
         if ((!v0i && v1i) || (v0i && !v1i))
         {
             glm::vec3 iv = plane_line_intersection(v0, v1, po, pn);
-            add_if_not_duplicated(out_face, iv, 0.01f);
+            out_face.push_back(iv);
         }
     }
 }

@@ -19,16 +19,16 @@ add_library(arpenteur STATIC
     util/misc.cuh
     primitives.cuh
     reward_func.cuh
-    Slicer.cu
-    Slicer.cuh
+    voxel/Slicer.cu
+    voxel/Slicer.cuh
     SpreadValue.cu
     SpreadValue.cuh
     types.cuh
     ui/BrickModelBuilder.hpp
     util/misc.hpp
     colorize_placements.cuh
-    voxel/TriBoxClipping.hpp
-    )
+    util/StaticVector.cuh
+)
 
 target_include_directories(arpenteur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 

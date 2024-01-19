@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include <glm/glm.hpp>
+#include "glm/glm.hpp"
 #include <thrust/device_vector.h>
 
 #include "DeviceImage.cuh"

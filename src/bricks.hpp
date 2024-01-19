@@ -4,6 +4,7 @@
 
 #define BRICK_MAX_WIDTH  8 // Must be a power of 2
 #define BRICK_MAX_HEIGHT 8 // TODO "HEIGHT"? IT'S NOT AN HEIGHT!
+#define BRICK_MAX_SIZE   (BRICK_MAX_WIDTH * BRICK_MAX_HEIGHT)
 
 #ifndef __CUDACC__
 #   define __constant__

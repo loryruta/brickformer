@@ -2,7 +2,11 @@
 
 #include <thrust/copy.h>
 
+#include "util/StaticVector.cuh"
 #include "util/intersections.cuh"
+
+#define MAX_POLYGON_SIZE 8  ///< The maximum number of vertices that are allowed (after e.g. triangle clipping)
+#define SET_VOXEL_SPREAD 0  ///< The radius of the area where the voxel is set (0 = only set position)
 
 using namespace lego_builder;
 
@@ -50,17 +54,12 @@ void set_voxel(int x, int z, const glm::vec4& color, SliceT* out_slice)
     assert(x >= 0 && x <= out_slice->m_width);
     assert(z >= 0 && z <= out_slice->m_height);
 
-    const size_t k_spread = 1;
-
-    for (int nx = x - k_spread; nx <= x + k_spread; nx++)
+    for (int nx = x - SET_VOXEL_SPREAD; nx <= x + SET_VOXEL_SPREAD; nx++)
     {
-        for (int nz = z - k_spread; nz <= z + k_spread; nz++)
+        for (int nz = z - SET_VOXEL_SPREAD; nz <= z + SET_VOXEL_SPREAD; nz++)
         {
             if (!out_slice->is_valid_pixel(x, z)) continue;
-
             out_slice->write_pixel(nx, nz, color);
-
-            //printf("Setting voxel; (%d, %d): (%.3f, %.3f, %.3f, %.3f)\n", nx, nz, color.r, color.g, color.b, color.a);
         }
     }
 }
@@ -143,6 +142,111 @@ int8_t eval_cut_centrality(
 }
 
 __device__
+glm::vec3 plane_line_intersection(
+    const glm::vec3& l1,
+    const glm::vec3& l2,
+    const glm::vec3& po,
+    const glm::vec3& pn
+    )
+{
+    glm::vec3 ld = l2 - l1;
+    float t = glm::dot(po - l1, pn) / glm::dot(ld, pn);
+    return l1 + ld * t;
+}
+
+__device__
+void clip_face_with_plane(
+    const StaticVector<glm::vec3, MAX_POLYGON_SIZE>& face,
+    const glm::vec3& po, const glm::vec3& pn,
+    StaticVector<glm::vec3, MAX_POLYGON_SIZE>& out_face
+    )
+{
+    const float k_epsilon = 0.001f;
+
+    for (int i = 0; i < face.size(); i++)
+    {
+        const glm::vec3& v0 = face[i];
+        const glm::vec3& v1 = face[pmod(i + 1, face.size())];
+
+        bool v0i = glm::dot(v0 - po, pn) < k_epsilon;  // v0 inside
+        bool v1i = glm::dot(v1 - po, pn) < k_epsilon;  // v1 inside
+
+        if (v0i) out_face.push_back(v0);
+
+        if ((!v0i && v1i) || (v0i && !v1i))
+        {
+            glm::vec3 iv = plane_line_intersection(v0, v1, po, pn);
+            out_face.push_back(iv);
+        }
+    }
+}
+
+__device__
+void clip_face_with_aabb(
+    StaticVector<glm::vec3, MAX_POLYGON_SIZE>& face,  // Input & output
+    const glm::vec3& bmin, const glm::vec3& bmax
+    )
+{
+    StaticVector<glm::vec3, MAX_POLYGON_SIZE> face2;
+
+    // bmin.x
+    clip_face_with_plane(face, bmin, {-1, 0, 0}, face2);
+
+    // bmin.y
+    face.clear();
+    clip_face_with_plane(face2, bmin, {0, -1, 0}, face);
+
+    // bmin.z
+    face2.clear();
+    clip_face_with_plane(face, bmin, {0, 0, -1}, face2);
+
+    // bmax.x
+    face.clear();
+    clip_face_with_plane(face2, bmax, {1, 0, 0}, face);
+
+    // bmax.y
+    face2.clear();
+    clip_face_with_plane(face, bmax, {0, 1, 0}, face2);
+
+    // bmax.z
+    face.clear();
+    clip_face_with_plane(face2, bmax, {0, 0, 1}, face);
+}
+
+__device__
+float calc_triangle_area(const glm::vec2& v0, const glm::vec2& v1, const glm::vec2& v2)
+{
+    return 0.5f * glm::abs(v0.x * (v1.y - v2.y) + v1.x * (v2.y - v0.y) + v2.x * (v0.y - v1.y));
+}
+
+__device__
+float calc_convex_face_area(
+    const StaticVector<glm::vec3, MAX_POLYGON_SIZE>& face,
+    const glm::vec3& pd1,
+    const glm::vec3& pd2
+)
+{
+    if (face.size() < 3) return 0.0f;
+
+    const glm::vec3& v0 = face[0];
+
+    glm::vec2 pv0{0, 0};
+
+    float area = 0.0f;
+    for (int i = 1; i < face.size() - 1; i++)
+    {
+        const glm::vec3& v1 = face[i];
+        const glm::vec3& v2 = face[i + 1];
+
+        glm::vec2 pv1{glm::dot(v1 - v0, pd1), glm::dot(v1 - v0, pd2)};
+        glm::vec2 pv2{glm::dot(v2 - v0, pd1), glm::dot(v2 - v0, pd2)};
+
+        area += calc_triangle_area(pv0, pv1, pv2);
+    }
+    return area;
+}
+
+__device__
 void voxelize_triangle_to_slice(const TriRef& tri_ref,
                                 const DeviceModel& model,
                                 uint32_t slice_y,
@@ -165,19 +269,59 @@ void voxelize_triangle_to_slice(const TriRef& tri_ref,
     {
         for (int z = glm::max(tri_min.z, 0); z <= glm::min<int>(tri_max.z, out_slice->m_height); z++)
         {
-            glm::vec3 bmin{x, slice_y, z};
-            if (intersect_triangle(Box{bmin, bmin + 1.0f}, Triangle{a, b, c}))
-            {
-                int8_t cc = eval_cut_centrality(bmin, bmin + 1.0f, a, b, c);
-                if (cc == 0)
-                {
-                    glm::vec4 color = interp_triangle_color(bmin + 0.5f, tri_ref, model);
-                    set_voxel(x, z, color, out_slice);
-                    num_intersections++;
-                }
-            }
+            ++num_iterations;
 
-            num_iterations++;
+            glm::vec3 bmin{x, slice_y, z};
+
+            StaticVector<glm::vec3, MAX_POLYGON_SIZE> face{};
+            face.push_back(a);
+            face.push_back(b);
+            face.push_back(c);
+            clip_face_with_aabb(face, bmin, bmin + 1.0f);
+
+            if (face.size() == 0) continue;  // Not intersecting
+
+            //float area = calc_convex_face_area(face, d1, d2);
+
+            /*
+            bool check = area < tarea + 0.01f;
+            if (!check)
+            {
+                printf("(%f, %f, %f)\n", a.x, a.y, a.z);
+                printf("(%f, %f, %f)\n", b.x, b.y, b.z);
+                printf("(%f, %f, %f)\n", c.x, c.y, c.z);
+
+                printf("\n");
+
+
+                for (int i = 0; i < face.size(); i++)
+                {
+                    const glm::vec3& v = face[i];
+                    printf("%d : (%f, %f, %f)\n", i, v.x, v.y, v.z);
+                }
+
+                printf("area: %f, tarea: %f\n", area, tarea);
+            }
+            assert(check);
+            */
+
+            //area = glm::max(area / tarea, area);  // 2nd is / 1.0f (max area within cube)
+            //if (area < 0.2f) continue;
+            //printf("Voxel (%d, %d, %d) ; Face: %d, Area: %f\n", x, slice_y, z, int(face.size()), area);
+            //if (area < 0.2f) continue;  // Intersection not central enough
+
+            glm::vec4 color = interp_triangle_color(bmin + 0.5f, tri_ref, model);
+            //glm::vec4 color = {255,0,0,255};
+
+//            glm::vec4 color;
+//            color.r = glm::fract(sin(x) * 1e4) * 255.0f;
+//            color.g = glm::fract(cos(slice_y * 124.0f) * 43758.0f) * 255.0f;
+//            color.b = glm::fract(cos(z * 758.0f) * 43758.0f) * 255.0f;
+//            color.a = 255.0f;
+
+            set_voxel(x, z, color, out_slice);
+            //printf("Set voxel: (%f,%f,%f,%f)\n", color.r, color.g, color.b, color.a);
+            ++num_intersections;
         }
     }
 

@@ -17,5 +17,8 @@ public:
     [[nodiscard]] const Model& model() const { return m_model; }
 
     void place(int slice_y, int x, int z, int bid, uint8_t subslice_mask, const glm::vec4& color);
+
+private:
+    void place_1x1(int slice_y, int x, int z, uint8_t subslice_mask, const glm::vec4& color);
 };
 }

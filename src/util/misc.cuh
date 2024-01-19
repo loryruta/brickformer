@@ -86,4 +86,10 @@ namespace lego_builder
 
     __host__ __device__
     inline glm::vec4 to_fvec4(const float4& v) { return {v.x, v.y, v.z, v.w}; }
+
+    __host__ __device__
+    inline int pmod(int i, int n)
+    {
+        return (i % n + n) % n;
+    }
 }
