@@ -19,6 +19,16 @@ struct Placement
     uint8_t m_y;
     uint8_t _pad;  // Autistic padding to 32bit
 
+    struct {
+        bool is_outside;
+        bool is_overlapping;
+        int num_covered_map_cells;
+        int brick_size;
+        int num_neighbors;
+        int num_connectible_sides;
+        int num_connected_bricks;
+    } computed;
+
     bool operator==(const Placement& other) const
     {
         return m_bid == other.m_bid && m_x == other.m_x && m_y == other.m_y;

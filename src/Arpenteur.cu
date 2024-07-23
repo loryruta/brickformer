@@ -7,6 +7,7 @@
 #include "colorize_placements.cuh"
 #include "model/GltfLoader.hpp"
 #include "reward_func.cuh"
+#include "types.cuh"
 #include "util/StopWatch.hpp"
 
 using namespace lego_builder;
@@ -119,7 +120,7 @@ template<bool IS_SUBSLICE0>
 __global__
 void eval_placements_kernel(Arpenteur* self)
 {
-    uint32_t warp_i = blockIdx.x * 32 + (threadIdx.x >> 5);
+    uint32_t warp_i = blockIdx.x * 32 + (threadIdx.x >> 5); // One placement per warp
 
     if (warp_i < self->m_num_placements)
     {

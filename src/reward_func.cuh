@@ -49,7 +49,7 @@ inline void inspect_neighborhood(
 
     if (mx + 1 < placement_map->m_width && (bx + 1 >= BRICK_MAX_WIDTH || !brick[by][bx + 1]))
     {
-        if (placement_map->read_pixel(mx + 1, my).x > 0) ++inout_num_neighbors;
+        if (placement_map->read_pixel(mx + 1, my).x > 0) ++inout_num_neighbors; // TODO: bug: increment atomically
         ++inout_num_connectible_sides;
     }
 
@@ -78,6 +78,8 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
 {
     auto& brick = k_bricks[placement.m_bid];
 
+    int warp_i = threadIdx.x >> 5;
+
     ColorMapT* color_map_d = arpenteur.m_color_map_d;
     ProximityMapT* prev_proximity_map_d = arpenteur.m_prev_proximity_map_d;
     PlacementMapT* prev_placements_d = arpenteur.m_prev_placements_d;
@@ -91,7 +93,7 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     // - if not subslice0, the similarity to previous slice placements covered (we want to stack them)
     bool is_outside = false;
     bool is_overlapping = false;
-    int num_covered_map_cells = 0;   // The number of cells of the underlying color_map being covered by the placement
+    int num_covered_map_cells = 0;   // The number of cells of the color map covered by the placement
     int brick_size = 0;              // The number of set cells of the brick's grid
     int num_neighbors = 0;           // A number *proportional* to the number of bricks adjacent to the placement (likely >=)
     int num_connectible_sides = 0;   // A number *proportional* to the number of connectible sides
@@ -164,11 +166,20 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
         highest_proximity = glm::max(highest_proximity, __shfl_down_sync(FULL_MASK, highest_proximity, offset));
     }
 
-    // After reduction, only the first thread holds the aggregated values:
+    // After reduction, only the first thread of the warp holds the aggregated values:
     // it's the only one able to compute validity/reward!
     if ((threadIdx.x & 0x1f) != 0) return false;
 
     // ONLY THREAD 0 IS VALID FROM NOW ON
+
+    auto& computed_props = placement.computed;
+    computed_props.is_outside = is_outside;
+    computed_props.is_overlapping = is_overlapping;
+    computed_props.num_covered_map_cells = num_covered_map_cells;
+    computed_props.brick_size = brick_size;
+    computed_props.num_neighbors = num_neighbors;
+    computed_props.num_connectible_sides = num_connectible_sides;
+    computed_props.num_connected_bricks = num_connected_bricks;
 
     bool discard = false;
     discard |= brick_size == 0;  // Empty brick
@@ -203,8 +214,8 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     ch = 1.0f - ch;
     ch = ch * ch * ch;
 
-    float a = 0.8f * an * an * an;  // Adjacency factor [0.0, 0.8]
-    float c = 0.8f * cn * ch;
+//    float a = 0.8f * an * an * an;  // Adjacency factor [0.0, 0.8]
+//    float c = 0.8f * cn * ch;
 
     // Connectivity factor [0.0, 1.0]
     if constexpr (!IS_SUBSLICE0)
@@ -213,7 +224,18 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
         dn = 1.0f - dn;
     }
 
-    out_reward = glm::max(cn * a, c) + 0.2f * (cn * bn);  // TODO dn
+    // TODO OLD out_reward = glm::max(cn * a, c) + 0.2f * (cn * bn);  // TODO dn
+
+    if (num_covered_map_cells == 0) {
+        if (num_neighbors == num_connectible_sides) {
+            // If this placement doesn't cover the color map, it is only allowed to fill holes!
+            out_reward = bn;
+        } else {
+            out_reward = 0.f;
+        }
+    } else {
+        out_reward = bn * (an + dn) + (.2f + cn * .8f);
+    }
 
     return true;
 }

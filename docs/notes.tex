@@ -1,0 +1,44 @@
+\document{article}
+
+\title{LEGO Builder}
+
+\section{Floating bricks}
+
+Consider the following situation:
+
+we have a model with two cluster of voxels that are far away each other (different heights).
+For this situation, we would like to place bricks for both clusters as there's no way the two can be connected.
+
+> Although alternative solutions were considered: for example, identifying such clusters in the model's grid and
+> connect them with a straight line. Not feasible as it would lead to unstable structure.
+
+Now, take the very first slice of the ''floating'' cluster.
+Bricks placed for it should be valid placements.
+Do we need a special treatment to accept those? 
+
+Yes, if the placement isn't connecting any brick of the previous subslice, is invalid.
+
+**But if the value of the previous subslice proximity map is below a threshold, then it's valid!**
+
+\section{Reward function}
+
+The program works by testing all the possible Placement that can be done for a 2d slice.
+For every placement, a \textbf{reward function} is evaluated and the optimal placement is chosen.
+
+The reward function evaluation is done leveraging GPU parallelism:
+we can easily test all the possible, finite points, instead of performing an approximate search (for example, using Particle Swarm Optimization).
+
+Given the following variables defined per placement $\rho$:
+
+\begin{itemize}
+    \item $a_{n} \in [0, 1]$ a number proportional to the number of sides with a neighbor over all placement sides
+    \item $b_{n} \in ]0, 1]$ the ratio of the brick size over the maximum brick size
+    \item $c_{n} \in [0, 1]$ a number proportional to the number of color spots covered by the placement
+    \item $d_{n} \in [0, 1]$ a number proportional to the number of different bricks of the previous slice connected by the placement
+\end{itemize}
+
+The reward function is defined as:
+
+\begin{equation}
+    f(\rho) =
+\end{equation}

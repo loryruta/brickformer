@@ -29,7 +29,7 @@ public:
 
     /// The minimum accepted reward.
     /// If the best placement for a subslice has its reward lower than this threshold, the subslice is completed.
-    float m_min_reward = 0.3f;
+    float m_min_reward = 0.001f;
 
     size_t m_num_placements;
 
