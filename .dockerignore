@@ -1,5 +1,10 @@
 /.idea
+/.venv
+/docs
 
 # Build directories
+/build
 /cmake-build-*
 /docker-build
+
+/venv

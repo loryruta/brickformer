@@ -1,6 +1,8 @@
 
 
 add_library(arpenteur STATIC
+    exporters/OutputToGltf.cu
+
     model/DeviceModel.cu
     model/DeviceModel.cuh
     model/GltfLoader.cpp
@@ -37,6 +39,10 @@ target_link_libraries(arpenteur PUBLIC glm)
 target_link_libraries(arpenteur PUBLIC stb)
 target_link_libraries(arpenteur PUBLIC tinygltf)
 
-add_subdirectory(ui)
-add_subdirectory(video)
+if (NOT LEGO_BUILDER_NO_VIDEO)
+    add_subdirectory(ui)
+    add_subdirectory(video)
+endif()
+
 add_subdirectory(voxel)
+add_subdirectory(headless)

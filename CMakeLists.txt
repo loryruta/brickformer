@@ -2,8 +2,12 @@ cmake_minimum_required(VERSION 3.25)
 
 set(CMAKE_CUDA_ARCHITECTURES 75)
 
-# Important: nvcc requires GNU version <= 12
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${CMAKE_CXX_COMPILER}")
+# Important: nvcc 12.3 requires GNU version <= 12
+# There could be situations where the system's default compiler has an incompatible version, in such cases the developer
+# might explicit the compiler to use by setting CXX env variable
+if (CMAKE_CXX_COMPILER)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${CMAKE_CXX_COMPILER}")
+endif()
 
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 
@@ -18,6 +22,12 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(arpenteur LANGUAGES C CXX CUDA)
 
+if (NOT LEGO_BUILDER_NO_VIDEO)
+    message(STATUS "Video support is enabled")
+else()
+    message(STATUS "Video support is disabled (only headless target defined)")
+endif()
+
 # ------------------------------------------------------------------------------------------------
 # External libraries
 # ------------------------------------------------------------------------------------------------
@@ -31,17 +41,19 @@ set(CCCL_ENABLE_EXAMPLES OFF)
 set(CCCL_ENABLE_BENCHMARKS OFF)
 add_subdirectory(external/cccl)
 
-# glad
-add_library(glad STATIC external/glad/src/gl.c)
-target_include_directories(glad PUBLIC external/glad/include/)
+if (NOT LEGO_BUILDER_NO_VIDEO)
+    # glad
+    add_library(glad STATIC external/glad/src/gl.c)
+    target_include_directories(glad PUBLIC external/glad/include/)
 
-# glfw
-set(BUILD_SHARED_LIBS OFF)
-set(GLFW_BUILD_EXAMPLES OFF)
-set(GLFW_BUILD_TESTS OFF)
-set(GLFW_BUILD_DOCS OFF)
-set(GLFW_INSTALL OFF)
-add_subdirectory(external/glfw)
+    # glfw
+    set(BUILD_SHARED_LIBS OFF)
+    set(GLFW_BUILD_EXAMPLES OFF)
+    set(GLFW_BUILD_TESTS OFF)
+    set(GLFW_BUILD_DOCS OFF)
+    set(GLFW_INSTALL OFF)
+    add_subdirectory(external/glfw)
+endif ()
 
 # GLM
 add_library(glm INTERFACE)
@@ -71,16 +83,18 @@ set(TINYGLTF_HEADER_ONLY OFF)
 set(TINYGLTF_INSTALL OFF)
 add_subdirectory(external/tinygltf)
 
-# imgui backend OpenGL3+GLFW
-add_library(imgui_backend_opengl3_glfw STATIC
-    external/imgui/backends/imgui_impl_opengl3.cpp
-    external/imgui/backends/imgui_impl_glfw.cpp
-    )
+if (NOT LEGO_BUILDER_NO_VIDEO)
+    # imgui backend OpenGL3+GLFW
+    add_library(imgui_backend_opengl3_glfw STATIC
+        external/imgui/backends/imgui_impl_opengl3.cpp
+        external/imgui/backends/imgui_impl_glfw.cpp
+        )
 
-target_include_directories(imgui_backend_opengl3_glfw PUBLIC external/imgui/backends)
+    target_include_directories(imgui_backend_opengl3_glfw PUBLIC external/imgui/backends)
 
-target_link_libraries(imgui_backend_opengl3_glfw PRIVATE glfw)
-target_link_libraries(imgui_backend_opengl3_glfw PRIVATE imgui)
+    target_link_libraries(imgui_backend_opengl3_glfw PRIVATE glfw)
+    target_link_libraries(imgui_backend_opengl3_glfw PRIVATE imgui)
+endif ()
 
 # ------------------------------------------------------------------------------------------------
 
