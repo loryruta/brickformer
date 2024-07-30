@@ -15,6 +15,8 @@ namespace lego_builder
         GLuint m_vao, m_vbo, m_ebo;
         size_t m_num_elements;
 
+        glm::vec4 m_color{1.f};
+
         /// A non-owned reference to the baked texture, stored in BakedModel.
         /// If negative, a white texture is used.
         int m_texture_idx = -1;

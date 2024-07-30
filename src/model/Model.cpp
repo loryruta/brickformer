@@ -5,7 +5,9 @@ using namespace lego_builder;
 void Mesh::apply_transform(const glm::mat4& transform)
 {
     for (Vertex& vertex : m_vertices)
+    {
         vertex.m_position = transform * glm::vec4(vertex.m_position, 1.0f);
+    }
 }
 
 void Mesh::update_min_max()

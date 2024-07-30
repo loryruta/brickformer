@@ -1,19 +1,11 @@
 add_library(arpenteur_video STATIC
     Camera.cpp
-    Camera.hpp
     cuda_interop_helpers.cu
-    cuda_interop_helpers.cuh
     gl_helpers.cpp
-    gl_helpers.hpp
     ModelRenderer.cpp
-    ModelRenderer.hpp
     TextureRenderer.cpp
-    TextureRenderer.hpp
     Window.cpp
-    Window.hpp
-    CustomFramebuffer.hpp
     CustomFramebuffer.cpp
-    VoxelModelBuilder.hpp
     VoxelModelBuilder.cpp
     )
 

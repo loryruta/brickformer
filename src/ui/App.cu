@@ -28,7 +28,8 @@ App::App(Window& window) :
     ImGui_ImplOpenGL3_Init("#version 330");
 
     //
-    m_arpenteur = std::make_unique<Arpenteur>(m_model_path, m_slice_side, *this);
+    m_arpenteur = std::make_unique<Arpenteur>(m_model_path, m_slice_side);
+    m_arpenteur->set_listener(this);
 
     m_color_map_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
     m_proximity_map_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));

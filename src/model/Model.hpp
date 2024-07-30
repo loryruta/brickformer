@@ -21,7 +21,7 @@ namespace lego_builder
     {
         std::vector<Vertex> m_vertices;
         std::vector<uint32_t> m_indices;
-
+        glm::vec4 m_color{1.f};
         int m_texture_idx = -1;  ///< Texture index into Model's m_textures array.
 
         glm::vec3 m_min;

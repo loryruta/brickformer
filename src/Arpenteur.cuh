@@ -15,17 +15,17 @@ namespace lego_builder
 
 /// The class that manages the whole conversion process: from the raw Model to the Construction.
 /// Important: this data structure must also be available in device code.
-class Arpenteur  // Arpenteur in French = Surveyor in English (= Geometra in Italian)
+class Arpenteur // Arpenteur in French = Surveyor in English (= Geometra in Italian)
 {
 public:
     /// A copy of this class' data on device.
-    Arpenteur* m_self_d;  // Used to avoid having kernels with many parameters
+    Arpenteur* m_self_d; // Used to avoid having kernels with many parameters
 
     std::string m_model_path;
     uint32_t m_slice_side;
-    ArpenteurListener* m_listener;
+    ArpenteurListener* m_listener = nullptr;
 
-    uint8_t m_proximity_threshold = 1;  ///< If floating placement proximity is below this value, then it's allowed
+    uint8_t m_proximity_threshold = 1; ///< If floating placement proximity is below this value, then it's allowed
 
     /// The minimum accepted reward.
     /// If the best placement for a subslice has its reward lower than this threshold, the subslice is completed.
@@ -33,10 +33,10 @@ public:
 
     size_t m_num_placements;
 
-    Placement* m_placements_d;  ///< Device array containing all possible placements.
-    float* m_rewards_d;         ///< Device array of rewards, each corresponding to a placement.
+    Placement* m_placements_d; ///< Device array containing all possible placements.
+    float* m_rewards_d;        ///< Device array of rewards, each corresponding to a placement.
 
-    bool* m_valid_placements_d;  ///< Device array telling if the i-th placement is valid (optimization).
+    bool* m_valid_placements_d; ///< Device array telling if the i-th placement is valid (optimization).
 
     ColorMapT m_color_map;
     ColorMapT* m_color_map_d;
@@ -59,14 +59,14 @@ public:
 
     std::unordered_map<Placement, uint8_t, PlacementHash> m_stacked_placements;
 
-    const size_t k_max_colored_placements = 1024 * 1024;  // >1MB
+    const size_t k_max_colored_placements = 1024 * 1024; // >1MB
     std::vector<ColoredPlacement> m_colored_placements;
     ColoredPlacement* m_colored_placements_d;
 
     /// The placement ID used for filling the Placement map.
     uint32_t m_next_pid = 0;
 
-    explicit Arpenteur(const std::filesystem::path& model_path, uint32_t slice_side, ArpenteurListener& listener);
+    explicit Arpenteur(const std::filesystem::path& model_path, uint32_t slice_side);
 
     // @param model_path valid path to the input model
     // @param grid the grid that the model has to fit in. "Slice side" would be a sufficient input, but 3D grid is more user-friendly
@@ -74,9 +74,11 @@ public:
 
     ~Arpenteur() = default;
 
+    void set_listener(ArpenteurListener* listener) { m_listener = listener; }
+
     void run();
 
-    void init_placements();  // TODO should be private but error...
+    void init_placements(); // TODO should be private but error...
 
 private:
     /// Transforms the model vertices such that fits the user input grid (i.e. the Slicer space).
@@ -99,4 +101,4 @@ private:
     void linearize_and_colorize();
 };
 
-}
+} // namespace lego_builder

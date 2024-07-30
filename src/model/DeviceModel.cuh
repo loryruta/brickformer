@@ -13,6 +13,7 @@ namespace lego_builder
         const Vertex* m_vertices;
         const uint32_t* m_indices;
 
+        glm::vec4 m_color;
         int m_texture_idx;
     };
 

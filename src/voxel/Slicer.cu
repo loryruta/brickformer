@@ -59,7 +59,8 @@ void set_voxel(int x, int z, const glm::vec4& color, SliceT* out_slice)
         for (int nz = z - SET_VOXEL_SPREAD; nz <= z + SET_VOXEL_SPREAD; nz++)
         {
             if (!out_slice->is_valid_pixel(x, z)) continue;
-            out_slice->write_pixel(nx, nz, color);
+            glm::vec<4, uint8_t> u8_color = glm::clamp(color * 255.f, 0.f, 255.f);
+            out_slice->write_pixel(nx, nz, u8_color);
         }
     }
 }
@@ -101,15 +102,14 @@ glm::vec4 interp_triangle_color(const glm::vec3& p, const TriRef& tri_ref, const
     const Vertex& v2a = mesh.m_vertices[mesh.m_indices[tri_ref.m_triangle_idx * 3 + 2]];
 
     glm::vec2 texcoord = v0a.m_texcoord * w0 + v1a.m_texcoord * w1 + v2a.m_texcoord * w2;
-    //glm::vec4 color = v0a.m_color * w0 + v1a.m_color * w1 + v2a.m_color * w2; TODO apply color (remember it's [0, 1])
+    //glm::vec4 color = v0a.m_color * w0 + v1a.m_color * w1 + v2a.m_color * w2; TODO apply vertex color (remember it's [0, 1])
 
-    glm::vec4 out_color{};
+    glm::vec4 out_color = mesh.m_color;
 
     if (mesh.m_texture_idx >= 0)
     {
         cudaTextureObject_t texture = model.m_textures[mesh.m_texture_idx];
-
-        out_color = to_fvec4(tex2D<uchar4>(texture, texcoord.x, texcoord.y));
+        out_color *= to_fvec4(tex2D<float4>(texture, texcoord.x, texcoord.y));
     }
 
     return out_color;

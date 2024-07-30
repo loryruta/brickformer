@@ -1,7 +1,9 @@
 #include "GltfLoader.hpp"
 
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/quaternion.hpp"
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+
+#include "util/misc.hpp"
 
 using namespace lego_builder;
 
@@ -96,6 +98,10 @@ void GltfLoader::parse_vertices(const tinygltf::Primitive& primitive, Mesh& mesh
     {
         copy_accessor_data(*color_accessor, color_accessor->type, dst_vertices + offsetof(Vertex, m_color), sizeof(Vertex));
     }
+    else
+    {
+        printf("[GltfLoader] Color accessor not found\n");
+    }
 
     // Apply the transform to all vertices' position
     mesh.apply_transform(transform);
@@ -135,6 +141,49 @@ void GltfLoader::parse_indices(const tinygltf::Primitive& primitive, Mesh& mesh)
     }
 }
 
+void GltfLoader::print_material(const tinygltf::Material& material) const
+{
+    printf("[DEBUG] [GltfLoader] Material:\n");
+    printf("[DEBUG] [GltfLoader]   Name: %s, Double sided: %d\n", material.name.c_str(), material.doubleSided);
+    printf("[DEBUG] [GltfLoader]   PBR Base color texture: %d (texcoord %d), Factor: (%f, %f, %f, %f)\n",
+           material.pbrMetallicRoughness.baseColorTexture.index,
+           material.pbrMetallicRoughness.baseColorTexture.texCoord,
+           material.pbrMetallicRoughness.baseColorFactor[0],
+           material.pbrMetallicRoughness.baseColorFactor[1],
+           material.pbrMetallicRoughness.baseColorFactor[2],
+           material.pbrMetallicRoughness.baseColorFactor[3]
+    );
+    printf("[DEBUG] [GltfLoader]   PBR Metallic/roughness texture: %d (texcoord %d), Metallic factor: %f, Roughness factor: %f\n",
+           material.pbrMetallicRoughness.metallicRoughnessTexture.index,
+           material.pbrMetallicRoughness.metallicRoughnessTexture.texCoord,
+           material.pbrMetallicRoughness.metallicFactor,
+           material.pbrMetallicRoughness.roughnessFactor
+    );
+    printf("[DEBUG] [GltfLoader]   Emissive texture: %d (texcoord %d), Emissive factor: (%f, %f, %f)\n",
+           material.emissiveTexture.index,
+           material.emissiveTexture.texCoord,
+           material.emissiveFactor[0],
+           material.emissiveFactor[1],
+           material.emissiveFactor[2]
+    );
+    printf("[DEBUG] [GltfLoader]   Normal texture: %d (texcoord %d)\n",
+           material.normalTexture.index,
+           material.normalTexture.texCoord
+    );
+    printf("[DEBUG] [GltfLoader]   Occlusion texture: %d (texcoord %d)\n",
+           material.occlusionTexture.index,
+           material.occlusionTexture.texCoord
+    );
+    printf("[DEBUG] [GltfLoader]   LODS: %zu, Values (deprecated): %zu, Additional values (deprecated): %zu\n",
+           material.lods.size(),
+           material.values.size(),
+           material.additionalValues.size()
+    );
+    printf("[DEBUG] [GltfLoader]   Extensions: ");
+    for (const auto& [extension, _] : material.extensions) printf("%s, ", extension.c_str());
+    printf("\n");
+}
+
 void GltfLoader::parse_mesh(const tinygltf::Mesh& gltf_mesh, const glm::mat4& transform)
 {
     Mesh mesh{};
@@ -143,7 +192,7 @@ void GltfLoader::parse_mesh(const tinygltf::Mesh& gltf_mesh, const glm::mat4& tr
     {
         if (primitive.mode != TINYGLTF_MODE_TRIANGLES)
         {
-            printf("[GltfLoader] WARNING: Skipping primitive mode: %d\n", primitive.mode);
+            printf("[WARN ] [GltfLoader] Skipping primitive mode: %d\n", primitive.mode);
             continue;
         }
 
@@ -151,7 +200,46 @@ void GltfLoader::parse_mesh(const tinygltf::Mesh& gltf_mesh, const glm::mat4& tr
         parse_indices(primitive, mesh);
 
         tinygltf::Material& material = m_gltf_model.materials.at(primitive.material);
-        mesh.m_texture_idx = material.pbrMetallicRoughness.baseColorTexture.index;
+
+        // print_material(material); // DEBUG
+
+        if (material.extensions.contains("KHR_materials_pbrSpecularGlossiness"))
+        {
+            auto& extension = material.extensions["KHR_materials_pbrSpecularGlossiness"];
+
+            CHECK_STATE(extension.Get("diffuseFactor").IsArray());
+
+            if (extension.Has("diffuseFactor"))
+            {
+                auto& diffuse_factor = extension.Get("diffuseFactor");
+                mesh.m_color[0] = diffuse_factor.Get(0).GetNumberAsDouble();
+                mesh.m_color[1] = diffuse_factor.Get(1).GetNumberAsDouble();
+                mesh.m_color[2] = diffuse_factor.Get(2).GetNumberAsDouble();
+                mesh.m_color[3] = diffuse_factor.Get(3).GetNumberAsDouble();
+            }
+
+            if (extension.Has("diffuseTexture"))
+            {
+                mesh.m_texture_idx = extension.Get("diffuseTexture").Get("index").GetNumberAsInt();
+            }
+        }
+        else
+        {
+            auto& base_color_factor = material.pbrMetallicRoughness.baseColorFactor;
+            mesh.m_color[0] = base_color_factor[0];
+            mesh.m_color[1] = base_color_factor[1];
+            mesh.m_color[2] = base_color_factor[2];
+            mesh.m_color[3] = base_color_factor[3];
+
+            mesh.m_texture_idx = material.pbrMetallicRoughness.baseColorTexture.index;
+        }
+
+        printf("[DEBUG] [GltfLoader] Mesh; Color: (%f, %f, %f, %f), Texture: %d\n",
+               mesh.m_color[0],
+               mesh.m_color[1],
+               mesh.m_color[2],
+               mesh.m_color[3],
+               mesh.m_texture_idx);
     }
 
     m_model.m_meshes.emplace_back(std::move(mesh));

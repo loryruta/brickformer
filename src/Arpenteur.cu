@@ -12,11 +12,10 @@
 
 using namespace lego_builder;
 
-Arpenteur::Arpenteur(const std::filesystem::path& model_path, uint32_t slice_side, ArpenteurListener& listener)
+Arpenteur::Arpenteur(const std::filesystem::path& model_path, uint32_t slice_side)
 {
     m_model_path = model_path;
     m_slice_side = slice_side;
-    m_listener = &listener;
 
     m_num_placements = slice_side * slice_side * k_num_bricks;
 
@@ -198,6 +197,26 @@ size_t Arpenteur::place_on_subslice(uint32_t slice_y)
         auto [placement, reward] = compute_next_placement<SUBSLICE>();
 
         if (reward < m_min_reward) break;
+
+        if (false) {
+            printf("[DEBUG] [Arpenteur] Placing brick %d at (%d, %d), reward: %f\n", placement.m_bid, placement.m_x, placement.m_y, reward);
+            printf("[DEBUG] [Arpenteur] Placement; BID: %d, Pos: (%d, %d)\n", placement.m_bid, placement.m_x, placement.m_y);
+            printf("[DEBUG] [Arpenteur]   is_outside: %s, "
+                   "is_overlapping: %s, "
+                   "num_covered_map_cells: %d, "
+                   "brick_size: %d, "
+                   "num_neighbors: %d, "
+                   "num_connectible_sides: %d, "
+                   "num_connected_bricks: %d\n",
+                   placement.computed.is_outside ? "y" : "n",
+                   placement.computed.is_overlapping ? "y" : "n",
+                   placement.computed.num_covered_map_cells,
+                   placement.computed.brick_size,
+                   placement.computed.num_neighbors,
+                   placement.computed.num_connectible_sides,
+                   placement.computed.num_connected_bricks
+            );
+        }
 
         place(placement);
 

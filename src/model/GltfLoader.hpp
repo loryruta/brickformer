@@ -30,6 +30,8 @@ namespace lego_builder
         void parse_vertices(const tinygltf::Primitive& primitive, Mesh& mesh, const glm::mat4& transform);
         void parse_indices(const tinygltf::Primitive& primitive, Mesh& mesh);
 
+        void print_material(const tinygltf::Material& material) const;
+
         void parse_mesh(const tinygltf::Mesh& gltf_mesh, const glm::mat4& transform);
         void parse_node(const tinygltf::Node& gltf_node, glm::mat4 transform);
         void parse_scene(const tinygltf::Scene& gltf_scene);

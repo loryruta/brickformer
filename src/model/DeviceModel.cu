@@ -36,7 +36,7 @@ const DeviceModel* lego_builder::upload_model(const Model& model)
         tex_desc.addressMode[0] = cudaAddressModeWrap;
         tex_desc.addressMode[1] = cudaAddressModeWrap;
         tex_desc.filterMode = cudaFilterModePoint;  // Use this if uint8_t pixels (otherwise cudaErrorInvalidFilterSetting)
-        tex_desc.readMode = cudaReadModeElementType;
+        tex_desc.readMode = cudaReadModeNormalizedFloat;
         tex_desc.normalizedCoords = true;
 
         cudaTextureObject_t d_texture{};
@@ -52,6 +52,7 @@ const DeviceModel* lego_builder::upload_model(const Model& model)
         d_mesh.m_vertices = to_device(mesh.m_vertices.data(), mesh.m_vertices.size());
         d_mesh.m_indices = to_device(mesh.m_indices.data(), mesh.m_indices.size());
 
+        d_mesh.m_color = mesh.m_color;
         d_mesh.m_texture_idx = mesh.m_texture_idx;
 
         d_meshes.emplace_back(d_mesh);

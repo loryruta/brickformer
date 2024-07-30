@@ -58,6 +58,7 @@ const char* k_frag_shader_src = R"(
     in vec2 v_texcoord;
     in vec4 v_color;
 
+    uniform vec4 u_mesh_color;
     uniform sampler2D u_texture;
 
     uniform vec3 u_camera_position;
@@ -83,7 +84,7 @@ const char* k_frag_shader_src = R"(
 
     void main()
     {
-        vec4 color = texture(u_texture, v_texcoord) * v_color;
+        vec4 color = u_mesh_color * texture(u_texture, v_texcoord) * v_color;
 
 #ifndef NO_SHADING
         vec3 shading;
@@ -107,6 +108,7 @@ BakedMesh::BakedMesh(BakedMesh&& other) noexcept :
     m_vbo(other.m_vbo),
     m_ebo(other.m_ebo),
     m_num_elements(other.m_num_elements),
+    m_color(other.m_color),
     m_texture_idx(other.m_texture_idx)
 {
     other.m_vao = 0;  // Prevent moved element from being deleted
@@ -215,6 +217,9 @@ void ModelRenderer::render(const BakedModel& baked_model, const Camera& camera, 
         glm::mat4 camera_mat = camera.matrix();
         glUniformMatrix4fv(get_uniform_location(program, "u_camera"), 1, GL_FALSE, glm::value_ptr(camera_mat));
 
+        // Color
+        glUniform4fv(get_uniform_location(program, "u_mesh_color"), 1, glm::value_ptr(baked_mesh.m_color));
+
         // Texture
         GLuint texture = baked_mesh.m_texture_idx >= 0 ? baked_model.m_textures[baked_mesh.m_texture_idx] : m_white_texture;
         glBindTexture(GL_TEXTURE_2D, texture);
@@ -276,6 +281,7 @@ BakedMesh ModelRenderer::bake_mesh(const Mesh& mesh)
     //
     glBindVertexArray(0);
 
+    baked_mesh.m_color = mesh.m_color;
     baked_mesh.m_texture_idx = mesh.m_texture_idx;
 
     return baked_mesh;
