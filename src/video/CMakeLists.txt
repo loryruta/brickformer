@@ -7,6 +7,7 @@ add_library(arpenteur_video STATIC
     Window.cpp
     CustomFramebuffer.cpp
     VoxelModelBuilder.cpp
+    GridRenderer.cpp
     )
 
 # TODO objective is to make this a self-contained module that can potentially be used in other projects.

@@ -3,7 +3,7 @@
 #include <string>
 
 #define CHECK_STATE(condition) \
-    lego_builder::check_state(condition, #condition, __FILE__, __LINE__, nullptr)
+    lego_builder::check_state(!!(condition), #condition, __FILE__, __LINE__, nullptr)
 
 #define CHECK_STATE_MSG(condition, message) \
     lego_builder::check_state(condition, #condition, __FILE__, __LINE__, message)
@@ -36,4 +36,16 @@ std::string to_string(const T& element)
 {
     return std::to_string(element);
 }
+
+template<typename ITERABLE>
+std::string join(ITERABLE iterable, std::string separator = ", ")
+{
+    std::string result{};
+    for (const std::string& str : iterable)
+    {
+        result += str + separator;
+    }
+    return result;
+}
+
 }

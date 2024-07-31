@@ -12,11 +12,10 @@
 
 using namespace lego_builder;
 
-Arpenteur::Arpenteur(const std::filesystem::path& model_path, uint32_t slice_side)
+Arpenteur::Arpenteur(const std::filesystem::path& model_path, int slice_side) :
+    m_model_path(model_path),
+    m_slice_side(slice_side)
 {
-    m_model_path = model_path;
-    m_slice_side = slice_side;
-
     m_num_placements = slice_side * slice_side * k_num_bricks;
 
     CHECK_CU(cudaMalloc(&m_placements_d, m_num_placements * sizeof(Placement)));
@@ -299,7 +298,7 @@ void Arpenteur::run()
     printf("[Arpenteur] Model loaded in %s\n", dur_str.c_str());
 
     //
-    uint32_t num_slices = glm::ceil(m_model->size().y);
+    int num_slices = glm::ceil(m_model->size().y);
 
     m_slicer = std::make_unique<Slicer>(*m_model, m_slice_side);
     m_model.reset();  // We don't need host-side model anymore
@@ -311,6 +310,8 @@ void Arpenteur::run()
 
     for (m_slice_y = 0; m_slice_y < num_slices; m_slice_y++)
     {
+        if (m_stop) return;
+
         printf("[Arpenteur] Slice %d/%d\n", m_slice_y, num_slices);
 
         m_stacked_placements.clear();

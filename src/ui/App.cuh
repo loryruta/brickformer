@@ -6,10 +6,12 @@
 #include "Arpenteur.cuh"
 #include "BrickModelBuilder.hpp"
 #include "Queue.hpp"
+#include "ui.hpp"
+#include "util/StopWatch.hpp"
 #include "video/CustomFramebuffer.hpp"
 #include "video/VoxelModelBuilder.hpp"
 #include "video/cuda_interop_helpers.cuh"
-#include "util/StopWatch.hpp"
+#include "video/GridRenderer.hpp"
 #include "video/ModelRenderer.hpp"
 #include "video/TextureRenderer.hpp"
 #include "video/Window.hpp"
@@ -21,18 +23,14 @@ class App : public ArpenteurListener
 private:
     Window& m_window;
 
-    std::filesystem::path m_model_path;
-    uint32_t m_slice_side;
-
-    std::unique_ptr<Arpenteur> m_arpenteur;
-
     std::unique_ptr<ModelRenderer> m_model_renderer;
     TextureRenderer m_texture_renderer;
+    std::unique_ptr<GridRenderer> m_grid_renderer;
 
-    CustomFramebuffer m_model_view_framebuffer{512, 512};
+    CustomFramebuffer m_model_view_framebuffer{1500, 1500};
+
     std::optional<CudaMappedGlTexture> m_color_map_cuda_mapping;
     std::optional<CudaMappedGlTexture> m_proximity_map_cuda_mapping;
-
     std::vector<CudaMappedGlTexture> m_hashed_placement_map_cuda_mappings;
     std::vector<CudaMappedGlTexture> m_colored_placement_map_cuda_mappings;
 
@@ -42,35 +40,38 @@ private:
     VoxelModelBuilder m_voxel_model_builder;
     std::unique_ptr<BakedModel> m_baked_voxel_model;
 
-    enum VisualizeMapType : uint8_t
-    {
-        VisualizeMapType_ColorMap = 0, VisualizeMapType_ProximityMap, VisualizeMapType_PlacementMap
-    };
-
-    VisualizeMapType m_visualized_map = VisualizeMapType_ColorMap;
-    int32_t m_visualized_subslice_idx = 0;  ///< The subslice being visualized
-    bool m_visualize_colored_placement_map = false;
-
-    bool m_visualize_model = true;
-    bool m_visualize_brick_height_adjustment = false;
-    bool m_visualize_construction = true;
-    bool m_visualize_voxels = false;
-
     /// If the placement takes too long, this stopwatch is used to visualize intermediate result at fixed intervals.
     StopWatch m_placement_stopwatch;
     const float k_placement_visualization_period = 5.0f;  // In seconds
 
+    /* Model */
+    std::unique_ptr<Model> m_model;
     std::unique_ptr<BakedModel> m_baked_model;
+    glm::mat4 m_model_to_view_transform; ///< Transform from original Model space to View space
+    glm::vec3 m_model_bbox_min; ///< Model bounding box in View space
+    glm::vec3 m_model_bbox_max; ///< Model bounding box in View space
+    glm::vec3 m_model_bbox_mid; ///< Model center in View space
+    glm::mat4 m_conversion_to_view_transform; ///< Transform from Conversion space to View space
+
+    /* UI */
+    ui::InputWindow m_ui_input_form;
+    ui::ViewSettingsWindow m_ui_view_settings;
+    ui::MapsWindow m_ui_maps_window;
+    std::unique_ptr<ui::View3dWindow> m_view_3d_window;
 
     Camera m_camera;
-    glm::vec3 m_look_at_position;
     float m_camera_speed = 40.0f;
     bool m_freecam = true;  // TODO default false
-
     glm::mat4 m_undo_brick_height_adjustment_matrix{1.0f};
 
     float m_dt;
     double m_last_frame_t;
+
+    /* Arpenteur */
+    std::string m_model_path; ///< Model path used for the current conversion
+    int m_resolution; ///< Resolution used for the current conversion
+    std::unique_ptr<Arpenteur> m_arpenteur;
+    std::unique_ptr<std::thread> m_arpenteur_thread;
 
     /// A queue holding the jobs that have to be executed on main thread (GL thread).
     Queue<std::function<void()>> m_job_queue;
@@ -82,6 +83,8 @@ private:
     std::condition_variable m_job_queue_cond_var;  ///< Used to wait for main thread jobs to complete before proceeding.
 
 public:
+    static constexpr float k_max_view_side = 100.f;
+
     explicit App(Window& window);
     ~App();
 
@@ -96,6 +99,9 @@ public:
 
 private:
     void render();
+
+    void stop_conversion();
+    void start_conversion();
 
     void copy_color_map();
     void copy_proximity_map();
@@ -117,8 +123,10 @@ private:
     /// Renders a 3d scene displaying the model and the LEGO construction while it's building up.
     void render_3d_scene();
 
-    void show_model_window();
-    void show_placement_map_window();
+    /// Method called when a new model is selected.
+    void on_select_model(const std::filesystem::path& model_path);
+
+    void show_main_window();
 };
 }
 

@@ -55,4 +55,11 @@ namespace lego_builder
 
         void update_min_max(bool update_mesh_minmax = true);
     };
+
+    inline int calc_num_slices(const Model& model, int resolution) // TODO find a better place
+    {
+        glm::vec3 size = model.size();
+        float max_side = glm::max(size.x, size.z);
+        return (int) glm::ceil(float(resolution) / max_side * size.y);
+    }
 }

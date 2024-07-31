@@ -70,6 +70,9 @@ add_library(imgui STATIC
 
 target_include_directories(imgui PUBLIC external/imgui)
 
+# nativefiledialog-extended
+add_subdirectory(external/nativefiledialog-extended)
+
 # stb
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE external/stb)

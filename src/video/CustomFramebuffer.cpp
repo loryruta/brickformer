@@ -4,11 +4,11 @@
 
 using namespace lego_builder;
 
-CustomFramebuffer::CustomFramebuffer(uint32_t width, uint32_t height)
+CustomFramebuffer::CustomFramebuffer(int width, int height) :
+    m_width(width),
+    m_height(height),
+    m_aspect_ratio(float(width) / float(height))
 {
-    m_width = width;
-    m_height = height;
-
     // Generate framebuffer
     glGenFramebuffers(1, &m_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
@@ -47,7 +47,7 @@ CustomFramebuffer::~CustomFramebuffer()
     glDeleteFramebuffers(1, &m_framebuffer);
 }
 
-void CustomFramebuffer::render(const std::function<void()>& render_func) const
+void CustomFramebuffer::render(const RenderFuncT& render_func) const
 {
     // Save current state
     GLint old_framebuffer;

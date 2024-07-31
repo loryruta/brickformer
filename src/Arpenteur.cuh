@@ -8,7 +8,7 @@
 #include "ArpenteurListener.hpp"
 #include "SpreadValue.cuh"
 #include "types.cuh"
-#include "voxel/Slicer.cuh"
+#include "Slicer.cuh"
 
 namespace lego_builder
 {
@@ -21,8 +21,10 @@ public:
     /// A copy of this class' data on device.
     Arpenteur* m_self_d; // Used to avoid having kernels with many parameters
 
+    /* Input */
     std::string m_model_path;
-    uint32_t m_slice_side;
+    int m_slice_side;
+
     ArpenteurListener* m_listener = nullptr;
 
     uint8_t m_proximity_threshold = 1; ///< If floating placement proximity is below this value, then it's allowed
@@ -66,7 +68,9 @@ public:
     /// The placement ID used for filling the Placement map.
     uint32_t m_next_pid = 0;
 
-    explicit Arpenteur(const std::filesystem::path& model_path, uint32_t slice_side);
+    bool m_stop = false;
+
+    explicit Arpenteur(const std::filesystem::path& model_path, int slice_side);
 
     // @param model_path valid path to the input model
     // @param grid the grid that the model has to fit in. "Slice side" would be a sufficient input, but 3D grid is more user-friendly

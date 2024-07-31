@@ -5,50 +5,63 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <nfd.h>
 
 #include "bricks.hpp"
+#include "model/GltfLoader.hpp"
 #include "util/StopWatch.hpp"
 #include "video/gl_helpers.hpp"
 
 using namespace lego_builder;
 
-
 App::App(Window& window) :
     m_window(window)
 {
-    m_model_path = "/home/loryruta/CLionProjects/lego-builder/resources/models/polka-dot_man.glb";
-    m_slice_side = 60;
-
     // Initialize imgui
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     (void) io;
 
     ImGui_ImplGlfw_InitForOpenGL(m_window.handle(), true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    //
-    m_arpenteur = std::make_unique<Arpenteur>(m_model_path, m_slice_side);
-    m_arpenteur->set_listener(this);
-
-    m_color_map_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
-    m_proximity_map_cuda_mapping.emplace(create_gl_texture(m_slice_side, m_slice_side));
-
-    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
-    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
-    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
-
-    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
-    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
-    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_slice_side, m_slice_side));
+    m_undo_brick_height_adjustment_matrix = glm::identity<glm::mat4>();
+    m_undo_brick_height_adjustment_matrix[1][1] *= 1.2f;
 
     m_model_renderer = std::make_unique<ModelRenderer>();
-    m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{-1.0f, -1.0f, 0.0f}), .m_color = glm::vec3{1.0f}});
-    m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{0.0f, -1.0f, -1.0f}), .m_color = glm::vec3{1.0f}});
-    m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{-1.0f, 0.0f, -1.0f}), .m_color = glm::vec3{1.0f}});
-    m_model_renderer->add_directional_light({.m_direction = glm::normalize(glm::vec3{0.0f, -1.0f, -1.0f}), .m_color = glm::vec3{1.0f}});
+    m_grid_renderer = std::make_unique<GridRenderer>();
 
-    m_undo_brick_height_adjustment_matrix[1][1] *= 1.2f;
+    /* UI */
+    m_ui_input_form.on_resolution_change = [this](int slices)
+    {
+        // Update number of slices (depends on resolution)
+        if (m_model)
+            m_ui_input_form.display_num_slices = calc_num_slices(*m_model, slices);
+        else
+        {
+            m_ui_input_form.display_num_slices = -1;
+        }
+    };
+    m_ui_input_form.on_select_model = [this](const std::filesystem::path& model_path) { on_select_model(model_path); };
+    m_ui_input_form.on_convert = [this]() { start_conversion(); };
+
+    m_view_3d_window = std::make_unique<ui::View3dWindow>(
+        m_window, [&]() { render_3d_scene(); },
+        [&](const glm::vec3& dposition, float dyaw, float dpitch)
+        {
+            if (dposition.x != 0.f)
+                m_camera.m_position += m_camera.right() * dposition.x;
+            if (dposition.y != 0.f)
+                m_camera.m_position += m_camera.up() * dposition.y;
+            if (dposition.z != 0.f)
+                m_camera.m_position += m_camera.forward() * dposition.z;
+            if (dyaw != 0.f)
+                m_camera.m_yaw += dyaw * 0.004f;
+            if (dpitch != 0.f)
+                m_camera.m_pitch += dpitch * 0.004f;
+        }
+    );
 }
 
 App::~App()
@@ -59,33 +72,50 @@ App::~App()
     ImGui::DestroyContext();
 }
 
-void App::on_model_load(const Model& model)
+void App::on_select_model(const std::filesystem::path& model_path)
 {
-    m_job_queue.push([this, model]()
-    {
-        m_baked_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(model));
+    stop_conversion();
 
-        glm::vec3 model_hsize = model.size() / 2.0f;
-        m_look_at_position = model.m_min + model_hsize;
+    GltfLoader gltf_loader{};
+    m_model = std::make_unique<Model>(gltf_loader.load_file(model_path));
+    m_baked_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(*m_model));
 
-        float camera_distance = glm::sqrt(model_hsize.x * model_hsize.x + model_hsize.z * model_hsize.z);
-        camera_distance *= 1.3f;
-        m_camera.m_position = m_look_at_position + glm::vec3(camera_distance, model_hsize.y / 2.0f, camera_distance);
-        m_camera.look_at(m_look_at_position);
-    });
+    // Transform to view (0, _, 0) -> (100, _, 100)
+    m_model_to_view_transform = glm::identity<glm::mat4>();
+    glm::vec3 model_size = m_model->size();
+    float to_view_scale = k_max_view_side / glm::max(model_size.x, model_size.z);
+    m_model_to_view_transform = glm::scale(m_model_to_view_transform, glm::vec3(to_view_scale));
+    m_model_to_view_transform = glm::translate(m_model_to_view_transform, -m_model->m_min);
+
+    m_model_bbox_min = glm::vec3(0, 0, 0);
+    m_model_bbox_max = to_view_scale * m_model->size();
+    m_model_bbox_mid = m_model_bbox_max * .5f;
+
+    // Update num slices (UI)
+    m_ui_input_form.display_num_slices = calc_num_slices(*m_model, m_ui_input_form.resolution);
+
+    // Set camera to model
+    float camera_distance = glm::sqrt(m_model_bbox_mid.x * m_model_bbox_mid.x + m_model_bbox_mid.z * m_model_bbox_mid.z);
+    camera_distance *= 1.3f;
+    m_camera.m_position = m_model_bbox_mid + glm::vec3(camera_distance, m_model_bbox_mid.y / 2.0f, camera_distance);
+    m_camera.look_at(m_model_bbox_mid);
 }
+
+void App::on_model_load(const Model& model) {}
 
 void App::enqueue_and_wait_copy_maps_job()
 {
-    m_job_queue.push([this]()
-    {
-         copy_color_map();
-         copy_proximity_map();
-         write_placement_maps(m_hashed_placement_map_cuda_mappings, true);
-         write_placement_maps(m_colored_placement_map_cuda_mappings, false);
-         add_placements_to_construction_model();
-         add_color_map_voxels(); // TODO slow down too much
-    });
+    m_job_queue.push(
+        [this]()
+        {
+            copy_color_map();
+            copy_proximity_map();
+            write_placement_maps(m_hashed_placement_map_cuda_mappings, true);
+            write_placement_maps(m_colored_placement_map_cuda_mappings, false);
+            add_placements_to_construction_model();
+            add_color_map_voxels(); // TODO slow down too much
+        }
+    );
 
     // Wait for the pushed jobs to be executed before continuing (avoid concurrency)
     {
@@ -140,40 +170,27 @@ void App::copy_color_map()
 }
 
 // TODO put in DeviceImage or utility file
-template<
-    uint32_t SRC_IMAGE_FORMAT, typename SRC_IMAGE_TYPE,
-    uint32_t DST_IMAGE_FORMAT, typename DST_IMAGE_TYPE
-    >
-__global__
-void transform_image_kernel(
-    const DeviceImage<SRC_IMAGE_FORMAT, SRC_IMAGE_TYPE>* src_image,
-    DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>* dst_image
-    )
+template<uint32_t SRC_IMAGE_FORMAT, typename SRC_IMAGE_TYPE, uint32_t DST_IMAGE_FORMAT, typename DST_IMAGE_TYPE>
+__global__ void transform_image_kernel(const DeviceImage<SRC_IMAGE_FORMAT, SRC_IMAGE_TYPE>* src_image, DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>* dst_image)
 {
     size_t x = blockIdx.x * blockDim.x + threadIdx.x;
     size_t y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    //printf("x: %d, y: %d, width: %d, height: %d\n", x, y, src_image->m_width, src_image->m_height);
+    // printf("x: %d, y: %d, width: %d, height: %d\n", x, y, src_image->m_width, src_image->m_height);
 
     if (x < src_image->m_width && y < src_image->m_height)
     {
         auto v = src_image->read_pixel(x, y);
-        //auto new_val = transform_func(v);
+        // auto new_val = transform_func(v);
         dst_image->write_pixel(x, y, glm::vec<4, uint8_t>{(float(v.x & 0x7F) / float(PROXIMITY_MAP_HIGH_VALUE)) * 255.0f, 0, 0, 255});
     }
 }
 
 /// Transform the input image into the output image invoking a transform function on each source pixel.
-template<
-    uint32_t SRC_IMAGE_FORMAT, typename SRC_IMAGE_TYPE,
-    uint32_t DST_IMAGE_FORMAT, typename DST_IMAGE_TYPE,
-    typename TRANSFORM_FUNC
-    >
+template<uint32_t SRC_IMAGE_FORMAT, typename SRC_IMAGE_TYPE, uint32_t DST_IMAGE_FORMAT, typename DST_IMAGE_TYPE, typename TRANSFORM_FUNC>
 void transform_image(
-    const DeviceImage<SRC_IMAGE_FORMAT, SRC_IMAGE_TYPE>& src_image,
-    DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>& dst_image,
-    TRANSFORM_FUNC transform_func
-    )
+    const DeviceImage<SRC_IMAGE_FORMAT, SRC_IMAGE_TYPE>& src_image, DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>& dst_image, TRANSFORM_FUNC transform_func
+)
 {
     assert(src_image.m_width == dst_image.m_width && src_image.m_height == dst_image.m_height);
 
@@ -190,8 +207,7 @@ void transform_image(
     CHECK_CU(cudaDeviceSynchronize());
 }
 
-__device__
-glm::vec<4, uint8_t> transform_proximity_map(const glm::vec<1, uint8_t>& v)
+__device__ glm::vec<4, uint8_t> transform_proximity_map(const glm::vec<1, uint8_t>& v)
 {
     uint8_t new_val = float(v.x) / float(PROXIMITY_MAP_HIGH_VALUE) * 255.0f;
 
@@ -205,10 +221,10 @@ void App::copy_proximity_map()
     // Allocate a temporary image that hosts the conversion of the proximity map to RGBA (remember: proximity map is
     // a grayscale image). This is necessary as I've not found a way to directly write to a cudaArray (i.e. CUDA mapped
     // texture)
-    DeviceImage<4, uint8_t> tmp_image = DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr);
+    DeviceImage<4, uint8_t> tmp_image = DeviceImage<4, uint8_t>::create(m_resolution, m_resolution, nullptr);
 
     tmp_image.fill(255);
-    transform_image(m_arpenteur->m_prev_proximity_map, tmp_image, transform_proximity_map);  // Fake CLion error :')
+    transform_image(m_arpenteur->m_prev_proximity_map, tmp_image, transform_proximity_map); // Fake CLion error :')
 
     m_proximity_map_cuda_mapping->copy_from(tmp_image);
 }
@@ -220,9 +236,8 @@ void App::write_placement_maps(std::vector<CudaMappedGlTexture>& out_images, boo
     printf("[App] Writing placements to textures for visualization...\n");
 
     DeviceImage<4, uint8_t> tmp_images[3]{
-        DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr),
-        DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr),
-        DeviceImage<4, uint8_t>::create(m_slice_side, m_slice_side, nullptr)
+        DeviceImage<4, uint8_t>::create(m_resolution, m_resolution, nullptr), DeviceImage<4, uint8_t>::create(m_resolution, m_resolution, nullptr),
+        DeviceImage<4, uint8_t>::create(m_resolution, m_resolution, nullptr)
     };
 
     tmp_images[0].fill(0);
@@ -233,7 +248,7 @@ void App::write_placement_maps(std::vector<CudaMappedGlTexture>& out_images, boo
     {
         Placement& placement = entry.m_placement;
         uint8_t subslice_mask = entry.m_subslice_mask;
-        assert(subslice_mask);  // Shouldn't be zero
+        assert(subslice_mask); // Shouldn't be zero
 
         glm::vec<4, uint8_t> color{};
         if (use_hashed_color)
@@ -253,9 +268,12 @@ void App::write_placement_maps(std::vector<CudaMappedGlTexture>& out_images, boo
             {
                 if (brick[bz][bx])
                 {
-                    if (subslice_mask & 0x1) tmp_images[0].write_pixel(placement.m_x + bx, placement.m_y + bz, color);
-                    if (subslice_mask & 0x2) tmp_images[1].write_pixel(placement.m_x + bx, placement.m_y + bz, color);
-                    if (subslice_mask & 0x4) tmp_images[2].write_pixel(placement.m_x + bx, placement.m_y + bz, color);
+                    if (subslice_mask & 0x1)
+                        tmp_images[0].write_pixel(placement.m_x + bx, placement.m_y + bz, color);
+                    if (subslice_mask & 0x2)
+                        tmp_images[1].write_pixel(placement.m_x + bx, placement.m_y + bz, color);
+                    if (subslice_mask & 0x4)
+                        tmp_images[2].write_pixel(placement.m_x + bx, placement.m_y + bz, color);
                 }
             }
         }
@@ -275,21 +293,18 @@ void App::add_placements_to_construction_model()
 
     for (ColoredPlacement& colored_placement : m_arpenteur->m_colored_placements)
     {
-//        uint64_t hash = hash_func(colored_placement);
+        //        uint64_t hash = hash_func(colored_placement);
 
-//        glm::vec<4, float> color{};
-//        color.x = glm::abs(glm::sin(hash * 0.147f));
-//        color.y = glm::abs(glm::cos(hash * 0.843f));
-//        color.z = glm::abs(glm::sin(hash * 0.239f));
-//        color.w = 1.0f;
+        //        glm::vec<4, float> color{};
+        //        color.x = glm::abs(glm::sin(hash * 0.147f));
+        //        color.y = glm::abs(glm::cos(hash * 0.843f));
+        //        color.z = glm::abs(glm::sin(hash * 0.239f));
+        //        color.w = 1.0f;
 
         m_brick_model_builder.place(
-            m_arpenteur->m_slice_y,
-            colored_placement.m_placement.m_x, colored_placement.m_placement.m_y,
-            colored_placement.m_placement.m_bid,
-            colored_placement.m_subslice_mask,
-            glm::vec4{colored_placement.m_color} / 255.0f
-            );
+            m_arpenteur->m_slice_y, colored_placement.m_placement.m_x, colored_placement.m_placement.m_y, colored_placement.m_placement.m_bid,
+            colored_placement.m_subslice_mask, glm::vec4{colored_placement.m_color} / 255.0f
+        );
     }
 
     printf("[App] UPDATE CONSTRUCTION MODEL; Baking...\n");
@@ -326,186 +341,188 @@ void App::render_3d_scene()
     glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    if (m_visualize_model)
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    m_camera.m_aspect_ratio = float(viewport[2]) / float(viewport[3]); // width / height
+
+    // Render model
+    if (m_ui_view_settings.show_model)
     {
         if (m_baked_model)
         {
-            m_model_renderer->render(
-                *m_baked_model,
-                m_camera,
-                m_visualize_brick_height_adjustment ? glm::mat4{1.0f} : m_undo_brick_height_adjustment_matrix
-                );
+            glm::mat4 transform{1.f};
+            if (!m_ui_view_settings.perform_brick_height_adjustment)
+                transform *= m_undo_brick_height_adjustment_matrix;
+            transform *= m_model_to_view_transform;
+
+            m_model_renderer->render(*m_baked_model, m_camera, transform);
         }
     }
 
-    if (m_visualize_construction)
+    // Render grid
+    if (m_ui_view_settings.show_grid)
     {
-        if (m_baked_construction_model) m_model_renderer->render(*m_baked_construction_model, m_camera, glm::mat4{1.0f});
+        if (m_baked_model)
+        {
+            int resolution = m_ui_input_form.resolution;
+
+            GridRenderer::RenderParams params{};
+            params.camera = m_camera;
+            params.min = glm::vec3(0, 0, 0);
+            params.divisions.x = resolution;
+            params.divisions.y = calc_num_slices(*m_model, resolution);
+            params.divisions.z = resolution;
+            params.max = glm::vec3(params.divisions) / float(resolution) * k_max_view_side;
+            params.half_border_size = 0.1f;
+
+            m_grid_renderer->render(params);
+        }
     }
 
-    if (m_visualize_voxels)
+    // Render construction
+    if (m_ui_view_settings.show_construction)
     {
-        if (m_baked_voxel_model) m_model_renderer->render(*m_baked_voxel_model, m_camera, glm::mat4{1.0f});
+        if (m_baked_construction_model)
+        {
+            m_model_renderer->render(*m_baked_construction_model, m_camera, m_conversion_to_view_transform);
+        }
+    }
+
+    // Render voxels
+    if (m_ui_view_settings.show_voxels)
+    {
+        if (m_baked_voxel_model)
+        {
+            m_model_renderer->render(*m_baked_voxel_model, m_camera, m_conversion_to_view_transform);
+        }
     }
 
     // Update the camera to orbit around the model
     if (!m_freecam)
     {
         m_camera.m_position += m_camera.right() * m_dt * m_camera_speed;
-        m_camera.look_at(m_look_at_position);
+        m_camera.look_at(m_model_bbox_mid);
     }
 }
 
-void App::show_model_window()
+void App::show_main_window()
 {
-    if (ImGui::Begin("Model"))
+    ImGui::DockSpaceOverViewport();
+
+    if (ImGui::Begin("###LeftSidebarWindow", nullptr, ImGuiWindowFlags_NoTitleBar))
     {
-        ImGui::Text("Model path: %s", m_arpenteur->m_model_path.c_str());
-        ImGui::NewLine();
-
-        ImGui::Checkbox("Model", &m_visualize_model);
-        ImGui::SameLine();
-        ImGui::Checkbox("Brick height adjustment", &m_visualize_brick_height_adjustment);
-        ImGui::NewLine();
-
-        ImGui::Checkbox("Construction", &m_visualize_construction);
-        ImGui::SameLine();
-        ImGui::Checkbox("Voxels", &m_visualize_voxels);
-        ImGui::SameLine();
-        ImGui::Checkbox("Shading", &m_model_renderer->m_shading);
-        ImGui::NewLine();
-
-        ImVec2 image_size;
-        image_size.y = ImGui::GetContentRegionAvail().y;
-        image_size.x = image_size.y;
-        ImGui::Image(reinterpret_cast<void*>(m_model_view_framebuffer.m_texture), image_size, ImVec2(0, 1), ImVec2(1, 0));
-
-        static bool s_captured = false;
-        static std::optional<glm::dvec2> s_last_cursor_pos;
-
-        if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left) && !s_captured)
-        {
-            s_captured = true;
-            ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
-            glfwSetInputMode(m_window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        }
-
-        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && s_captured)
-        {
-            s_captured = false;
-            s_last_cursor_pos.reset();
-            ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = false;
-            glfwSetInputMode(m_window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        }
-
-        if (s_captured)
-        {
-            if (m_window.is_key_pressed(GLFW_KEY_W)) m_camera.m_position += m_camera.forward();
-            if (m_window.is_key_pressed(GLFW_KEY_S)) m_camera.m_position -= m_camera.forward();
-            if (m_window.is_key_pressed(GLFW_KEY_A)) m_camera.m_position -= m_camera.right();
-            if (m_window.is_key_pressed(GLFW_KEY_D)) m_camera.m_position += m_camera.right();
-            if (m_window.is_key_pressed(GLFW_KEY_LEFT_SHIFT)) m_camera.m_position -= m_camera.up();
-            if (m_window.is_key_pressed(GLFW_KEY_SPACE)) m_camera.m_position += m_camera.up();
-
-            glm::dvec2 cursor;
-            glfwGetCursorPos(m_window.handle(), &cursor.x, &cursor.y);
-
-            if (s_last_cursor_pos)
-            {
-                glm::dvec2 drotation = cursor - *s_last_cursor_pos;
-                m_camera.m_yaw += drotation.x * 0.004f;
-                m_camera.m_pitch -= drotation.y * 0.004f;
-            }
-
-            s_last_cursor_pos = cursor;
-        }
+        ImGuiID dockspace_id = ImGui::GetID("LeftSidebarDockspace");
+        ImGui::DockSpace(dockspace_id);
     }
     ImGui::End();
-}
 
-void App::show_placement_map_window()
-{
-    if (ImGui::Begin("Placement maps"))
+    if (ImGui::Begin("###RightSidebarWindow", nullptr, ImGuiWindowFlags_NoTitleBar))
     {
-        ImGui::RadioButton("Color map", (int*) &m_visualized_map, VisualizeMapType_ColorMap);
-        ImGui::SameLine();
-        ImGui::RadioButton("Placement map", (int*) &m_visualized_map, VisualizeMapType_PlacementMap);
-        ImGui::SameLine();
-        ImGui::RadioButton("Proximity map (previous slice)", (int*) &m_visualized_map, VisualizeMapType_ProximityMap);
-
-        GLuint placement_map_texture;
-
-        // Color map
-        if (m_visualized_map == VisualizeMapType_ColorMap)
-        {
-            ImGui::NewLine();
-            placement_map_texture = m_color_map_cuda_mapping->texture();
-        }
-        // Proximity map
-        else if (m_visualized_map == VisualizeMapType_ProximityMap)
-        {
-            ImGui::NewLine();
-            placement_map_texture = m_proximity_map_cuda_mapping->texture();
-        }
-        // Placement map
-        else if (m_visualized_map == VisualizeMapType_PlacementMap)
-        {
-            if (ImGui::ArrowButton("subslice_left", ImGuiDir_Left) && m_visualized_subslice_idx > 0)
-            {
-                if (m_visualized_subslice_idx > 0) --m_visualized_subslice_idx;
-            }
-            ImGui::SameLine();
-            if (ImGui::ArrowButton("subslice_right", ImGuiDir_Right) && m_visualized_subslice_idx < 2)
-            {
-                if (m_visualized_subslice_idx < 2) ++m_visualized_subslice_idx;
-            }
-            ImGui::SameLine();
-            ImGui::Text("Slice %d/2", m_visualized_subslice_idx);
-            ImGui::SameLine();
-            ImGui::Checkbox("Color", &m_visualize_colored_placement_map);
-
-            std::vector<CudaMappedGlTexture>& placement_maps = m_visualize_colored_placement_map ? m_colored_placement_map_cuda_mappings : m_hashed_placement_map_cuda_mappings;
-            placement_map_texture = placement_maps.at(m_visualized_subslice_idx).texture();
-        }
-
-        ImVec2 image_size;
-        image_size.y = ImGui::GetContentRegionAvail().y;
-        image_size.x = image_size.y;
-
-        ImGui::Image(reinterpret_cast<void*>(placement_map_texture), image_size, ImVec2(0, 1), ImVec2(1, 0));
+        ImGuiID dockspace_id = ImGui::GetID("RightSidebarDockspace");
+        ImGui::DockSpace(dockspace_id);
     }
     ImGui::End();
 }
 
 void App::render()
 {
-    m_model_view_framebuffer.render([&]() { render_3d_scene(); });
+    show_main_window();
+    m_ui_input_form.show();
+    m_ui_view_settings.show();
+    m_ui_maps_window.show();
+    m_view_3d_window->show();
+}
 
-    //ImGui::ShowDemoWindow();
-    show_model_window();
-    show_placement_map_window();
+void App::stop_conversion()
+{
+    if (!m_arpenteur)
+        return;
+
+    printf("[WARN ] [App] Conversion stopped\n");
+
+    CHECK_STATE(m_arpenteur);
+    CHECK_STATE(m_arpenteur_thread);
+
+    while (!m_job_queue.empty())
+        m_job_queue.pop();
+    m_arpenteur->m_stop = true;
+    m_arpenteur_should_run = true; // Let another iteration so to stop
+    m_arpenteur_thread->join();
+
+    m_arpenteur_thread.reset();
+    m_arpenteur.reset();
+    m_color_map_cuda_mapping.reset();
+    m_hashed_placement_map_cuda_mappings.clear();
+    m_colored_placement_map_cuda_mappings.clear();
+    m_proximity_map_cuda_mapping.reset();
+    m_baked_construction_model.reset();
+    m_baked_voxel_model.reset();
+}
+
+void App::start_conversion()
+{
+    stop_conversion();
+
+    CHECK_STATE(!m_arpenteur);
+    CHECK_STATE(!m_arpenteur_thread);
+
+    m_model_path = m_ui_input_form.model_path;
+    m_resolution = m_ui_input_form.resolution;
+
+    m_arpenteur = std::make_unique<Arpenteur>(m_model_path, m_resolution);
+    m_arpenteur->set_listener(this);
+
+    // Calculate view transforms
+    m_conversion_to_view_transform = glm::identity<glm::mat4>();
+    m_conversion_to_view_transform = glm::scale(m_conversion_to_view_transform, glm::vec3(k_max_view_side / m_resolution));
+
+    // Create maps (debug)
+    m_color_map_cuda_mapping.emplace(create_gl_texture(m_resolution, m_resolution));
+
+    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 0
+    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 1
+    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 2
+
+    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 0
+    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 1
+    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 2
+
+    m_proximity_map_cuda_mapping.emplace(create_gl_texture(m_resolution, m_resolution));
+
+    // Link maps texture to UI
+    m_ui_maps_window.color_map = m_color_map_cuda_mapping->texture();
+    for (int subslice = 0; subslice < 3; ++subslice)
+    {
+        m_ui_maps_window.hashed_placement_maps[subslice] = m_hashed_placement_map_cuda_mappings[subslice].texture();
+        m_ui_maps_window.colored_placement_maps[subslice] = m_colored_placement_map_cuda_mappings[subslice].texture();
+    }
+    m_ui_maps_window.proximity_map = m_proximity_map_cuda_mapping->texture();
+
+    // Start l'Arpenteur
+    m_arpenteur_thread = std::make_unique<std::thread>([this]() { m_arpenteur->run(); });
 }
 
 void App::run()
 {
-    // Start l'Arpenteur on a separate thread
-    std::thread arpenteur_thread([this]() { m_arpenteur->run(); });
-
-    m_window.set_key_callback([&](int key, int scancode, int action, int mods)
-    {
-        bool is_autorun_pressed = key == GLFW_KEY_F1 && action == GLFW_PRESS;
-
-        if ((key == GLFW_KEY_ENTER && action == GLFW_PRESS) || is_autorun_pressed)
+    m_window.set_key_callback(
+        [&](int key, int scancode, int action, int mods)
         {
-            // Resume the Arpenteur thread (by default it stops after a slice is completed)
-            m_arpenteur_should_run = true;
-            m_arpenteur_should_run.notify_all();
+            bool is_autorun_pressed = key == GLFW_KEY_F1 && action == GLFW_PRESS;
+
+            if ((key == GLFW_KEY_ENTER && action == GLFW_PRESS) || is_autorun_pressed)
+            {
+                // Resume the Arpenteur thread (by default it stops after a slice is completed)
+                m_arpenteur_should_run = true;
+                m_arpenteur_should_run.notify_all();
+            }
+
+            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+                m_window.set_should_close(true); // Bye bye! :)
+
+            if (is_autorun_pressed)
+                m_autorun = !m_autorun;
         }
-
-        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) m_window.set_should_close(true);  // Bye bye! :)
-
-        if (is_autorun_pressed) m_autorun = !m_autorun;
-    });
+    );
 
     // Loop
     while (!m_window.should_close())
@@ -516,7 +533,8 @@ void App::run()
         glViewport(0, 0, framebuffer_size.x, framebuffer_size.y);
 
         double now = glfwGetTime();
-        if (m_last_frame_t > 0.0f) m_dt = now - m_last_frame_t;
+        if (m_last_frame_t > 0.0f)
+            m_dt = now - m_last_frame_t;
         m_last_frame_t = now;
 
         // Render
@@ -544,9 +562,6 @@ void App::run()
             job();
         }
 
-        m_job_queue_cond_var.notify_all();  // Notify arpenteur thread that the job queue is now empty
+        m_job_queue_cond_var.notify_all(); // Notify arpenteur thread that the job queue is now empty
     }
-
-    // TODO STOP THE ARPENTEUR!
-    arpenteur_thread.join();
 }

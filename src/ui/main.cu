@@ -1,11 +1,15 @@
 #include "App.cuh"
 
+#include <nfd.h>
+
 #include "video/gl_helpers.hpp"
 
 using namespace lego_builder;
 
 int main(int argc, char* argv[])
 {
+    NFD_Init();
+
     // Initialize GLFW
     if (!glfwInit())
     {
@@ -33,6 +37,8 @@ int main(int argc, char* argv[])
     app.reset();
 
     glfwTerminate();
+
+    NFD_Quit();
 
     return 0;
 }
