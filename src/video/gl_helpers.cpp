@@ -94,7 +94,11 @@ GLint lego_builder::get_attrib_location(GLuint program, const char* name, bool r
 GLint lego_builder::get_uniform_location(GLuint program, const char* name, bool require)
 {
     GLint loc = glGetUniformLocation(program, name);
-    assert(!require || loc >= 0); // TODO no assert
+    if (require && loc < 0)
+    {
+        printf("[ERROR] [gl_helpers] Got invalid uniform location for: %s\n", name);
+        CHECK_STATE(!(require && loc < 0));
+    }
     return loc;
 }
 

@@ -1,13 +1,17 @@
 add_library(arpenteur_video STATIC
+    BoxFilter.cpp
     Camera.cpp
     cuda_interop_helpers.cu
     gl_helpers.cpp
+    GridRenderer.cpp
     ModelRenderer.cpp
     TextureRenderer.cpp
     Window.cpp
     CustomFramebuffer.cpp
+    GBuffer.cpp
+    ScreenQuad.cpp
+    SSAOPass.cpp
     VoxelModelBuilder.cpp
-    GridRenderer.cpp
     )
 
 # TODO objective is to make this a self-contained module that can potentially be used in other projects.

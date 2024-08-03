@@ -57,7 +57,7 @@ private:
     ui::InputWindow m_ui_input_form;
     ui::ViewSettingsWindow m_ui_view_settings;
     ui::MapsWindow m_ui_maps_window;
-    std::unique_ptr<ui::View3dWindow> m_view_3d_window;
+    std::unique_ptr<ui::View3dWindow> m_ui_view_3d_window;
 
     Camera m_camera;
     float m_camera_speed = 40.0f;

@@ -3,10 +3,13 @@
 #include <memory>
 #include <unordered_map>
 
-#include "glad/gl.h"
+#include <glad/gl.h>
 
+#include "BoxFilter.hpp"
 #include "Camera.hpp"
+#include "GBuffer.hpp"
 #include "model/Model.hpp"
+#include "SSAOPass.hpp"
 
 namespace lego_builder
 {
@@ -40,32 +43,45 @@ namespace lego_builder
         ~BakedModel();
     };
 
+    struct BlurredSSAOTarget
+    {
+        int width, height;
+        GLuint texture;
+
+        explicit BlurredSSAOTarget(int width, int height);
+        BlurredSSAOTarget(const BlurredSSAOTarget&) = delete;
+        BlurredSSAOTarget(const BlurredSSAOTarget&&) = delete;
+        ~BlurredSSAOTarget();
+    };
+
     class ModelRenderer
     {
-    public:
-        struct DirectionalLight { glm::vec3 m_direction; glm::vec3 m_color; };
-
     private:
         GLuint m_white_texture;
         GLuint m_program;
-        GLuint m_program_no_shading;
+        GLuint m_ssao_program;
+        GLuint m_shading_program;
 
-        std::vector<DirectionalLight> m_directional_lights;
+        std::unique_ptr<SSAOTarget> m_ssao_target;
+        std::unique_ptr<BlurredSSAOTarget> m_blurred_ssao_target;
+
+        std::unique_ptr<GBuffer> m_gbuffer;
 
     public:
-        bool m_shading = true;
+        SSAOPass m_ssao_pass;
+        BoxFilter m_box_filter;
+        bool m_ssao = true;
 
         explicit ModelRenderer();
         ~ModelRenderer();
-
-        void clear_directional_lights() { m_directional_lights.clear(); };
-        void add_directional_light(DirectionalLight directional_light);
 
         void render(const BakedModel& model, const Camera& camera, const glm::mat4& transform);
 
         BakedModel bake_model(const Model& model);
 
     private:
+        void store_geometry(const BakedModel& model, const Camera& camera, const glm::mat4& transform);
+
         GLuint create_white_texture();
 
         BakedMesh bake_mesh(const Mesh& mesh);

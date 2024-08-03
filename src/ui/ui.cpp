@@ -75,7 +75,7 @@ void ViewSettingsWindow::show()
         ImGui::Checkbox("Show grid", &show_grid);
         ImGui::Checkbox("Show construction", &show_construction);
         ImGui::Checkbox("Show voxels", &show_voxels);
-        ImGui::Checkbox("Enable Shading", &enable_shading);
+        ImGui::Checkbox("Ambient Occlusion", &ssao);
     }
     ImGui::End();
 }

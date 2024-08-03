@@ -2,6 +2,7 @@
 
 #include "glm/gtc/type_ptr.hpp"
 
+#include "ScreenQuad.hpp"
 #include "gl_helpers.hpp"
 #include "util/misc.hpp"
 
@@ -24,84 +25,83 @@ GLuint bake_texture(const Texture& texture)
     return gl_texture;
 }
 
-const char* k_vert_shader_src = R"(
+const char* k_vertex_shader_src = R"(#version 460 core
+
     layout(location = 0) in vec3 a_position;
     layout(location = 1) in vec3 a_normal;
-    layout(location = 2) in vec2 a_texcoord;
+    layout(location = 2) in vec2 a_uv;
     layout(location = 3) in vec4 a_color;
 
     uniform mat4 u_transform;
-    uniform mat4 u_camera;
+    uniform mat4 u_view;
+    uniform mat4 u_projection;
 
-    out vec3 v_position;
-    out vec3 v_normal;
-    out vec2 v_texcoord;
+    out vec4 v_position;
+    out vec4 v_normal;
+    out vec2 v_uv;
     out vec4 v_color;
 
     void main()
     {
-        vec4 position = u_transform * vec4(a_position, 1.0);
-        vec4 normal = u_transform * vec4(a_normal, 0.0);
+        mat4 VT = u_view * u_transform;
+        vec4 position = VT * vec4(a_position, 1);
+        vec4 normal = VT * vec4(a_normal, 0);
 
-        gl_Position = u_camera * position;
-
-        v_position = position.xyz;
-        v_normal = normal.xyz;
-        v_texcoord = a_texcoord;
+        v_position = position;
+        v_normal = normal;
+        v_uv = a_uv;
         v_color = a_color;
+
+        gl_Position = u_projection * position;
     }
 )";
 
-const char* k_frag_shader_src = R"(
-    in vec3 v_position;
-    in vec3 v_normal;
-    in vec2 v_texcoord;
+const char* k_fragment_shader_src = R"(#version 460 core
+
+    in vec4 v_position;
+    in vec4 v_normal;
+    in vec2 v_uv;
     in vec4 v_color;
 
     uniform vec4 u_mesh_color;
     uniform sampler2D u_texture;
 
-    uniform vec3 u_camera_position;
-
-    struct DirectionalLight { vec3 direction; vec3 color; };
-
-    uniform DirectionalLight u_directional_lights[8];
-    uniform uint u_num_directional_lights;
-
-    layout(location = 0) out vec4 f_color;
-
-    vec3 eval_phong_shading(vec3 light_dir, vec3 light_color)
-    {
-        vec3 ambient = 0.3 * light_color;
-        vec3 diffuse = max(dot(v_normal, light_dir), 0.0) * light_color;
-
-        vec3 view_dir = normalize(v_position - u_camera_position);
-        vec3 reflect_dir = reflect(-light_dir, v_normal);
-        vec3 specular = 0.5 * pow(max(dot(view_dir, reflect_dir), 0.0), 32) * light_color;
-
-        return ambient + diffuse + specular;
-    }
+    layout(location = 0) out vec4 f_position;
+    layout(location = 1) out vec4 f_normal;
+    layout(location = 2) out vec4 f_color;
 
     void main()
     {
-        vec4 color = u_mesh_color * texture(u_texture, v_texcoord) * v_color;
-
-#ifndef NO_SHADING
-        vec3 shading;
-        for (int i = 0; i < u_num_directional_lights; i++)
-        {
-            shading = max(
-                shading,
-                eval_phong_shading(u_directional_lights[i].direction, u_directional_lights[i].color)
-                );
-        }
-        color.xyz *= shading;
-#endif
-
-        f_color = color;
+        f_position = vec4(v_position.xyz, 1);
+        f_normal = vec4(normalize(v_normal.xyz), 1);
+        f_color = u_mesh_color * texture(u_texture, v_uv) * v_color;
     }
 )";
-}  // namespace
+
+const char* k_shading_shader_src = R"(#version 460 core
+
+    layout(location = 0) in vec2 v_uv;
+
+    // GBuffer
+    uniform sampler2D u_depth_buffer;
+    uniform sampler2D u_albedo_texture;
+    uniform sampler2D u_occlusion_texture;
+
+    layout(location = 0) out vec4 f_color;
+
+    void main()
+    {
+        float depth = texture(u_depth_buffer, v_uv).r;
+        vec4 albedo = texture(u_albedo_texture, v_uv);
+        float occlusion = texture(u_occlusion_texture, v_uv).r;
+
+        f_color.rgb = albedo.rgb * occlusion;
+        f_color.a = albedo.a;
+        gl_FragDepth = depth;
+    }
+)";
+
+} // namespace
 
 BakedMesh::BakedMesh(BakedMesh&& other) noexcept :
     m_vao(other.m_vao),
@@ -111,16 +111,19 @@ BakedMesh::BakedMesh(BakedMesh&& other) noexcept :
     m_color(other.m_color),
     m_texture_idx(other.m_texture_idx)
 {
-    other.m_vao = 0;  // Prevent moved element from being deleted
+    other.m_vao = 0; // Prevent moved element from being deleted
     other.m_vbo = 0;
     other.m_ebo = 0;
 }
 
 BakedMesh::~BakedMesh()
 {
-    if (m_ebo) glDeleteBuffers(1, &m_ebo);
-    if (m_vbo) glDeleteBuffers(1, &m_vbo);
-    if (m_vao) glDeleteVertexArrays(1, &m_vao);
+    if (m_ebo)
+        glDeleteBuffers(1, &m_ebo);
+    if (m_vbo)
+        glDeleteBuffers(1, &m_vbo);
+    if (m_vao)
+        glDeleteVertexArrays(1, &m_vao);
 }
 
 BakedModel::~BakedModel()
@@ -130,47 +133,59 @@ BakedModel::~BakedModel()
     glDeleteTextures(m_textures.size(), m_textures.data());
 }
 
+BlurredSSAOTarget::BlurredSSAOTarget(int width, int height) :
+    width(width),
+    height(height)
+{
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+}
+
+BlurredSSAOTarget::~BlurredSSAOTarget()
+{
+    glDeleteTextures(1, &texture);
+}
+
 ModelRenderer::ModelRenderer()
 {
-    m_white_texture = create_white_texture();  // Create a white texture, used in case of missing texture
-
-    std::string version_str = "#version 460 core\n";
+    m_white_texture = create_white_texture(); // Create a white texture, used in case of missing texture
 
     // Create program
-    GLuint vert_shader = create_shader(GL_VERTEX_SHADER, version_str + k_vert_shader_src);
-    GLuint frag_shader = create_shader(GL_FRAGMENT_SHADER, version_str + k_frag_shader_src);
-
-    std::string frag_shader_src = version_str + "#define NO_SHADING\n" + k_frag_shader_src;
-    GLuint frag_shader_no_shading = create_shader(GL_FRAGMENT_SHADER, frag_shader_src);
+    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, k_vertex_shader_src);
+    GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, k_fragment_shader_src);
+    GLuint shading_shader = create_shader(GL_FRAGMENT_SHADER, k_shading_shader_src);
 
     // Create program
     m_program = glCreateProgram();
-
-    glAttachShader(m_program, vert_shader);
-    glAttachShader(m_program, frag_shader);
-
+    glAttachShader(m_program, vertex_shader);
+    glAttachShader(m_program, fragment_shader);
     link_program(m_program);
 
-    // Create program, no shading
-    m_program_no_shading = glCreateProgram();
+    // Shading program
+    m_shading_program = glCreateProgram();
+    glAttachShader(m_shading_program, ScreenQuad::get().get_vertex_shader());
+    glAttachShader(m_shading_program, shading_shader);
+    link_program(m_shading_program);
 
-    glAttachShader(m_program_no_shading, vert_shader);
-    glAttachShader(m_program_no_shading, frag_shader_no_shading);
-
-    link_program(m_program_no_shading);
+    glUseProgram(m_shading_program);
+    glUniform1i(get_uniform_location(m_shading_program, "u_depth_buffer"), 0);
+    glUniform1i(get_uniform_location(m_shading_program, "u_albedo_texture"), 1);
+    glUniform1i(get_uniform_location(m_shading_program, "u_occlusion_texture"), 2);
 
     //
-    glDeleteShader(vert_shader);
-    glDeleteShader(frag_shader);
-    glDeleteShader(frag_shader_no_shading);
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
 }
 
 ModelRenderer::~ModelRenderer()
 {
     glDeleteTextures(1, &m_white_texture);
 
+    glDeleteProgram(m_ssao_program);
     glDeleteProgram(m_program);
-    glDeleteProgram(m_program_no_shading);
 }
 
 GLuint ModelRenderer::create_white_texture()
@@ -190,63 +205,98 @@ GLuint ModelRenderer::create_white_texture()
     return texture;
 }
 
-void ModelRenderer::add_directional_light(DirectionalLight directional_light)
+void ModelRenderer::store_geometry(const BakedModel& model, const Camera& camera, const glm::mat4& transform)
 {
-    CHECK_STATE_MSG(m_directional_lights.size() < 8, "Reached max number of directional lights");
-    m_directional_lights.emplace_back(std::move(directional_light));
-}
+    // NOTE: the currently bound framebuffer must be g-buffer's framebuffer
 
-void ModelRenderer::render(const BakedModel& baked_model, const Camera& camera, const glm::mat4& transform)
-{
-    GLuint program = m_shading ? m_program : m_program_no_shading;
-    glUseProgram(program);
+    CHECK_STATE(m_gbuffer);
+
+    glUseProgram(m_program);
 
     glEnable(GL_DEPTH_TEST);
-
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    for (const BakedMesh& baked_mesh : baked_model.m_meshes)
+    for (const BakedMesh& baked_mesh : model.m_meshes)
     {
-        if (baked_mesh.m_num_elements == 0) continue;
-
-        // Transform
-        glUniformMatrix4fv(get_uniform_location(program, "u_transform"), 1, GL_FALSE, glm::value_ptr(transform));
-
-        // Camera
-        glm::mat4 camera_mat = camera.matrix();
-        glUniformMatrix4fv(get_uniform_location(program, "u_camera"), 1, GL_FALSE, glm::value_ptr(camera_mat));
-
-        // Color
-        glUniform4fv(get_uniform_location(program, "u_mesh_color"), 1, glm::value_ptr(baked_mesh.m_color));
-
-        // Texture
-        GLuint texture = baked_mesh.m_texture_idx >= 0 ? baked_model.m_textures[baked_mesh.m_texture_idx] : m_white_texture;
-        glBindTexture(GL_TEXTURE_2D, texture);
-
-        if (m_shading)
+        if (baked_mesh.m_num_elements > 0)
         {
-            // Camera position
-            glUniform3fv(get_uniform_location(program, "u_camera_position", false), 1, glm::value_ptr(camera.m_position));
+            glUniformMatrix4fv(get_uniform_location(m_program, "u_transform"), 1, GL_FALSE, glm::value_ptr(transform));
 
-            // Directional lights
-            glUniform1ui(get_uniform_location(program, "u_num_directional_lights"), m_directional_lights.size());
-            for (int i = 0; i < m_directional_lights.size(); i++)
-            {
-                std::string uniform_name = "u_directional_lights[" + std::to_string(i) + "]";
-                glUniform3fv(get_uniform_location(program, uniform_name + ".direction"), 1, glm::value_ptr(m_directional_lights[i].m_direction));
-                glUniform3fv(get_uniform_location(program, uniform_name + ".color"), 1, glm::value_ptr(m_directional_lights[i].m_color));
-            }
+            glUniformMatrix4fv(get_uniform_location(m_program, "u_view"), 1, GL_FALSE, glm::value_ptr(camera.view()));
+            glUniformMatrix4fv(get_uniform_location(m_program, "u_projection"), 1, GL_FALSE, glm::value_ptr(camera.projection()));
+
+            glUniform4fv(get_uniform_location(m_program, "u_mesh_color"), 1, glm::value_ptr(baked_mesh.m_color));
+
+            glActiveTexture(GL_TEXTURE0);
+            GLuint texture = baked_mesh.m_texture_idx >= 0 ? model.m_textures[baked_mesh.m_texture_idx] : m_white_texture;
+            glBindTexture(GL_TEXTURE_2D, texture);
+
+            glBindVertexArray(baked_mesh.m_vao);
+            glDrawElements(GL_TRIANGLES, baked_mesh.m_num_elements, GL_UNSIGNED_INT, nullptr);
         }
-
-        glBindVertexArray(baked_mesh.m_vao);
-        glDrawElements(GL_TRIANGLES, baked_mesh.m_num_elements, GL_UNSIGNED_INT, nullptr);
     }
+}
+
+void ModelRenderer::render(const BakedModel& model, const Camera& camera, const glm::mat4& transform)
+{
+    GLint parent_framebuffer;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &parent_framebuffer);
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    int width = viewport[2];
+    int height = viewport[3];
+
+    /* Store geometry */
+    if (!m_gbuffer || m_gbuffer->get_width() != width || m_gbuffer->get_height() != height)
+        m_gbuffer = std::make_unique<GBuffer>(width, height);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, m_gbuffer->get_framebuffer());
+    glViewport(0, 0, width, height);
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    m_gbuffer->clear();
+
+    store_geometry(model, camera, transform);
+
+    /* SSAO */
+    if (!m_ssao_target || m_ssao_target->width != width || m_ssao_target->height != height)
+    {
+        m_ssao_target = std::make_unique<SSAOTarget>(width, height);
+        m_blurred_ssao_target = std::make_unique<BlurredSSAOTarget>(width, height);
+    }
+
+    if (m_ssao) {
+        m_ssao_pass.draw(*m_gbuffer, camera, *m_ssao_target);
+        m_box_filter.run(m_ssao_target->texture, m_blurred_ssao_target->texture, 3);
+    } else {
+        // If SSAO is disabled, set occlusion to 1.0 (none)
+        const float value = 1.f;
+        glClearTexImage(m_blurred_ssao_target->texture, 0, GL_RED, GL_FLOAT, &value);
+    }
+
+    /* Final shading */
+    glBindFramebuffer(GL_FRAMEBUFFER, parent_framebuffer);
+    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+
+    glUseProgram(m_shading_program);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_gbuffer->get_depth_buffer());
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_gbuffer->get_albedo_texture());
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_blurred_ssao_target->texture);
+
+    ScreenQuad::get().draw();
 }
 
 BakedMesh ModelRenderer::bake_mesh(const Mesh& mesh)
 {
-    assert(mesh.m_indices.size() % 3 == 0);  // TODO no assert
+    assert(mesh.m_indices.size() % 3 == 0); // TODO no assert
 
     BakedMesh baked_mesh{};
 
@@ -291,20 +341,20 @@ BakedModel ModelRenderer::bake_model(const Model& model)
 {
     BakedModel baked_model{};
 
-    //printf("[ModelRenderer] Baking %zu textures...\n", model.m_textures.size());
+    // printf("[ModelRenderer] Baking %zu textures...\n", model.m_textures.size());
     for (const Texture& texture : model.m_textures)
     {
         baked_model.m_textures.emplace_back(bake_texture(texture));
     }
 
-    //printf("[ModelRenderer] Baking %zu meshes...\n", model.m_meshes.size());
+    // printf("[ModelRenderer] Baking %zu meshes...\n", model.m_meshes.size());
     for (const Mesh& mesh : model.m_meshes)
     {
         BakedMesh baked_mesh = bake_mesh(mesh);
         baked_model.m_meshes.emplace_back(std::move(baked_mesh));
     }
 
-    //printf("[ModelRenderer] Model baked\n");
+    // printf("[ModelRenderer] Model baked\n");
 
     return baked_model;
 }

@@ -34,7 +34,7 @@ struct ViewSettingsWindow
     bool show_grid = true;
     bool show_construction = true;
     bool show_voxels = false;
-    bool enable_shading = true;
+    bool ssao = true;
 
     void show();
 };

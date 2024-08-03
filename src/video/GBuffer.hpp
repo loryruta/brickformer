@@ -1,0 +1,38 @@
+#pragma once
+
+#include <glad/gl.h>
+
+namespace lego_builder
+{
+class GBuffer
+{
+private:
+    int m_width;
+    int m_height;
+
+    GLuint m_framebuffer;
+    GLuint m_depth_buffer;
+
+    GLuint m_position_texture;
+    GLuint m_normal_texture;
+    GLuint m_albedo_texture;
+
+public:
+    explicit GBuffer(int width, int height);
+    GBuffer(const GBuffer&) = delete;
+    GBuffer(const GBuffer&&) = delete; // TODO
+    ~GBuffer();
+
+    [[nodiscard]] int get_width() const { return m_width; }
+    [[nodiscard]] int get_height() const { return m_height; }
+
+    [[nodiscard]] GLuint get_framebuffer() const { return m_framebuffer; }
+
+    [[nodiscard]] GLuint get_position_texture() const { return m_position_texture; }
+    [[nodiscard]] GLuint get_normal_texture() const { return m_normal_texture; }
+    [[nodiscard]] GLuint get_albedo_texture() const { return m_albedo_texture; }
+    [[nodiscard]] GLuint get_depth_buffer() const { return m_depth_buffer; }
+
+    void clear();
+};
+}

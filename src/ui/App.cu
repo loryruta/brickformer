@@ -46,7 +46,7 @@ App::App(Window& window) :
     m_ui_input_form.on_select_model = [this](const std::filesystem::path& model_path) { on_select_model(model_path); };
     m_ui_input_form.on_convert = [this]() { start_conversion(); };
 
-    m_view_3d_window = std::make_unique<ui::View3dWindow>(
+    m_ui_view_3d_window = std::make_unique<ui::View3dWindow>(
         m_window, [&]() { render_3d_scene(); },
         [&](const glm::vec3& dposition, float dyaw, float dpitch)
         {
@@ -293,14 +293,6 @@ void App::add_placements_to_construction_model()
 
     for (ColoredPlacement& colored_placement : m_arpenteur->m_colored_placements)
     {
-        //        uint64_t hash = hash_func(colored_placement);
-
-        //        glm::vec<4, float> color{};
-        //        color.x = glm::abs(glm::sin(hash * 0.147f));
-        //        color.y = glm::abs(glm::cos(hash * 0.843f));
-        //        color.z = glm::abs(glm::sin(hash * 0.239f));
-        //        color.w = 1.0f;
-
         m_brick_model_builder.place(
             m_arpenteur->m_slice_y, colored_placement.m_placement.m_x, colored_placement.m_placement.m_y, colored_placement.m_placement.m_bid,
             colored_placement.m_subslice_mask, glm::vec4{colored_placement.m_color} / 255.0f
@@ -344,6 +336,8 @@ void App::render_3d_scene()
     GLint viewport[4];
     glGetIntegerv(GL_VIEWPORT, viewport);
     m_camera.m_aspect_ratio = float(viewport[2]) / float(viewport[3]); // width / height
+
+    m_model_renderer->m_ssao = m_ui_view_settings.ssao;
 
     // Render model
     if (m_ui_view_settings.show_model)
@@ -430,7 +424,7 @@ void App::render()
     m_ui_input_form.show();
     m_ui_view_settings.show();
     m_ui_maps_window.show();
-    m_view_3d_window->show();
+    m_ui_view_3d_window->show();
 }
 
 void App::stop_conversion()

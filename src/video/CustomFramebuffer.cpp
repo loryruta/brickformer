@@ -51,8 +51,8 @@ void CustomFramebuffer::render(const RenderFuncT& render_func) const
 {
     // Save current state
     GLint old_framebuffer;
-    GLint old_viewport[4];
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &old_framebuffer);
+    GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
 
     //
