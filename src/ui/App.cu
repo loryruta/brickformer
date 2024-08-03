@@ -64,11 +64,12 @@ App::~App()
 
 void App::on_input_change()
 {
-    stop_conversion();
+    clear_conversion();
 
     ui::InputWindow& input_ui = m_ui_input;
 
-    if (input_ui.model_path.empty()) return;
+    if (input_ui.model_path.empty())
+        return;
 
     bool model_changed = m_view_model_path != input_ui.model_path;
 
@@ -83,7 +84,7 @@ void App::on_input_change()
         m_baked_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(*m_model));
     }
 
-    // Calculate transform from Model space to UI space
+    // Calculate transform from Model space to UI space (flip flags could have changed)
     m_model_to_view_transform = glm::identity<glm::mat4>();
     glm::vec3 model_size = m_model->size();
     glm::vec3 scale_matrix = glm::vec3(k_max_view_side / glm::max(model_size.x, model_size.z));
@@ -305,7 +306,7 @@ void App::add_placements_to_construction_model()
 
     for (ColoredPlacement& colored_placement : m_arpenteur->m_colored_placements)
     {
-        m_brick_model_builder.place(
+        m_brick_model_builder->place(
             m_arpenteur->m_slice_y, colored_placement.m_placement.m_x, colored_placement.m_placement.m_y, colored_placement.m_placement.m_bid,
             colored_placement.m_subslice_mask, glm::vec4{colored_placement.m_color} / 255.0f
         );
@@ -313,7 +314,7 @@ void App::add_placements_to_construction_model()
 
     printf("[App] UPDATE CONSTRUCTION MODEL; Baking...\n");
 
-    m_baked_construction_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(m_brick_model_builder.model()));
+    m_baked_construction_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(m_brick_model_builder->model()));
 
     printf("[App] UPDATE CONSTRUCTION MODEL; Done\n");
 }
@@ -333,11 +334,11 @@ void App::add_color_map_voxels()
             int x = i % color_map.m_width;
             int z = i / color_map.m_width;
             glm::vec4 color = glm::vec4{data[i]} / 255.0f;
-            m_voxel_model_builder.set_voxel(x, slice_y, z, color);
+            m_voxel_model_builder->set_voxel(x, slice_y, z, color);
         }
     }
 
-    m_baked_voxel_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(m_voxel_model_builder.model()));
+    m_baked_voxel_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(m_voxel_model_builder->model()));
 }
 
 void App::render_3d_scene()
@@ -439,7 +440,7 @@ void App::render()
     m_ui_view_3d_window->show();
 }
 
-void App::stop_conversion()
+void App::clear_conversion()
 {
     if (!m_arpenteur)
         return;
@@ -453,6 +454,7 @@ void App::stop_conversion()
         m_job_queue.pop();
     m_arpenteur->m_stop = true;
     m_arpenteur_should_run = true; // Let another iteration so to stop
+    m_arpenteur_should_run.notify_all();
     m_arpenteur_thread->join();
 
     m_arpenteur_thread.reset();
@@ -461,16 +463,20 @@ void App::stop_conversion()
     m_hashed_placement_map_cuda_mappings.clear();
     m_colored_placement_map_cuda_mappings.clear();
     m_proximity_map_cuda_mapping.reset();
+    m_brick_model_builder.reset();
     m_baked_construction_model.reset();
+    m_voxel_model_builder.reset();
     m_baked_voxel_model.reset();
 }
 
 void App::start_conversion()
 {
-    stop_conversion();
+    clear_conversion();
 
     CHECK_STATE(!m_arpenteur);
     CHECK_STATE(!m_arpenteur_thread);
+
+    m_ui_view_settings.show_grid = false;
 
     int resolution = m_ui_input.resolution;
 
@@ -498,6 +504,9 @@ void App::start_conversion()
     m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(resolution, resolution)); // Subslice 2
 
     m_proximity_map_cuda_mapping.emplace(create_gl_texture(resolution, resolution));
+
+    m_brick_model_builder = std::make_unique<BrickModelBuilder>(); // Construction model
+    m_voxel_model_builder = std::make_unique<VoxelModelBuilder>(); // Voxel model
 
     // Link maps texture to UI
     m_ui_maps_window.color_map = m_color_map_cuda_mapping->texture();

@@ -35,10 +35,10 @@ private:
     std::vector<CudaMappedGlTexture> m_hashed_placement_map_cuda_mappings;
     std::vector<CudaMappedGlTexture> m_colored_placement_map_cuda_mappings;
 
-    BrickModelBuilder m_brick_model_builder; // TODO rename
+    std::unique_ptr<BrickModelBuilder> m_brick_model_builder; // TODO rename
     std::unique_ptr<BakedModel> m_baked_construction_model;
 
-    VoxelModelBuilder m_voxel_model_builder;
+    std::unique_ptr<VoxelModelBuilder> m_voxel_model_builder;
     std::unique_ptr<BakedModel> m_baked_voxel_model;
 
     /// If the placement takes too long, this stopwatch is used to visualize intermediate result at fixed intervals.
@@ -99,7 +99,7 @@ public:
 private:
     void render();
 
-    void stop_conversion();
+    void clear_conversion();
     void start_conversion();
 
     void copy_color_map();
