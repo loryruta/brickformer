@@ -7,6 +7,7 @@
 #include "BrickModelBuilder.hpp"
 #include "Queue.hpp"
 #include "ui.hpp"
+#include "util/BoundingBox3f.hpp"
 #include "util/StopWatch.hpp"
 #include "video/CustomFramebuffer.hpp"
 #include "video/VoxelModelBuilder.hpp"
@@ -45,16 +46,15 @@ private:
     const float k_placement_visualization_period = 5.0f;  // In seconds
 
     /* Model */
+    std::string m_view_model_path = ""; // Used to detect when the UI model changes
     std::unique_ptr<Model> m_model;
     std::unique_ptr<BakedModel> m_baked_model;
     glm::mat4 m_model_to_view_transform; ///< Transform from original Model space to View space
-    glm::vec3 m_model_bbox_min; ///< Model bounding box in View space
-    glm::vec3 m_model_bbox_max; ///< Model bounding box in View space
-    glm::vec3 m_model_bbox_mid; ///< Model center in View space
+    BoundingBox3f m_model_bbox; ///< Model bounding box in View space
     glm::mat4 m_conversion_to_view_transform; ///< Transform from Conversion space to View space
 
     /* UI */
-    ui::InputWindow m_ui_input_form;
+    ui::InputWindow m_ui_input;
     ui::ViewSettingsWindow m_ui_view_settings;
     ui::MapsWindow m_ui_maps_window;
     std::unique_ptr<ui::View3dWindow> m_ui_view_3d_window;
@@ -68,8 +68,7 @@ private:
     double m_last_frame_t;
 
     /* Arpenteur */
-    std::string m_model_path; ///< Model path used for the current conversion
-    int m_resolution; ///< Resolution used for the current conversion
+    ArpenteurInput m_input;
     std::unique_ptr<Arpenteur> m_arpenteur;
     std::unique_ptr<std::thread> m_arpenteur_thread;
 
@@ -123,8 +122,8 @@ private:
     /// Renders a 3d scene displaying the model and the LEGO construction while it's building up.
     void render_3d_scene();
 
-    /// Method called when a new model is selected.
-    void on_select_model(const std::filesystem::path& model_path);
+    /// Method called whenever Arpenteur input changes (e.g. new model, resolution changed...).
+    void on_input_change();
 
     void show_main_window();
 };

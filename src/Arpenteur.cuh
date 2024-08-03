@@ -13,6 +13,15 @@
 namespace lego_builder
 {
 
+struct ArpenteurInput
+{
+    std::string model_path = "";
+    int resolution = -1;
+    bool flip_x = false;
+    bool flip_y = false;
+    bool flip_z = false;
+};
+
 /// The class that manages the whole conversion process: from the raw Model to the Construction.
 /// Important: this data structure must also be available in device code.
 class Arpenteur // Arpenteur in French = Surveyor in English (= Geometra in Italian)
@@ -22,8 +31,7 @@ public:
     Arpenteur* m_self_d; // Used to avoid having kernels with many parameters
 
     /* Input */
-    std::string m_model_path;
-    int m_slice_side;
+    const ArpenteurInput m_input;
 
     ArpenteurListener* m_listener = nullptr;
 
@@ -70,7 +78,7 @@ public:
 
     bool m_stop = false;
 
-    explicit Arpenteur(const std::filesystem::path& model_path, int slice_side);
+    explicit Arpenteur(const ArpenteurInput& input);
 
     // @param model_path valid path to the input model
     // @param grid the grid that the model has to fit in. "Slice side" would be a sufficient input, but 3D grid is more user-friendly

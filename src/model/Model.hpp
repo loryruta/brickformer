@@ -50,10 +50,13 @@ namespace lego_builder
 
         [[nodiscard]] inline glm::vec3 size() const { return m_max - m_min; }
 
-        /// Applies the transform to all meshes.
+        /// Applies the transform to all meshes' vertices.
         void apply_transform(const glm::mat4& transform);
 
         void update_min_max(bool update_mesh_minmax = true);
+
+        /// Applies a transform that flips the specified axes of the input model while keeping the same bounding box (scale and translate).
+        void apply_flip(bool flip_x, bool flip_y, bool flip_z, glm::mat4& transform) const;
     };
 
     inline int calc_num_slices(const Model& model, int resolution) // TODO find a better place

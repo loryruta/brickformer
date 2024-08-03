@@ -39,26 +39,25 @@ void InputWindow::show()
                 {
                     printf("[INFO ] [InputForm] Selected model: %s\n", out_path);
                     model_path = tmp_model_path;
-                    if (on_select_model)
-                        on_select_model(model_path);
+                    if (on_input_change) on_input_change();
                 }
                 NFD_FreePathU8(out_path);
             }
         }
 
-        if (ImGui::SliderInt("Resolution", &resolution, 1, 256))
-        {
-            if (on_resolution_change)
-                on_resolution_change(resolution);
-        }
+        if (ImGui::SliderInt("Resolution", &resolution, 1, 256) && on_input_change) on_input_change();
         ImGui::Text("Num slices: %d", display_num_slices);
+
+        if (ImGui::Checkbox("Flip X", &flip_x) && on_input_change) on_input_change();
+        if (ImGui::Checkbox("Flip Y", &flip_y) && on_input_change) on_input_change();
+        if (ImGui::Checkbox("Flip Z", &flip_z) && on_input_change) on_input_change();
 
         if (model_path.empty())
             ImGui::BeginDisabled();
         if (ImGui::Button("Convert"))
         {
-            if (on_convert)
-                on_convert();
+            if (on_submit)
+                on_submit();
         }
         if (model_path.empty())
             ImGui::EndDisabled();

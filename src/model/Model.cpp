@@ -41,3 +41,20 @@ void Model::update_min_max(bool update_mesh_minmax)
     }
 }
 
+void Model::apply_flip(bool flip_x, bool flip_y, bool flip_z, glm::mat4& transform) const
+{
+    if (!flip_x && !flip_y && !flip_z) return;
+
+    glm::vec3 scale{};
+    scale.x = flip_x ? -1.f : 1.f;
+    scale.y = flip_y ? -1.f : 1.f;
+    scale.z = flip_z ? -1.f : 1.f;
+
+    glm::vec3 translate{};
+    translate.x = flip_x ? m_min.x + m_max.x : 0.f;
+    translate.y = flip_y ? m_min.y + m_max.y : 0.f;
+    translate.z = flip_z ? m_min.z + m_max.z : 0.f;
+
+    transform = glm::translate(transform, translate);
+    transform = glm::scale(transform, scale);
+}

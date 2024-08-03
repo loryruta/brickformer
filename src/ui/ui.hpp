@@ -16,12 +16,15 @@ struct InputWindow
 {
     std::filesystem::path model_path = "";
     int resolution = 50;
+    bool flip_x = false;
+    bool flip_y = false;
+    bool flip_z = false;
+
     int display_num_slices = -1;
 
     /* Callbacks */
-    std::function<void(const std::filesystem::path& model_path)> on_select_model;
-    std::function<void(int resolution)> on_resolution_change;
-    std::function<void()> on_convert;
+    std::function<void()> on_input_change;
+    std::function<void()> on_submit;
 
     void show();
 };

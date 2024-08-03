@@ -33,18 +33,8 @@ App::App(Window& window) :
     m_grid_renderer = std::make_unique<GridRenderer>();
 
     /* UI */
-    m_ui_input_form.on_resolution_change = [this](int slices)
-    {
-        // Update number of slices (depends on resolution)
-        if (m_model)
-            m_ui_input_form.display_num_slices = calc_num_slices(*m_model, slices);
-        else
-        {
-            m_ui_input_form.display_num_slices = -1;
-        }
-    };
-    m_ui_input_form.on_select_model = [this](const std::filesystem::path& model_path) { on_select_model(model_path); };
-    m_ui_input_form.on_convert = [this]() { start_conversion(); };
+    m_ui_input.on_input_change = [this]() { on_input_change(); };
+    m_ui_input.on_submit = [this]() { start_conversion(); };
 
     m_ui_view_3d_window = std::make_unique<ui::View3dWindow>(
         m_window, [&]() { render_3d_scene(); },
@@ -72,33 +62,53 @@ App::~App()
     ImGui::DestroyContext();
 }
 
-void App::on_select_model(const std::filesystem::path& model_path)
+void App::on_input_change()
 {
     stop_conversion();
 
-    GltfLoader gltf_loader{};
-    m_model = std::make_unique<Model>(gltf_loader.load_file(model_path));
-    m_baked_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(*m_model));
+    ui::InputWindow& input_ui = m_ui_input;
 
-    // Transform to view (0, _, 0) -> (100, _, 100)
+    if (input_ui.model_path.empty()) return;
+
+    bool model_changed = m_view_model_path != input_ui.model_path;
+
+    // Reload model if changed
+    if (model_changed)
+    {
+        std::string model_path = input_ui.model_path;
+
+        m_view_model_path = model_path;
+        GltfLoader gltf_loader{};
+        m_model = std::make_unique<Model>(gltf_loader.load_file(model_path));
+        m_baked_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(*m_model));
+    }
+
+    // Calculate transform from Model space to UI space
     m_model_to_view_transform = glm::identity<glm::mat4>();
     glm::vec3 model_size = m_model->size();
-    float to_view_scale = k_max_view_side / glm::max(model_size.x, model_size.z);
-    m_model_to_view_transform = glm::scale(m_model_to_view_transform, glm::vec3(to_view_scale));
+    glm::vec3 scale_matrix = glm::vec3(k_max_view_side / glm::max(model_size.x, model_size.z));
+    m_model_to_view_transform = glm::scale(m_model_to_view_transform, glm::vec3(scale_matrix));
     m_model_to_view_transform = glm::translate(m_model_to_view_transform, -m_model->m_min);
+    m_model->apply_flip(input_ui.flip_x, input_ui.flip_y, input_ui.flip_z, m_model_to_view_transform);
 
-    m_model_bbox_min = glm::vec3(0, 0, 0);
-    m_model_bbox_max = to_view_scale * m_model->size();
-    m_model_bbox_mid = m_model_bbox_max * .5f;
+    // Update UI space bounding box
+    glm::vec3 transformed_bbox_min = m_model_to_view_transform * glm::vec4(m_model->m_min, 1);
+    glm::vec3 transformed_bbox_max = m_model_to_view_transform * glm::vec4(m_model->m_max, 1);
+    m_model_bbox.min = glm::min(transformed_bbox_min, transformed_bbox_max); // We can recalc min-max like this because we're not rotating
+    m_model_bbox.max = glm::max(transformed_bbox_min, transformed_bbox_max);
 
     // Update num slices (UI)
-    m_ui_input_form.display_num_slices = calc_num_slices(*m_model, m_ui_input_form.resolution);
+    input_ui.display_num_slices = calc_num_slices(*m_model, input_ui.resolution);
 
-    // Set camera to model
-    float camera_distance = glm::sqrt(m_model_bbox_mid.x * m_model_bbox_mid.x + m_model_bbox_mid.z * m_model_bbox_mid.z);
-    camera_distance *= 1.3f;
-    m_camera.m_position = m_model_bbox_mid + glm::vec3(camera_distance, m_model_bbox_mid.y / 2.0f, camera_distance);
-    m_camera.look_at(m_model_bbox_mid);
+    // Reset camera
+    if (model_changed)
+    {
+        glm::vec3 p = m_model_bbox.get_center();
+        float camera_distance = glm::sqrt(p.x * p.x + p.z * p.z);
+        camera_distance *= 1.3f;
+        m_camera.m_position = p + glm::vec3(camera_distance, p.y / 2.0f, camera_distance);
+        m_camera.look_at(p);
+    }
 }
 
 void App::on_model_load(const Model& model) {}
@@ -221,7 +231,7 @@ void App::copy_proximity_map()
     // Allocate a temporary image that hosts the conversion of the proximity map to RGBA (remember: proximity map is
     // a grayscale image). This is necessary as I've not found a way to directly write to a cudaArray (i.e. CUDA mapped
     // texture)
-    DeviceImage<4, uint8_t> tmp_image = DeviceImage<4, uint8_t>::create(m_resolution, m_resolution, nullptr);
+    DeviceImage<4, uint8_t> tmp_image = DeviceImage<4, uint8_t>::create(m_input.resolution, m_input.resolution, nullptr);
 
     tmp_image.fill(255);
     transform_image(m_arpenteur->m_prev_proximity_map, tmp_image, transform_proximity_map); // Fake CLion error :')
@@ -235,10 +245,12 @@ void App::write_placement_maps(std::vector<CudaMappedGlTexture>& out_images, boo
 
     printf("[App] Writing placements to textures for visualization...\n");
 
-    DeviceImage<4, uint8_t> tmp_images[3]{
-        DeviceImage<4, uint8_t>::create(m_resolution, m_resolution, nullptr), DeviceImage<4, uint8_t>::create(m_resolution, m_resolution, nullptr),
-        DeviceImage<4, uint8_t>::create(m_resolution, m_resolution, nullptr)
-    };
+    int resolution = m_input.resolution;
+
+    DeviceImage<4, uint8_t> tmp_images[3];
+    tmp_images[0] = DeviceImage<4, uint8_t>::create(resolution, resolution, nullptr);
+    tmp_images[1] = DeviceImage<4, uint8_t>::create(resolution, resolution, nullptr);
+    tmp_images[2] = DeviceImage<4, uint8_t>::create(resolution, resolution, nullptr);
 
     tmp_images[0].fill(0);
     tmp_images[1].fill(0);
@@ -358,7 +370,7 @@ void App::render_3d_scene()
     {
         if (m_baked_model)
         {
-            int resolution = m_ui_input_form.resolution;
+            int resolution = m_ui_input.resolution;
 
             GridRenderer::RenderParams params{};
             params.camera = m_camera;
@@ -395,7 +407,7 @@ void App::render_3d_scene()
     if (!m_freecam)
     {
         m_camera.m_position += m_camera.right() * m_dt * m_camera_speed;
-        m_camera.look_at(m_model_bbox_mid);
+        m_camera.look_at(m_model_bbox.get_center());
     }
 }
 
@@ -421,7 +433,7 @@ void App::show_main_window()
 void App::render()
 {
     show_main_window();
-    m_ui_input_form.show();
+    m_ui_input.show();
     m_ui_view_settings.show();
     m_ui_maps_window.show();
     m_ui_view_3d_window->show();
@@ -460,28 +472,32 @@ void App::start_conversion()
     CHECK_STATE(!m_arpenteur);
     CHECK_STATE(!m_arpenteur_thread);
 
-    m_model_path = m_ui_input_form.model_path;
-    m_resolution = m_ui_input_form.resolution;
+    int resolution = m_ui_input.resolution;
 
-    m_arpenteur = std::make_unique<Arpenteur>(m_model_path, m_resolution);
+    m_input.model_path = m_ui_input.model_path;
+    m_input.resolution = resolution;
+    m_input.flip_x = m_ui_input.flip_x;
+    m_input.flip_y = m_ui_input.flip_y;
+    m_input.flip_z = m_ui_input.flip_z;
+    m_arpenteur = std::make_unique<Arpenteur>(m_input);
     m_arpenteur->set_listener(this);
 
     // Calculate view transforms
     m_conversion_to_view_transform = glm::identity<glm::mat4>();
-    m_conversion_to_view_transform = glm::scale(m_conversion_to_view_transform, glm::vec3(k_max_view_side / m_resolution));
+    m_conversion_to_view_transform = glm::scale(m_conversion_to_view_transform, glm::vec3(k_max_view_side / resolution));
 
     // Create maps (debug)
-    m_color_map_cuda_mapping.emplace(create_gl_texture(m_resolution, m_resolution));
+    m_color_map_cuda_mapping.emplace(create_gl_texture(resolution, resolution));
 
-    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 0
-    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 1
-    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 2
+    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(resolution, resolution)); // Subslice 0
+    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(resolution, resolution)); // Subslice 1
+    m_hashed_placement_map_cuda_mappings.emplace_back(create_gl_texture(resolution, resolution)); // Subslice 2
 
-    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 0
-    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 1
-    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(m_resolution, m_resolution)); // Subslice 2
+    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(resolution, resolution)); // Subslice 0
+    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(resolution, resolution)); // Subslice 1
+    m_colored_placement_map_cuda_mappings.emplace_back(create_gl_texture(resolution, resolution)); // Subslice 2
 
-    m_proximity_map_cuda_mapping.emplace(create_gl_texture(m_resolution, m_resolution));
+    m_proximity_map_cuda_mapping.emplace(create_gl_texture(resolution, resolution));
 
     // Link maps texture to UI
     m_ui_maps_window.color_map = m_color_map_cuda_mapping->texture();

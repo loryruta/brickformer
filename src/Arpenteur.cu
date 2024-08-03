@@ -12,11 +12,11 @@
 
 using namespace lego_builder;
 
-Arpenteur::Arpenteur(const std::filesystem::path& model_path, int slice_side) :
-    m_model_path(model_path),
-    m_slice_side(slice_side)
+Arpenteur::Arpenteur(const ArpenteurInput& input) :
+    m_input(input)
 {
-    m_num_placements = slice_side * slice_side * k_num_bricks;
+    int resolution = input.resolution;
+    m_num_placements = resolution * resolution * k_num_bricks;
 
     CHECK_CU(cudaMalloc(&m_placements_d, m_num_placements * sizeof(Placement)));
     init_placements();
@@ -25,16 +25,16 @@ Arpenteur::Arpenteur(const std::filesystem::path& model_path, int slice_side) :
 
     CHECK_CU(cudaMalloc(&m_valid_placements_d, m_num_placements * sizeof(bool)));
 
-    m_color_map = ColorMapT::create(slice_side, slice_side, nullptr);
+    m_color_map = ColorMapT::create(resolution, resolution, nullptr);
     m_color_map_d = to_device(m_color_map);
 
-    m_prev_proximity_map = ProximityMapT::create(slice_side, slice_side, nullptr);
+    m_prev_proximity_map = ProximityMapT::create(resolution, resolution, nullptr);
     m_prev_proximity_map_d = to_device(m_prev_proximity_map);
 
-    m_prev_placements = PlacementMapT::create(slice_side, slice_side, nullptr);
+    m_prev_placements = PlacementMapT::create(resolution, resolution, nullptr);
     m_prev_placements_d = to_device(m_prev_placements);
 
-    m_cur_placements = PlacementMapT::create(slice_side, slice_side, nullptr);
+    m_cur_placements = PlacementMapT::create(resolution, resolution, nullptr);
     m_cur_placements_d = to_device(m_cur_placements);
 
     m_colored_placements.reserve(k_max_colored_placements);
@@ -46,15 +46,15 @@ void init_placements_kernel(Arpenteur* self)
 {
     size_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    uint32_t slice_side = self->m_slice_side;
+    uint32_t resolution = self->m_input.resolution;
 
     if (i < self->m_num_placements)
     {
         Placement& placement = self->m_placements_d[i];
 
         placement.m_bid = i % k_num_bricks;
-        placement.m_x = (i / k_num_bricks) % slice_side;
-        placement.m_y = i / (slice_side * k_num_bricks);
+        placement.m_x = (i / k_num_bricks) % resolution;
+        placement.m_y = i / (resolution * k_num_bricks);
     }
 }
 
@@ -69,12 +69,15 @@ void Arpenteur::transform_model()
     glm::vec3 model_size = m_model->size();
     float max_xz_side = glm::max(model_size.x, model_size.z);
 
-    glm::vec3 scale_factor{m_slice_side / max_xz_side};
-    scale_factor.y /= 1.2f;  // Brick height adjustment
+    // Transform from Model space to Conversion space
+    glm::vec3 scale_matrix{m_input.resolution / max_xz_side};
+    scale_matrix.y /= 1.2f;  // Brick height adjustment
 
     glm::mat4 transform = glm::identity<glm::mat4>();
-    transform = glm::scale(transform, scale_factor);
-    transform = glm::translate(transform, -m_model->m_min);
+    transform = glm::scale(transform, scale_matrix);
+    transform = glm::translate(transform, -m_model->m_min); // Bring to origin
+
+    m_model->apply_flip(m_input.flip_x, m_input.flip_y, m_input.flip_z, transform);
 
     m_model->apply_transform(transform);
     m_model->update_min_max(true /* update_mesh_min_max */);
@@ -105,8 +108,8 @@ void Arpenteur::init_proximity_map_from_color_map()
     m_prev_proximity_map.fill(0);
 
     dim3 num_blocks{};
-    num_blocks.x = div_ceil<size_t>(m_slice_side, 32);
-    num_blocks.y = div_ceil<size_t>(m_slice_side, 32);
+    num_blocks.x = div_ceil<size_t>(m_input.resolution, 32);
+    num_blocks.y = div_ceil<size_t>(m_input.resolution, 32);
     num_blocks.z = 1;
 
     dim3 block_dim(32, 32, 1);
@@ -283,12 +286,12 @@ void Arpenteur::run()
     std::string dur_str;
 
     // LOAD MODEL
-    printf("[Arpenteur] Loading model: %s\n", m_model_path.c_str());
+    printf("[Arpenteur] Loading model: %s\n", m_input.model_path.c_str());
 
     stop_watch.reset();
 
     GltfLoader gltf_loader{};
-    m_model = std::make_unique<Model>(gltf_loader.load_file(m_model_path));
+    m_model = std::make_unique<Model>(gltf_loader.load_file(m_input.model_path));
 
     transform_model();
 
@@ -300,7 +303,7 @@ void Arpenteur::run()
     //
     int num_slices = glm::ceil(m_model->size().y);
 
-    m_slicer = std::make_unique<Slicer>(*m_model, m_slice_side);
+    m_slicer = std::make_unique<Slicer>(*m_model, m_input.resolution);
     m_model.reset();  // We don't need host-side model anymore
 
     // INIT
