@@ -77,6 +77,10 @@ add_subdirectory(external/nativefiledialog-extended)
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE external/stb)
 
+# tinyformat
+add_library(tinyformat INTERFACE)
+target_include_directories(tinyformat INTERFACE external/tinyformat)
+
 # tinygltf
 set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF)
 set(TINYGLTF_BUILD_GL_EXAMPLES OFF)

@@ -15,6 +15,7 @@ target_include_directories(arpenteur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(arpenteur PUBLIC CCCL::CCCL)
 target_link_libraries(arpenteur PUBLIC glm)
 target_link_libraries(arpenteur PUBLIC stb)
+target_link_libraries(arpenteur PUBLIC tinyformat)
 target_link_libraries(arpenteur PUBLIC tinygltf)
 
 if (NOT LEGO_BUILDER_NO_VIDEO)
