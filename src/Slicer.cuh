@@ -22,17 +22,17 @@ using SliceT = DeviceImage<4, uint8_t>;
 class Slicer
 {
 private:
-    uint32_t m_slice_side;
+    int m_resolution;
+    float m_alpha_test_threshold;
+
     const DeviceModel* m_model_d;
     thrust::device_vector<TriRef> m_triangles_d;
 
 public:
     /// Initializes data structures; the model is uploaded to GPU and its meshes' triangles are linearized into one
     /// device-local triangle list. After the call, the model can be freed.
-    explicit Slicer(const Model& model, uint32_t slice_side);
+    explicit Slicer(const Model& model, int resolution, float alpha_test_threshold);
     ~Slicer() = default;
-
-    [[nodiscard]] uint32_t slice_side() const { return m_slice_side; }
 
     void slice(uint32_t slice_y, SliceT& out_slice);
 

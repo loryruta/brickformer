@@ -52,6 +52,8 @@ void InputWindow::show()
         if (ImGui::Checkbox("Flip Y", &flip_y) && on_input_change) on_input_change();
         if (ImGui::Checkbox("Flip Z", &flip_z) && on_input_change) on_input_change();
 
+        if (ImGui::SliderFloat("Alpha test threshold", &alpha_test_threshold, 0.f, 1.f) && on_input_change) on_input_change();
+
         if (model_path.empty())
             ImGui::BeginDisabled();
         if (ImGui::Button("Convert"))

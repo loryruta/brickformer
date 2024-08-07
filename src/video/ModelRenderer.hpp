@@ -59,7 +59,6 @@ namespace lego_builder
     private:
         GLuint m_white_texture;
         GLuint m_program;
-        GLuint m_ssao_program;
         GLuint m_shading_program;
 
         std::unique_ptr<SSAOTarget> m_ssao_target;
@@ -70,6 +69,9 @@ namespace lego_builder
     public:
         SSAOPass m_ssao_pass;
         BoxFilter m_box_filter;
+
+        /* Params */
+        float m_alpha_test_threshold = 0.7f;
         bool m_ssao = true;
 
         explicit ModelRenderer();
@@ -77,13 +79,13 @@ namespace lego_builder
 
         void render(const BakedModel& model, const Camera& camera, const glm::mat4& transform);
 
-        BakedModel bake_model(const Model& model);
+        static BakedModel bake_model(const Model& model);
 
     private:
         void store_geometry(const BakedModel& model, const Camera& camera, const glm::mat4& transform);
 
         GLuint create_white_texture();
 
-        BakedMesh bake_mesh(const Mesh& mesh);
+        static BakedMesh bake_mesh(const Mesh& mesh);
     };
 }

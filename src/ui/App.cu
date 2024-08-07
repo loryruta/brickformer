@@ -81,7 +81,7 @@ void App::on_input_change()
         m_view_model_path = model_path;
         GltfLoader gltf_loader{};
         m_model = std::make_unique<Model>(gltf_loader.load_file(model_path));
-        m_baked_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(*m_model));
+        m_baked_model = std::make_unique<BakedModel>(ModelRenderer::bake_model(*m_model));
     }
 
     // Calculate transform from Model space to UI space (flip flags could have changed)
@@ -100,6 +100,8 @@ void App::on_input_change()
 
     // Update num slices (UI)
     input_ui.display_num_slices = calc_num_slices(*m_model, input_ui.resolution);
+
+    m_model_renderer->m_alpha_test_threshold = input_ui.alpha_test_threshold;
 
     // Reset camera
     if (model_changed)
@@ -314,7 +316,7 @@ void App::add_placements_to_construction_model()
 
     printf("[App] UPDATE CONSTRUCTION MODEL; Baking...\n");
 
-    m_baked_construction_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(m_brick_model_builder->model()));
+    m_baked_construction_model = std::make_unique<BakedModel>(ModelRenderer::bake_model(m_brick_model_builder->model()));
 
     printf("[App] UPDATE CONSTRUCTION MODEL; Done\n");
 }
@@ -338,7 +340,7 @@ void App::add_color_map_voxels()
         }
     }
 
-    m_baked_voxel_model = std::make_unique<BakedModel>(m_model_renderer->bake_model(m_voxel_model_builder->model()));
+    m_baked_voxel_model = std::make_unique<BakedModel>(ModelRenderer::bake_model(m_voxel_model_builder->model()));
 }
 
 void App::render_3d_scene()

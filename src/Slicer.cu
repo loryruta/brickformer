@@ -10,10 +10,10 @@
 
 using namespace lego_builder;
 
-Slicer::Slicer(const Model& model, uint32_t slice_side)
+Slicer::Slicer(const Model& model, int resolution, float alpha_test_threshold) :
+    m_resolution(resolution),
+    m_alpha_test_threshold(alpha_test_threshold)
 {
-    m_slice_side = slice_side;
-
     m_model_d = upload_model(model);
 
     linearize_triangles(model);
@@ -250,6 +250,7 @@ __device__
 void voxelize_triangle_to_slice(const TriRef& tri_ref,
                                 const DeviceModel& model,
                                 uint32_t slice_y,
+                                float alpha_test_threshold,
                                 SliceT* out_slice,
                                 size_t& out_num_iterations,
                                 size_t& out_num_intersections
@@ -311,6 +312,8 @@ void voxelize_triangle_to_slice(const TriRef& tri_ref,
             //if (area < 0.2f) continue;  // Intersection not central enough
 
             glm::vec4 color = interp_triangle_color(bmin + 0.5f, tri_ref, model);
+            if (color.a < alpha_test_threshold) continue;
+
             //glm::vec4 color = {255,0,0,255};
 
 //            glm::vec4 color;
@@ -331,7 +334,7 @@ void voxelize_triangle_to_slice(const TriRef& tri_ref,
 
 void Slicer::slice(uint32_t slice_y, SliceT& out_slice)
 {
-    assert(out_slice.m_width >= m_slice_side && out_slice.m_height >= m_slice_side);
+    assert(out_slice.m_width >= m_resolution && out_slice.m_height >= m_resolution);
 
     out_slice.fill(0);
 
@@ -343,12 +346,13 @@ void Slicer::slice(uint32_t slice_y, SliceT& out_slice)
     int32_t* min_intersections_d = to_device(INT32_MAX);
 
     const DeviceModel* model_d = m_model_d;
+    float alpha_test_threshold = m_alpha_test_threshold;
     SliceT* out_slice_d = to_device(out_slice);  // TODO input already on device image (move to host for debug-only)
 
     thrust::for_each(m_triangles_d.begin(), m_triangles_d.end(), [=] __device__ (const TriRef& tri) {
         size_t num_iterations;
         size_t num_intersections;
-        voxelize_triangle_to_slice(tri, *model_d, slice_y, out_slice_d, num_iterations, num_intersections);
+        voxelize_triangle_to_slice(tri, *model_d, slice_y, alpha_test_threshold, out_slice_d, num_iterations, num_intersections);
 
         atomicMax(max_iterations_d, num_iterations);
         atomicMin(min_iterations_d, num_iterations);

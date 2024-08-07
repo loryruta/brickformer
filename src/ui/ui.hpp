@@ -19,6 +19,7 @@ struct InputWindow
     bool flip_x = false;
     bool flip_y = false;
     bool flip_z = false;
+    float alpha_test_threshold = 0.7f;
 
     int display_num_slices = -1;
 

@@ -20,6 +20,7 @@ struct ArpenteurInput
     bool flip_x = false;
     bool flip_y = false;
     bool flip_z = false;
+    float alpha_test_threshold = 0.7f;
 };
 
 /// The class that manages the whole conversion process: from the raw Model to the Construction.

@@ -1,6 +1,7 @@
 #include "ModelRenderer.hpp"
 
-#include "glm/gtc/type_ptr.hpp"
+#include <glm/gtc/type_ptr.hpp>
+#include <tinyformat.h>
 
 #include "ScreenQuad.hpp"
 #include "gl_helpers.hpp"
@@ -65,6 +66,7 @@ const char* k_fragment_shader_src = R"(#version 460 core
 
     uniform vec4 u_mesh_color;
     uniform sampler2D u_texture;
+    uniform float u_alpha_test_threshold;
 
     layout(location = 0) out vec4 f_position;
     layout(location = 1) out vec4 f_normal;
@@ -72,9 +74,12 @@ const char* k_fragment_shader_src = R"(#version 460 core
 
     void main()
     {
+        vec4 color = u_mesh_color * texture(u_texture, v_uv) * v_color;
+        if (color.a < u_alpha_test_threshold) discard;
+
         f_position = vec4(v_position.xyz, 1);
         f_normal = vec4(normalize(v_normal.xyz), 1);
-        f_color = u_mesh_color * texture(u_texture, v_uv) * v_color;
+        f_color = color;
     }
 )";
 
@@ -178,13 +183,14 @@ ModelRenderer::ModelRenderer()
     //
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
+    glDeleteShader(shading_shader);
 }
 
 ModelRenderer::~ModelRenderer()
 {
     glDeleteTextures(1, &m_white_texture);
 
-    glDeleteProgram(m_ssao_program);
+    glDeleteProgram(m_shading_program);
     glDeleteProgram(m_program);
 }
 
@@ -214,7 +220,9 @@ void ModelRenderer::store_geometry(const BakedModel& model, const Camera& camera
     glUseProgram(m_program);
 
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
+    glDisable(GL_BLEND);
+
+    glUniform1f(get_uniform_location(m_program, "u_alpha_test_threshold"), m_alpha_test_threshold);
 
     for (const BakedMesh& baked_mesh : model.m_meshes)
     {

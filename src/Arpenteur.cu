@@ -303,7 +303,7 @@ void Arpenteur::run()
     //
     int num_slices = glm::ceil(m_model->size().y);
 
-    m_slicer = std::make_unique<Slicer>(*m_model, m_input.resolution);
+    m_slicer = std::make_unique<Slicer>(*m_model, m_input.resolution, m_input.alpha_test_threshold);
     m_model.reset();  // We don't need host-side model anymore
 
     // INIT
