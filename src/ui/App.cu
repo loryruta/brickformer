@@ -68,6 +68,13 @@ void App::on_input_change()
 
     ui::InputWindow& input_ui = m_ui_input;
 
+    // Proximity settings
+    if (input_ui.auto_proximity_settings)
+    {
+        input_ui.proximity_threshold = Arpenteur::calc_proximity_threshold(input_ui.resolution);
+        input_ui.proximity_max_value = Arpenteur::calc_proximity_max_value(input_ui.resolution);
+    }
+
     if (input_ui.model_path.empty())
         return;
 
@@ -182,53 +189,6 @@ void App::copy_color_map()
     m_color_map_cuda_mapping->copy_from(m_arpenteur->m_color_map);
 }
 
-// TODO put in DeviceImage or utility file
-template<uint32_t SRC_IMAGE_FORMAT, typename SRC_IMAGE_TYPE, uint32_t DST_IMAGE_FORMAT, typename DST_IMAGE_TYPE>
-__global__ void transform_image_kernel(const DeviceImage<SRC_IMAGE_FORMAT, SRC_IMAGE_TYPE>* src_image, DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>* dst_image)
-{
-    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t y = blockIdx.y * blockDim.y + threadIdx.y;
-
-    // printf("x: %d, y: %d, width: %d, height: %d\n", x, y, src_image->m_width, src_image->m_height);
-
-    if (x < src_image->m_width && y < src_image->m_height)
-    {
-        auto v = src_image->read_pixel(x, y);
-        // auto new_val = transform_func(v);
-        dst_image->write_pixel(x, y, glm::vec<4, uint8_t>{(float(v.x & 0x7F) / float(PROXIMITY_MAP_HIGH_VALUE)) * 255.0f, 0, 0, 255});
-    }
-}
-
-/// Transform the input image into the output image invoking a transform function on each source pixel.
-template<uint32_t SRC_IMAGE_FORMAT, typename SRC_IMAGE_TYPE, uint32_t DST_IMAGE_FORMAT, typename DST_IMAGE_TYPE, typename TRANSFORM_FUNC>
-void transform_image(
-    const DeviceImage<SRC_IMAGE_FORMAT, SRC_IMAGE_TYPE>& src_image, DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>& dst_image, TRANSFORM_FUNC transform_func
-)
-{
-    assert(src_image.m_width == dst_image.m_width && src_image.m_height == dst_image.m_height);
-
-    DeviceImage<SRC_IMAGE_FORMAT, SRC_IMAGE_TYPE>* src_image_d = to_device(src_image);
-    DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>* dst_image_d = to_device(dst_image);
-
-    dim3 num_blocks{};
-    num_blocks.x = div_ceil<uint32_t>(src_image.m_width, 32);
-    num_blocks.y = div_ceil<uint32_t>(src_image.m_height, 32);
-    num_blocks.z = 1;
-
-    dim3 block_dim(32, 32, 1);
-    transform_image_kernel<<<num_blocks, block_dim>>>(src_image_d, dst_image_d);
-    CHECK_CU(cudaDeviceSynchronize());
-}
-
-__device__ glm::vec<4, uint8_t> transform_proximity_map(const glm::vec<1, uint8_t>& v)
-{
-    uint8_t new_val = float(v.x) / float(PROXIMITY_MAP_HIGH_VALUE) * 255.0f;
-
-    printf("FROM %d TO %d\n", v.x, new_val);
-
-    return glm::vec<4, uint8_t>{new_val, 0, 0, 255};
-}
-
 void App::copy_proximity_map()
 {
     // Allocate a temporary image that hosts the conversion of the proximity map to RGBA (remember: proximity map is
@@ -236,8 +196,15 @@ void App::copy_proximity_map()
     // texture)
     DeviceImage<4, uint8_t> tmp_image = DeviceImage<4, uint8_t>::create(m_input.resolution, m_input.resolution, nullptr);
 
-    tmp_image.fill(255);
-    transform_image(m_arpenteur->m_prev_proximity_map, tmp_image, transform_proximity_map); // Fake CLion error :')
+    int proximity_max_val = m_arpenteur->m_proximity_max_value;
+
+    auto transform_proximity_val = [proximity_max_val] __device__ (const glm::vec<1, uint8_t>& val) -> glm::vec<4, uint8_t> {
+        uint8_t new_val = (uint8_t) float(val.x) / float(proximity_max_val) * 255.0f;
+        return glm::vec<4, uint8_t>{new_val, 0, 0, 255};
+    };
+
+    tmp_image.fill(0);
+    m_arpenteur->m_prev_proximity_map.transform_to(tmp_image, transform_proximity_val);
 
     m_proximity_map_cuda_mapping->copy_from(tmp_image);
 }
@@ -469,6 +436,8 @@ void App::clear_conversion()
     m_baked_construction_model.reset();
     m_voxel_model_builder.reset();
     m_baked_voxel_model.reset();
+
+    m_ui_view_settings.show_model = true;
 }
 
 void App::start_conversion()

@@ -52,7 +52,14 @@ void InputWindow::show()
         if (ImGui::Checkbox("Flip Y", &flip_y) && on_input_change) on_input_change();
         if (ImGui::Checkbox("Flip Z", &flip_z) && on_input_change) on_input_change();
 
-        if (ImGui::SliderFloat("Alpha test threshold", &alpha_test_threshold, 0.f, 1.f) && on_input_change) on_input_change();
+        if (ImGui::SliderFloat("Alpha test threshold", &alpha_test_threshold, 0.f, 0.999f) && on_input_change) on_input_change();
+
+        ImGui::Text("Proximity");
+        ImGui::Checkbox("Auto", &auto_proximity_settings);
+        if (auto_proximity_settings) ImGui::BeginDisabled();
+        ImGui::SliderInt("Max value", &proximity_max_value, 1, 254);
+        ImGui::SliderInt("Threshold", &proximity_threshold, 1, 32);
+        if (auto_proximity_settings) ImGui::EndDisabled();
 
         if (model_path.empty())
             ImGui::BeginDisabled();

@@ -21,6 +21,12 @@ struct ArpenteurInput
     bool flip_y = false;
     bool flip_z = false;
     float alpha_test_threshold = 0.7f;
+
+    /// If a floating placement's proximity value is below this value, then it's allowed.
+    uint8_t proximity_threshold = 1;
+
+    /// The value to which the proximity map is initialized where voxels are set (UINT8_MAX to make it automatically assigned).
+    uint8_t proximity_max_value = UINT8_MAX;
 };
 
 /// The class that manages the whole conversion process: from the raw Model to the Construction.
@@ -34,9 +40,10 @@ public:
     /* Input */
     const ArpenteurInput m_input;
 
-    ArpenteurListener* m_listener = nullptr;
+    uint8_t m_proximity_threshold = UINT8_MAX;
+    uint8_t m_proximity_max_value = UINT8_MAX;
 
-    uint8_t m_proximity_threshold = 1; ///< If floating placement proximity is below this value, then it's allowed
+    ArpenteurListener* m_listener = nullptr;
 
     /// The minimum accepted reward.
     /// If the best placement for a subslice has its reward lower than this threshold, the subslice is completed.
@@ -92,6 +99,11 @@ public:
     void run();
 
     void init_placements(); // TODO should be private but error...
+
+    static uint8_t calc_proximity_threshold(int resolution);
+
+    /// If unassigned, this function helps to calculate the proximity max value given the resolution.
+    static uint8_t calc_proximity_max_value(int resolution);
 
 private:
     /// Transforms the model vertices such that fits the user input grid (i.e. the Slicer space).

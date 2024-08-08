@@ -204,7 +204,7 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     float bn = float(brick_size) / float(BRICK_MAX_WIDTH * BRICK_MAX_HEIGHT);
     float cn = float(num_covered_map_cells) / float(brick_size);
     float dn = float(num_connected_bricks) / float(brick_size);
-    float pn = float(highest_proximity) / float(PROXIMITY_MAP_HIGH_VALUE);
+    float pn = float(highest_proximity) / float(arpenteur.m_proximity_max_value);
 
     static constexpr float max_color_diff = 260100.0f;  // 255^2 + 255^2 + 255^2 + 255^2
     glm::vec4 minmax_color_diff = max_color - min_color;

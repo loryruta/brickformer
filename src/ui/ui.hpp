@@ -21,6 +21,10 @@ struct InputWindow
     bool flip_z = false;
     float alpha_test_threshold = 0.7f;
 
+    bool auto_proximity_settings = true;
+    int proximity_max_value = UINT8_MAX;
+    int proximity_threshold = 1;
+
     int display_num_slices = -1;
 
     /* Callbacks */

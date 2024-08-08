@@ -96,6 +96,8 @@ public:
     void on_place(uint32_t slice_y, const Placement& placement, float reward) override;
     void on_placement_end(uint32_t slice_y) override;
 
+    void copy_proximity_map();
+
 private:
     void render();
 
@@ -103,7 +105,6 @@ private:
     void start_conversion();
 
     void copy_color_map();
-    void copy_proximity_map();
 
     /// Takes the slice placements and writes them to the given images (either by using their colors or hashed colors).
     /// The images are then expected to be used for visualization.

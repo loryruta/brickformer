@@ -8,6 +8,20 @@
 
 namespace lego_builder
 {
+
+template<uint32_t FORMAT, typename DATA_TYPE>
+class DeviceImage;
+
+template<
+    uint32_t SRC_IMAGE_FORMAT, typename SRC_IMAGE_TYPE,
+    uint32_t DST_IMAGE_FORMAT, typename DST_IMAGE_TYPE,
+    typename TRANSFORM_FUNC>
+__global__ void transform_image_kernel(
+    const DeviceImage<SRC_IMAGE_FORMAT, SRC_IMAGE_TYPE>* src_image,
+    DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>* dst_image,
+    TRANSFORM_FUNC transform_func
+);
+
 /// Represents an image allocated on device.
 /// Pixels are organized in a row-first manner and (0, 0) is the top-left pixel.
 template<uint32_t FORMAT, typename DATA_TYPE>
@@ -45,9 +59,7 @@ public:
 
     [[nodiscard]] uint32_t width() const { return m_width; }
     [[nodiscard]] uint32_t height() const { return m_height; }
-
     [[nodiscard]] size_t pixel_size() const { return sizeof(PixelT); }
-
     [[nodiscard]] size_t data_size() const { return m_width * m_height * sizeof(PixelT); };
 
     __host__ __device__
@@ -86,6 +98,28 @@ public:
 #else
         write_region(x, y, 1, 1, &value);
 #endif
+    }
+
+    /// Transform every pixel of the current image into a pixel of some other format (using the supplied device function).
+    /// Finally writes the result in the destination image.
+    template<
+        uint32_t DST_IMAGE_FORMAT, typename DST_IMAGE_TYPE,
+         typename TRANSFORM_FUNC>
+    void transform_to(const DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>& dst_image, TRANSFORM_FUNC transform_func)
+    {
+        assert(m_width == dst_image.m_width && m_height == dst_image.m_height);
+
+        DeviceImage<FORMAT, DATA_TYPE>* src_image_d = to_device(*this);
+        DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>* dst_image_d = to_device(dst_image);
+
+        dim3 num_blocks{};
+        num_blocks.x = div_ceil<uint32_t>(m_width, 32);
+        num_blocks.y = div_ceil<uint32_t>(m_height, 32);
+        num_blocks.z = 1;
+
+        dim3 block_dim(32, 32, 1);
+        transform_image_kernel<<<num_blocks, block_dim>>>(src_image_d, dst_image_d, transform_func);
+        CHECK_CU(cudaDeviceSynchronize());
     }
 
     /// Fills image data with the supplied int value.
@@ -131,5 +165,26 @@ public:
         return image;
     }
 };
+
+template<
+    uint32_t SRC_IMAGE_FORMAT, typename SRC_IMAGE_TYPE,
+    uint32_t DST_IMAGE_FORMAT, typename DST_IMAGE_TYPE,
+    typename TRANSFORM_FUNC>
+__global__ void transform_image_kernel(
+    const DeviceImage<SRC_IMAGE_FORMAT, SRC_IMAGE_TYPE>* src_image,
+    DeviceImage<DST_IMAGE_FORMAT, DST_IMAGE_TYPE>* dst_image,
+    TRANSFORM_FUNC transform_func
+)
+{
+    size_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x < src_image->m_width && y < src_image->m_height)
+    {
+        auto old_val = src_image->read_pixel(x, y);
+        auto new_val = transform_func(old_val);
+        dst_image->write_pixel(x, y, new_val);
+    }
+}
 
 }  // namespace lego_builder

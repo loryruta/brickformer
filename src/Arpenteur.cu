@@ -1,5 +1,6 @@
 #include "Arpenteur.cuh"
 
+#include <tinyformat.h>
 #include <thrust/extrema.h>
 #include <cuda_profiler_api.h>
 
@@ -16,6 +17,24 @@ Arpenteur::Arpenteur(const ArpenteurInput& input) :
     m_input(input)
 {
     int resolution = input.resolution;
+    tfm::printf("[INFO ] [Arpenteur] Resolution: %d\n", resolution);
+
+    if (m_proximity_threshold == UINT8_MAX) {
+        m_proximity_threshold = calc_proximity_threshold(resolution);
+        tfm::printf("[INFO ] [Arpenteur] Proximity threshold (derived): %d\n", m_proximity_threshold);
+    } else {
+        m_proximity_threshold = input.proximity_threshold;
+        tfm::printf("[INFO ] [Arpenteur] Proximity threshold: %d\n", m_proximity_threshold);
+    }
+
+    if (input.proximity_max_value == UINT8_MAX) {
+        m_proximity_max_value = calc_proximity_max_value(resolution);
+        tfm::printf("[INFO ] [Arpenteur] Proximity max value (derived): %d\n", m_proximity_max_value);
+    } else {
+        m_proximity_max_value = input.proximity_max_value;
+        tfm::printf("[INFO ] [Arpenteur] Proximity max value: %d\n", m_proximity_max_value);
+    }
+
     m_num_placements = resolution * resolution * k_num_bricks;
 
     CHECK_CU(cudaMalloc(&m_placements_d, m_num_placements * sizeof(Placement)));
@@ -64,6 +83,21 @@ void Arpenteur::init_placements()
     init_placements_kernel<<<num_blocks, 1024>>>(to_device(*this));  // this to device, even if some fields aren't initialized yet
 }
 
+uint8_t Arpenteur::calc_proximity_threshold(int resolution)
+{
+    return 1;
+}
+
+uint8_t Arpenteur::calc_proximity_max_value(int resolution)
+{
+    // If the resolution is 16, we opt to use a proximity max value of 2.
+    // We use this ratio to calculate the proximity max value for any resolution
+
+    float r = 2.f / 16.f;
+    int v = (int) (r * float(resolution));
+    return (uint8_t) std::min(v, 254);
+}
+
 void Arpenteur::transform_model()
 {
     glm::vec3 model_size = m_model->size();
@@ -84,7 +118,7 @@ void Arpenteur::transform_model()
 }
 
 __global__
-void init_proximity_map_from_color_map_kernel(const ColorMapT* color_map, ProximityMapT* out_proximity_map)
+void init_proximity_map_from_color_map_kernel(const ColorMapT* color_map, uint8_t init_val, ProximityMapT* out_proximity_map)
 {
     assert(color_map->m_width == out_proximity_map->m_width && color_map->m_height == out_proximity_map->m_height);
 
@@ -93,13 +127,8 @@ void init_proximity_map_from_color_map_kernel(const ColorMapT* color_map, Proxim
 
     if (px < color_map->m_width && py < color_map->m_height)
     {
-        bool colored = color_map->read_pixel(px, py).a > 0;
-        if (colored)
-        {
-            uint8_t v = PROXIMITY_MAP_HIGH_VALUE;
-            v |= 0x80;
-            out_proximity_map->write_pixel(px, py, glm::vec<1, uint8_t>{v});
-        }
+        bool is_colored = color_map->read_pixel(px, py).a > 0;
+        if (is_colored) out_proximity_map->write_pixel(px, py, glm::vec<1, uint8_t>{init_val});
     }
 }
 
@@ -113,7 +142,7 @@ void Arpenteur::init_proximity_map_from_color_map()
     num_blocks.z = 1;
 
     dim3 block_dim(32, 32, 1);
-    init_proximity_map_from_color_map_kernel<<<num_blocks, block_dim>>>(m_color_map_d, m_prev_proximity_map_d);
+    init_proximity_map_from_color_map_kernel<<<num_blocks, block_dim>>>(m_color_map_d, m_proximity_max_value /* init_val */, m_prev_proximity_map_d);
     CHECK_CU(cudaDeviceSynchronize());
 }
 
@@ -309,7 +338,7 @@ void Arpenteur::run()
     // INIT
     m_prev_placements.fill(0xFFFF);
     m_cur_placements.fill(0);
-    m_prev_proximity_map.fill(PROXIMITY_MAP_HIGH_VALUE);
+    m_prev_proximity_map.fill(m_proximity_max_value);
 
     for (m_slice_y = 0; m_slice_y < num_slices; m_slice_y++)
     {
@@ -375,8 +404,8 @@ void Arpenteur::run()
         // COMPUTE PROXIMITY MAP
         stop_watch.reset();
 
-        init_proximity_map_from_color_map();          // Init colored cells to PROXIMITY_MAP_HIGH_VALUE
-        m_spread_value.spread(m_prev_proximity_map);  // Spread the init values on the proximity map
+        init_proximity_map_from_color_map();
+        m_spread_value.spread(m_prev_proximity_map, m_proximity_max_value /* num_iterations */);  // Spread the init values on the proximity map
 
         printf("[Arpenteur]   COMPUTE PROXIMITY MAP; %s\n", stop_watch.elapsed_time_str().c_str());
     }
