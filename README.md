@@ -18,3 +18,8 @@ connected bricks of the previous layer; thus avoiding "brick piles" that could l
 
 "l'Arpenteur", from French, means "the surveyor" in English ("il geometra" in Italian).
 And no, I'm not French neither I speak it, but sounded cool so here it is.
+
+# TODO
+
+- [ ] Null value in placement map (current placement map and previous). 
+0 null value isn't valid as it is the same for the first placement. UINT16_MAX?

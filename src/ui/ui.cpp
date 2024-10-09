@@ -52,7 +52,8 @@ void InputWindow::show()
         if (ImGui::Checkbox("Flip Y", &flip_y) && on_input_change) on_input_change();
         if (ImGui::Checkbox("Flip Z", &flip_z) && on_input_change) on_input_change();
 
-        if (ImGui::SliderFloat("Alpha test threshold", &alpha_test_threshold, 0.f, 0.999f) && on_input_change) on_input_change();
+        ImGui::Text("Alpha test threshold");
+        if (ImGui::SliderFloat("###alpha_test_threshold", &alpha_test_threshold, 0.f, 0.999f) && on_input_change) on_input_change();
 
         ImGui::Text("Proximity");
         ImGui::Checkbox("Auto", &auto_proximity_settings);

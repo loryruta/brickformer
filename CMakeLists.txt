@@ -15,7 +15,9 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-#   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -g")
+    # Can't debug because compute-sanitizer says:
+    # Program hit cudaErrorLaunchOutOfResources (error 701) due to "too many resources requested for launch" on CUDA API call to cudaGetLastError
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)

@@ -1,14 +1,15 @@
 #pragma once
 
 #include <filesystem>
-#include <unordered_map>
+#include <unordered_set>
 
 #include <glm/glm.hpp>
 
 #include "ArpenteurListener.hpp"
+#include "PlacementSolver.cuh"
+#include "Slicer.cuh"
 #include "SpreadValue.cuh"
 #include "types.cuh"
-#include "Slicer.cuh"
 
 namespace lego_builder
 {
@@ -51,9 +52,6 @@ public:
 
     size_t m_num_placements;
 
-    Placement* m_placements_d; ///< Device array containing all possible placements.
-    float* m_rewards_d;        ///< Device array of rewards, each corresponding to a placement.
-
     bool* m_valid_placements_d; ///< Device array telling if the i-th placement is valid (optimization).
 
     ColorMapT m_color_map;
@@ -68,6 +66,8 @@ public:
     PlacementMapT m_cur_placements;
     PlacementMapT* m_cur_placements_d;
 
+    std::unique_ptr<PlacementSolver> m_placement_solver;
+
     int m_slice_y;
 
     std::unique_ptr<Model> m_model;
@@ -75,11 +75,9 @@ public:
     std::unique_ptr<Slicer> m_slicer;
     SpreadValue m_spread_value;
 
-    std::unordered_map<Placement, uint8_t, PlacementHash> m_stacked_placements;
-
-    const size_t k_max_colored_placements = 1024 * 1024; // >1MB
-    std::vector<ColoredPlacement> m_colored_placements;
-    ColoredPlacement* m_colored_placements_d;
+    std::unordered_set<Placement, PlacementHash> m_stacked_placements;
+    std::vector<Placement> m_linear_stacked_placements;
+    Placement* m_linear_stacked_placements_d = nullptr;
 
     /// The placement ID used for filling the Placement map.
     uint32_t m_next_pid = 0;
@@ -98,8 +96,6 @@ public:
 
     void run();
 
-    void init_placements(); // TODO should be private but error...
-
     static uint8_t calc_proximity_threshold(int resolution);
 
     /// If unassigned, this function helps to calculate the proximity max value given the resolution.
@@ -113,17 +109,13 @@ private:
     /// Initializes the proximity map so that colored cells have a high value (others zero).
     void init_proximity_map_from_color_map();
 
-    template<uint32_t SUBSLICE>
-    std::pair<Placement, float> compute_next_placement();
-
     /// Writes the given placement into the current placement map.
     void place(const Placement& placement);
 
-    template<uint32_t SUBSLICE>
-    size_t place_on_subslice(uint32_t slice_y);
+    size_t place_on_subslice(uint32_t slice_y, int subslice);
 
-    /// Linearizes the placements list (for faster iteration), and colorizes them according to the Color map.
-    void linearize_and_colorize();
+    /// Linearizes the placements from a hashset to linear memory (for fast iteration).
+    void linearize_placements_to_output();
 };
 
 } // namespace lego_builder

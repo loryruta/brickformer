@@ -70,8 +70,10 @@ public:
     }
 
     __device__
-    PixelT read_pixel(uint32_t x, uint32_t y) const
+    PixelT read_pixel(int x, int y) const
     {
+        assert(x >= 0 && x < m_width);
+        assert(y >= 0 && y < m_height);
         return m_data[y * m_height + x];
     }
 

@@ -6,6 +6,7 @@ add_library(arpenteur STATIC
     model/GltfLoader.cpp
     model/Model.cpp
     Arpenteur.cu
+        PlacementSolver.cu
     Slicer.cu
     SpreadValue.cu
 )

@@ -7,10 +7,14 @@
 #include <imgui_impl_opengl3.h>
 #include <nfd.h>
 
+#include "brick_colors.hpp"
 #include "bricks.hpp"
+#include "log.hpp"
 #include "model/GltfLoader.hpp"
 #include "util/StopWatch.hpp"
 #include "video/gl_helpers.hpp"
+
+#define ARP_LOG_CONTEXT "App"
 
 using namespace lego_builder;
 
@@ -146,17 +150,17 @@ void App::enqueue_and_wait_copy_maps_job()
 
 void App::on_placement_begin(uint32_t slice_y)
 {
-    enqueue_and_wait_copy_maps_job();
-    m_placement_stopwatch.reset();
+    // enqueue_and_wait_copy_maps_job();
+    // m_placement_stopwatch.reset();
 }
 
 void App::on_place(uint32_t slice_y, const Placement& placement, float reward)
 {
-    if (m_placement_stopwatch.elapsed_millis() >= 1000 * k_placement_visualization_period)
-    {
-        enqueue_and_wait_copy_maps_job();
-        m_placement_stopwatch.reset();
-    }
+//    if (m_placement_stopwatch.elapsed_millis() >= 1000 * k_placement_visualization_period)
+//    {
+//        // enqueue_and_wait_copy_maps_job();
+//        m_placement_stopwatch.reset();
+//    }
 }
 
 void App::on_placement_end(uint32_t slice_y)
@@ -198,7 +202,8 @@ void App::copy_proximity_map()
 
     int proximity_max_val = m_arpenteur->m_proximity_max_value;
 
-    auto transform_proximity_val = [proximity_max_val] __device__ (const glm::vec<1, uint8_t>& val) -> glm::vec<4, uint8_t> {
+    auto transform_proximity_val = [proximity_max_val] __device__(const glm::vec<1, uint8_t>& val) -> glm::vec<4, uint8_t>
+    {
         uint8_t new_val = (uint8_t) float(val.x) / float(proximity_max_val) * 255.0f;
         return glm::vec<4, uint8_t>{new_val, 0, 0, 255};
     };
@@ -226,10 +231,9 @@ void App::write_placement_maps(std::vector<CudaMappedGlTexture>& out_images, boo
     tmp_images[1].fill(0);
     tmp_images[2].fill(0);
 
-    for (ColoredPlacement& entry : m_arpenteur->m_colored_placements)
+    for (Placement& placement : m_arpenteur->m_linear_stacked_placements)
     {
-        Placement& placement = entry.m_placement;
-        uint8_t subslice_mask = entry.m_subslice_mask;
+        uint8_t subslice_mask = placement.m_subslice_mask;
         assert(subslice_mask); // Shouldn't be zero
 
         glm::vec<4, uint8_t> color{};
@@ -239,8 +243,7 @@ void App::write_placement_maps(std::vector<CudaMappedGlTexture>& out_images, boo
         }
         else
         {
-            color = entry.m_color;
-            color.a = 255.0f;
+            color = k_brick_colors[placement.m_cid].color_u8();
         }
 
         auto& brick = k_bricks[placement.m_bid];
@@ -273,11 +276,20 @@ void App::add_placements_to_construction_model()
 {
     printf("[App] UPDATE CONSTRUCTION MODEL; Updating vertices...\n");
 
-    for (ColoredPlacement& colored_placement : m_arpenteur->m_colored_placements)
+    int pi = 0;
+    for (const Placement& placement : m_arpenteur->m_linear_stacked_placements)
     {
+        const BrickColor& brick_color = k_brick_colors[placement.m_cid];
+
+        ARP_DEBUG(
+            "  %3d Slice: %d, Placement BID: %2d, X: %3d, Y: %3d, Subslice mask: %d, Color: %s", pi, m_arpenteur->m_slice_y, placement.m_bid, placement.m_x, placement.m_y,
+            placement.m_subslice_mask, brick_color.name
+        );
+        ++pi;
+
         m_brick_model_builder->place(
-            m_arpenteur->m_slice_y, colored_placement.m_placement.m_x, colored_placement.m_placement.m_y, colored_placement.m_placement.m_bid,
-            colored_placement.m_subslice_mask, glm::vec4{colored_placement.m_color} / 255.0f
+            m_arpenteur->m_slice_y, placement.m_x, placement.m_y, placement.m_bid,
+            placement.m_subslice_mask, glm::vec4(brick_color.color_u8()) / 255.0f
         );
     }
 
