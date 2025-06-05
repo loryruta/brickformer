@@ -1,4 +1,4 @@
-#include "OutputToGltf.cuh"
+#include "GltfExporter.h"
 
 #include <numeric>
 
@@ -82,7 +82,7 @@ void OutputToGltf::set_brick_1x1(int x, int y, int z, int subslice_mask, const g
     }
 }
 
-void OutputToGltf::on_placement_end(uint32_t slice_y)
+void OutputToGltf::on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements)
 {
     for (const Placement& placement : m_arpenteur.m_linear_stacked_placements)
     {

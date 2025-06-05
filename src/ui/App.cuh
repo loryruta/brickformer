@@ -16,6 +16,7 @@
 #include "video/ModelRenderer.hpp"
 #include "video/TextureRenderer.hpp"
 #include "video/Window.hpp"
+#include "exporters/BuildInstructionsExporter.h"
 
 namespace lego_builder
 {
@@ -81,6 +82,9 @@ private:
     mutable std::mutex m_job_queue_mutex;
     std::condition_variable m_job_queue_cond_var;  ///< Used to wait for main thread jobs to complete before proceeding.
 
+    /* Exporters */
+    std::unique_ptr<BuildInstructionsExporter> m_build_instructions_exporter;
+
 public:
     static constexpr float k_max_view_side = 100.f;
 
@@ -94,7 +98,7 @@ public:
     void on_model_load(const Model& model) override;
     void on_placement_begin(uint32_t slice_y) override;
     void on_place(uint32_t slice_y, const Placement& placement, float reward) override;
-    void on_placement_end(uint32_t slice_y) override;
+    void on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements) override;
 
     void copy_proximity_map();
 

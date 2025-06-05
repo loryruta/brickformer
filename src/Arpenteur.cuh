@@ -44,7 +44,7 @@ public:
     uint8_t m_proximity_threshold = UINT8_MAX;
     uint8_t m_proximity_max_value = UINT8_MAX;
 
-    ArpenteurListener* m_listener = nullptr;
+    std::vector<ArpenteurListener*> m_listeners;
 
     /// The minimum accepted reward.
     /// If the best placement for a subslice has its reward lower than this threshold, the subslice is completed.
@@ -92,7 +92,7 @@ public:
 
     ~Arpenteur() = default;
 
-    void set_listener(ArpenteurListener* listener) { m_listener = listener; }
+    void add_listener(ArpenteurListener* listener) { m_listeners.emplace_back(listener); }
 
     void run();
 

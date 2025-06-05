@@ -196,7 +196,7 @@ size_t Arpenteur::place_on_subslice(uint32_t slice_y, int subslice)
         if (!inserted) iterator->m_subslice_mask |= 1 << subslice;
         // If the placement is stacked 3 times (3 equal placements for the slice), then can be compacted
 
-        if (m_listener) m_listener->on_place(m_slice_y, placement, reward);
+        for (const auto& listener : m_listeners) listener->on_place(m_slice_y, placement, reward);
 
         if (log_stopwatch.elapsed_millis() >= 5000)
         {
@@ -279,7 +279,7 @@ void Arpenteur::run()
 
     transform_model();
 
-    if (m_listener) m_listener->on_model_load(*m_model);
+    for (const auto& listener : m_listeners) listener->on_model_load(*m_model);
 
     dur_str = stop_watch.elapsed_time_str();
     printf("[Arpenteur] Model loaded in %s\n", dur_str.c_str());
@@ -312,7 +312,7 @@ void Arpenteur::run()
         ARP_INFO("Voxelization performed in %s", stop_watch.elapsed_time_str().c_str());
 
         // PLACEMENT BEGIN
-        if (m_listener) m_listener->on_placement_begin(m_slice_y);
+        for (const auto& listener : m_listeners) listener->on_placement_begin(m_slice_y);
 
         size_t num_placed_bricks;
 
@@ -350,7 +350,7 @@ void Arpenteur::run()
         linearize_placements_to_output();
 
         // SLICE END
-        if (m_listener) m_listener->on_placement_end(m_slice_y);
+        for (const auto& listener : m_listeners) listener->on_placement_end(m_slice_y, m_linear_stacked_placements);
 
         // COMPUTE PROXIMITY MAP
         stop_watch.reset();

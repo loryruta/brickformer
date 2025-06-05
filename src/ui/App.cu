@@ -163,7 +163,7 @@ void App::on_place(uint32_t slice_y, const Placement& placement, float reward)
 //    }
 }
 
-void App::on_placement_end(uint32_t slice_y)
+void App::on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements)
 {
     enqueue_and_wait_copy_maps_job();
 
@@ -469,7 +469,11 @@ void App::start_conversion()
     m_input.flip_y = m_ui_input.flip_y;
     m_input.flip_z = m_ui_input.flip_z;
     m_arpenteur = std::make_unique<Arpenteur>(m_input);
-    m_arpenteur->set_listener(this);
+    m_arpenteur->add_listener(this);
+
+    // Build instructions
+    m_build_instructions_exporter = std::make_unique<BuildInstructionsExporter>(resolution, 1024, "build_instructions");
+    m_arpenteur->add_listener(m_build_instructions_exporter.get());
 
     // Calculate view transforms
     m_conversion_to_view_transform = glm::identity<glm::mat4>();
