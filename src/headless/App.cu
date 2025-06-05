@@ -2,7 +2,7 @@
 #include <cstdio>
 
 #include "Arpenteur.cuh"
-#include "exporters/OutputToGltf.cuh"
+#include "exporters/GltfExporter.h"
 
 using namespace lego_builder;
 

@@ -25,7 +25,7 @@ public:
     void complete(const std::filesystem::path& output_dir);
 
 protected:
-    void on_placement_end(uint32_t slice_y) override;
+    void on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements) override;
 
 private:
     void set_brick_1x1(int x, int y, int z, int subslice_mask, const glm::vec<4, uint8_t>& color);

@@ -22,6 +22,9 @@ struct Placement
     mutable uint8_t m_subslice_mask = UINT8_MAX; ///< 3 bits bitmask; if i-th is set, this placement occupies the i-th subslice (out of 3)
 
     bool operator==(const Placement& other) const { return m_bid == other.m_bid && m_x == other.m_x && m_y == other.m_y; }
+
+    bool is_subslice() const { return m_subslice_mask & 0x7; }
+    bool is_full() const { return !is_subslice(); }
 };
 
 struct PlacementHash // Used for stacking placements

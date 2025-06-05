@@ -2,7 +2,7 @@
 
 #include <string>
 
-#define CHECK_STATE(condition) \
+#define CHECK_STATE(condition, ...) \
     lego_builder::check_state(!!(condition), #condition, __FILE__, __LINE__, nullptr)
 
 #define CHECK_STATE_MSG(condition, message) \
