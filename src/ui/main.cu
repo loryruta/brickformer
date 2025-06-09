@@ -1,4 +1,4 @@
-#include "App.cuh"
+#include "App.h"
 
 #include <nfd.h>
 
@@ -16,7 +16,7 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
-    Window window = Window::create_fullscreen("LEGO builder");
+    Window window = Window::create_fullscreen("BrickFormer");
 
     // Initialize GL
     int version = gladLoadGL(glfwGetProcAddress);
@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
 
     // Start the app
     std::unique_ptr<App> app = std::make_unique<App>(window);
-    app->run();
+    app->start();
 
     //
     app.reset();

@@ -1,16 +1,15 @@
 #pragma once
 
-#include "Arpenteur.cuh"
-#include "ArpenteurListener.hpp"
+#include "ConverterListener.h"
 #include "model/Model.hpp"
 #include "types.cuh"
 
 namespace lego_builder
 {
-class OutputToGltf : public ArpenteurListener
+class OutputToGltf : public ConverterListener
 {
 private:
-    const Arpenteur& m_arpenteur;
+    const Converter& m_converter;
 
     std::vector<Vertex> m_vertices;
     std::vector<uint32_t> m_indices;
@@ -19,7 +18,7 @@ private:
     glm::vec3 m_max_position;
 
 public:
-    explicit OutputToGltf(const Arpenteur& arpenteur);
+    explicit OutputToGltf(const Converter& arpenteur);
     ~OutputToGltf() = default;
 
     void complete(const std::filesystem::path& output_dir);

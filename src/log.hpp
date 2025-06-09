@@ -1,6 +1,6 @@
 #include <tinyformat.h>
 
-#define ARP_LOG_LEVEL 2
+#define ARP_LOG_LEVEL 3
 
 #define ARP_LOG(level, format, ...) \
     tfm::printf("[" level "] [" ARP_LOG_CONTEXT "] " format "\n", ##__VA_ARGS__)

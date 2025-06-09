@@ -1,12 +1,12 @@
 #pragma once
 
-#include "ArpenteurListener.hpp"
+#include "ConverterListener.h"
 
 #include <filesystem>
 
 namespace lego_builder
 {
-class BuildInstructionsExporter : public ArpenteurListener
+class BuildInstructionsExporter : public ConverterListener
 {
 private:
     const int m_resolution;

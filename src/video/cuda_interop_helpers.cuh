@@ -12,7 +12,7 @@ namespace lego_builder
 {
 
 /// A RAII wrapper for cudaGraphicsResource that represents a GL texture.
-class CudaMappedGlTexture
+class CUDAMappedGLTexture
 {
 private:
     GLuint m_texture;  // Not owned!
@@ -20,10 +20,10 @@ private:
     cudaArray_t m_mapped_ptr;
 
 public:
-    explicit CudaMappedGlTexture(GLuint texture);
-    CudaMappedGlTexture(const CudaMappedGlTexture&) = delete;
-    CudaMappedGlTexture(CudaMappedGlTexture&& other) noexcept;
-    ~CudaMappedGlTexture();
+    explicit CUDAMappedGLTexture(GLuint texture);
+    CUDAMappedGLTexture(const CUDAMappedGLTexture&) = delete;
+    CUDAMappedGLTexture(CUDAMappedGLTexture&& other) noexcept;
+    ~CUDAMappedGLTexture();
 
     [[nodiscard]] GLuint texture() const { return m_texture; }
 

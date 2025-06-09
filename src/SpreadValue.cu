@@ -1,4 +1,4 @@
-#include "SpreadValue.cuh"
+#include "SpreadValue.h"
 
 #include <glm/ext/scalar_constants.hpp>
 

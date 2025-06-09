@@ -2,17 +2,16 @@
 
 using namespace lego_builder;
 
-CudaMappedGlTexture::CudaMappedGlTexture(GLuint texture)
+CUDAMappedGLTexture::CUDAMappedGLTexture(GLuint texture)
 {
     m_texture = texture;
 
     CHECK_CU(cudaGraphicsGLRegisterImage(&m_resource, m_texture, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard));
-
     CHECK_CU(cudaGraphicsMapResources(1, &m_resource));
     CHECK_CU(cudaGraphicsSubResourceGetMappedArray(&m_mapped_ptr, m_resource, 0, 0));
 }
 
-CudaMappedGlTexture::CudaMappedGlTexture(CudaMappedGlTexture&& other) noexcept :
+CUDAMappedGLTexture::CUDAMappedGLTexture(CUDAMappedGLTexture&& other) noexcept :
     m_texture(other.m_texture),
     m_resource(other.m_resource),
     m_mapped_ptr(other.m_mapped_ptr)
@@ -22,7 +21,7 @@ CudaMappedGlTexture::CudaMappedGlTexture(CudaMappedGlTexture&& other) noexcept :
     other.m_mapped_ptr = nullptr;
 }
 
-CudaMappedGlTexture::~CudaMappedGlTexture()
+CUDAMappedGLTexture::~CUDAMappedGLTexture()
 {
     if (m_resource != nullptr)
     {
@@ -35,7 +34,7 @@ CudaMappedGlTexture::~CudaMappedGlTexture()
     }
 }
 
-void CudaMappedGlTexture::copy_from(DeviceImage<4, uint8_t>& image)
+void CUDAMappedGLTexture::copy_from(DeviceImage<4, uint8_t>& image)
 {
     CHECK_CU(cudaMemcpy2DToArray(
         m_mapped_ptr,

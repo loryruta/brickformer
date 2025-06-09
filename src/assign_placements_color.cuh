@@ -4,7 +4,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#include "Arpenteur.cuh"
+#include "Converter.h"
 #include "brick_colors.hpp"
 #include "bricks.hpp"
 #include "reward_func.cuh"
@@ -37,13 +37,13 @@ __device__ int search_nearest_brick_color(const glm::vec<4, uint8_t>& color)
 }
 
 /// Computes the placement color as the average of the colors being covered.
-__device__ void assign_placement_color(Arpenteur& arpenteur, Placement& placement)
+__device__ void assign_placement_color(Converter& converter, Placement& placement)
 {
     int pi = (blockIdx.x << 5) + (threadIdx.x >> 5); // One warp per placement
     int wi = threadIdx.x >> 5;
     int lane_idx = threadIdx.x & 0x1f;
 
-    ColorMapT* color_map = arpenteur.m_color_map_d;
+    ColorMapT* color_map = converter.m_color_map_d;
 
     __shared__ int histogram[32 /* warp */][96]; // 12KB
     static_assert(ARP_ARRAY_SIZE(k_brick_colors) <= ARP_ARRAY_SIZE(histogram[wi]));
@@ -94,11 +94,11 @@ __device__ void assign_placement_color(Arpenteur& arpenteur, Placement& placemen
     placement.m_cid = uint8_t(max_cid); // Assign CID
 }
 
-__global__ void assign_placements_color_kernel(Arpenteur* arpenteur, Placement* placements, size_t num_placements)
+__global__ void assign_placements_color_kernel(Converter* converter, Placement* placements, size_t num_placements)
 {
     int pi = (blockIdx.x << 5) + (threadIdx.x >> 5); // One warp per placement
     if (pi >= num_placements) return;
 
-    assign_placement_color(*arpenteur, placements[pi]);
+    assign_placement_color(*converter, placements[pi]);
 }
 } // namespace lego_builder

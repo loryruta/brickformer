@@ -1,12 +1,14 @@
 
 
 add_library(arpenteur STATIC
+        Converter.cu
+        Converter.h
+        ConverterListener.h
         exporters/BuildInstructionsExporter.cu
-        exporters/GltfExporter.cu
+#        exporters/GltfExporter.cu
         model/DeviceModel.cu
         model/GltfLoader.cpp
         model/Model.cpp
-        Arpenteur.cu
         PlacementSolver.cu
         Slicer.cu
         SpreadValue.cu

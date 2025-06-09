@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <cstdio>
 
-#include "Arpenteur.cuh"
+#include "Converter.h"
 #include "exporters/GltfExporter.h"
 
 using namespace lego_builder;
