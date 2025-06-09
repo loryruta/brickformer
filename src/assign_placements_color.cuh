@@ -55,14 +55,14 @@ __device__ void assign_placement_color(Converter& converter, Placement& placemen
     }
     __syncwarp();
 
-    auto& brick = k_bricks[placement.m_bid];
+    auto& brick = k_bricks[placement.bid];
     iterate_brick_grid(
         [&](int bx, int by)
         {
             if (brick[by][bx])
             {
-                int mx = placement.m_x + bx;
-                int my = placement.m_y + by;
+                int mx = placement.x + bx;
+                int my = placement.z + by;
                 glm::vec<4, uint8_t> color = color_map->read_pixel(mx, my);
                 if (color.a == UINT8_MAX) // Consider the color only if a valid rasterized voxel
                 {
@@ -91,7 +91,7 @@ __device__ void assign_placement_color(Converter& converter, Placement& placemen
     // There must be at least one non-zero histogram bucket because a placement is considered valid
     // if 30% of its cells are colored (see reward function definition)
     assert(max_cid >= 0);
-    placement.m_cid = uint8_t(max_cid); // Assign CID
+    placement.cid = uint8_t(max_cid); // Assign CID
 }
 
 __global__ void assign_placements_color_kernel(Converter* converter, Placement* placements, size_t num_placements)

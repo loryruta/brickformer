@@ -22,8 +22,8 @@ __device__ void iterate_brick_grid(CALLBACK callback)
     int lane_x = lane_i % 5;
     int lane_y = lane_i / 5;
 
-    int num_items_x = div_ceil(BRICK_MAX_WIDTH, 5);  // 2
-    int num_items_y = div_ceil(BRICK_MAX_HEIGHT, 5); // 2
+    int num_items_x = div_ceil(BRICK_MAX_EXTENT_X, 5);  // 2
+    int num_items_y = div_ceil(BRICK_MAX_EXTENT_Z, 5); // 2
 
     for (int ix = 0; ix < num_items_x; ix++)
     {
@@ -31,7 +31,7 @@ __device__ void iterate_brick_grid(CALLBACK callback)
         {
             int bx = lane_x * num_items_x + ix;
             int by = lane_y * num_items_y + iy;
-            if (bx < BRICK_MAX_WIDTH && by < BRICK_MAX_HEIGHT)
+            if (bx < BRICK_MAX_EXTENT_X && by < BRICK_MAX_EXTENT_Z)
             {
                 callback(bx, by);
             }
@@ -52,9 +52,9 @@ __global__ void internal::init_placements_kernel(Placement* placements, size_t n
 
     Placement& placement = placements[pi];
     placement = {}; // Init with default values
-    placement.m_bid = pi % k_num_bricks;
-    placement.m_x = (pi / k_num_bricks) % resolution;
-    placement.m_y = pi / (resolution * k_num_bricks);
+    placement.bid = pi % k_num_bricks;
+    placement.x = (pi / k_num_bricks) % resolution;
+    placement.z = pi / (resolution * k_num_bricks);
     // placement.m_subslice_mask
     // placement.m_cid
 }
@@ -71,7 +71,7 @@ __global__ void internal::eval_brick_size_kernel(const Placement* placements, si
     __syncwarp();
 
     const Placement& placement = placements[pi];
-    auto const& brick = k_bricks[placement.m_bid];
+    auto const& brick = k_bricks[placement.bid];
     iterate_brick_grid(
         [&](int bx, int by)
         {
@@ -98,7 +98,7 @@ __global__ void internal::eval_num_connectible_sides_kernel(const Placement* pla
     __syncwarp();
 
     const Placement& placement = placements[pi];
-    auto const& brick = k_bricks[placement.m_bid];
+    auto const& brick = k_bricks[placement.bid];
     iterate_brick_grid(
         [&](int bx, int by)
         {
@@ -107,8 +107,8 @@ __global__ void internal::eval_num_connectible_sides_kernel(const Placement* pla
                 int current_connectible_sides = 0;
                 current_connectible_sides += bx - 1 < 0 ? 1 : !brick[by][bx - 1];
                 current_connectible_sides += by - 1 < 0 ? 1 : !brick[by - 1][bx];
-                current_connectible_sides += bx + 1 >= BRICK_MAX_WIDTH ? 1 : !brick[by][bx + 1];
-                current_connectible_sides += by + 1 >= BRICK_MAX_HEIGHT ? 1 : !brick[by + 1][bx];
+                current_connectible_sides += bx + 1 >= BRICK_MAX_EXTENT_X ? 1 : !brick[by][bx + 1];
+                current_connectible_sides += by + 1 >= BRICK_MAX_EXTENT_Z ? 1 : !brick[by + 1][bx];
                 atomicAdd_block(&connectible_sides[wi], current_connectible_sides);
             }
         }
@@ -136,14 +136,14 @@ internal::eval_color_map_coverage_kernel(const Placement* placements, size_t num
     __syncwarp();
 
     const Placement& placement = placements[pi];
-    auto const& brick = k_bricks[placement.m_bid];
+    auto const& brick = k_bricks[placement.bid];
     iterate_brick_grid(
         [&](int bx, int by)
         {
             if (brick[by][bx])
             {
-                int mx = placement.m_x + bx;
-                int my = placement.m_y + by;
+                int mx = placement.x + bx;
+                int my = placement.z + by;
                 if (!color_map->is_valid_pixel(mx, my)) return; // Out of bounds
 
                 glm::vec<4, uint8_t> v = color_map->read_pixel(mx, my);
@@ -198,10 +198,10 @@ internal::eval_num_neighbors_kernel(const Placement* placements, size_t num_plac
     iterate_brick_grid(
         [&](int bx, int by)
         {
-            int mx = placement.m_x + bx;
-            int my = placement.m_y + by;
+            int mx = placement.x + bx;
+            int my = placement.z + by;
 
-            auto const& brick = k_bricks[placement.m_bid];
+            auto const& brick = k_bricks[placement.bid];
             if (brick[by][bx] && current_placement_map->is_valid_pixel(mx, my))
             {
                 int current_num_neighbors = 0;
@@ -211,12 +211,12 @@ internal::eval_num_neighbors_kernel(const Placement* placements, size_t num_plac
                            current_placement_map->read_pixel(mx - 1, my).x != ARP_NO_PLACEMENT_VALUE;
                 current_num_neighbors += has_left;
 
-                bool has_right = bx + 1 >= BRICK_MAX_WIDTH || !brick[by][bx + 1];
+                bool has_right = bx + 1 >= BRICK_MAX_EXTENT_X || !brick[by][bx + 1];
                 has_right = has_right && mx + 1 < current_placement_map->m_width &&
                             current_placement_map->read_pixel(mx + 1, my).x != ARP_NO_PLACEMENT_VALUE;
                 current_num_neighbors += has_right;
 
-                bool has_bottom = by + 1 >= BRICK_MAX_HEIGHT || !brick[by + 1][bx];
+                bool has_bottom = by + 1 >= BRICK_MAX_EXTENT_Z || !brick[by + 1][bx];
                 has_bottom = has_bottom && my + 1 < current_placement_map->m_height &&
                              current_placement_map->read_pixel(mx, my + 1).x != ARP_NO_PLACEMENT_VALUE;
                 current_num_neighbors += has_bottom;
@@ -249,15 +249,15 @@ __global__ void internal::eval_num_connected_bricks_kernel(
     int unique_bid_list_length = 0;
 
     const Placement& placement = placements[pi];
-    const auto& brick = k_bricks[placement.m_bid];
-    for (int bx = 0; bx < BRICK_MAX_WIDTH; ++bx)
+    const auto& brick = k_bricks[placement.bid];
+    for (int bx = 0; bx < BRICK_MAX_EXTENT_X; ++bx)
     {
-        for (int by = 0; by < BRICK_MAX_HEIGHT; ++by)
+        for (int by = 0; by < BRICK_MAX_EXTENT_Z; ++by)
         {
             if (brick[by][bx])
             {
-                int mx = placement.m_x + bx;
-                int my = placement.m_y + by;
+                int mx = placement.x + bx;
+                int my = placement.z + by;
                 if (!previous_placement_map->is_valid_pixel(mx, my)) continue;
 
                 uint16_t underlying_bid = previous_placement_map->read_pixel(mx, my).x;
@@ -298,8 +298,8 @@ internal::eval_highest_proximity_kernel(const Placement* placements, size_t num_
     iterate_brick_grid(
         [&](int bx, int by)
         {
-            int mx = placement.m_x + bx;
-            int my = placement.m_y + by;
+            int mx = placement.x + bx;
+            int my = placement.z + by;
             if (proximity_map->is_valid_pixel(mx, my))
             {
                 int proximity = proximity_map->read_pixel(mx, my).x;
@@ -321,14 +321,14 @@ __device__ bool is_outside_or_overlapping(const Placement& placement, const Plac
     if (ARP_IS_WARP_THREAD_0) result[wi] = false;
     __syncwarp();
 
-    const auto& brick = k_bricks[placement.m_bid];
+    const auto& brick = k_bricks[placement.bid];
     iterate_brick_grid(
         [&](int bx, int by)
         {
             if (brick[by][bx])
             {
-                int mx = placement.m_x + bx;
-                int my = placement.m_y + by;
+                int mx = placement.x + bx;
+                int my = placement.z + by;
 
                 bool out_of_bounds = !input->color_map_d->is_valid_pixel(mx, my);
                 bool overlapping = !out_of_bounds && input->current_placement_map_d->read_pixel(mx, my).x != ARP_NO_PLACEMENT_VALUE;
@@ -387,7 +387,7 @@ __device__ float eval_reward(const PlacementSolver* self, int pi, const Placemen
     // hn = measure of the heterogeneity of colors covered by this placement (1 is color homogeneity)
 
     float an = float(num_neighbors) / float(num_connectible_sides);
-    float bn = float(brick_size) / float(BRICK_MAX_WIDTH * BRICK_MAX_HEIGHT);
+    float bn = float(brick_size) / float(BRICK_MAX_EXTENT_X * BRICK_MAX_EXTENT_Z);
     float cn = float(color_map_coverage.num_covered_cells) / float(brick_size);
     float dn = float(num_connected_bricks) / float(brick_size);
     float hn = std::max(color_map_coverage.color_distance, 0);
@@ -495,7 +495,7 @@ std::pair<Placement, float> PlacementSolver::solve(const Input& input)
     Placement placement = to_host(&m_placements_d[max_pi]);
     float reward = to_host(max_reward_d);
 
-    ARP_DEBUG("Best placement found; PID: %5d, BID: %2d, X: %3d, Y: %3d, Reward: %.3f", max_pi, placement.m_bid, placement.m_x, placement.m_y, reward);
+    ARP_DEBUG("Best placement found; PID: %5d, BID: %2d, X: %3d, Y: %3d, Reward: %.3f", max_pi, placement.bid, placement.x, placement.z, reward);
 
     return {placement, reward};
 }

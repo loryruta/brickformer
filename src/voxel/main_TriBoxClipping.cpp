@@ -224,45 +224,45 @@ Model create_model_from_box(const Box& box, float a)
     Model model;
     Mesh& mesh = model.m_meshes.emplace_back();
 
-    mesh.m_vertices = {
+    mesh.vertices = {
         // Bottom
-        Vertex{ .m_position{m.x, m.y, m.z}, .m_normal{0, -1, 0}, .m_texcoord{}, .m_color{0,1,0,a}},
-        Vertex{ .m_position{m.x, m.y, M.z}, .m_normal{0, -1, 0}, .m_texcoord{}, .m_color{0,1,0,a}},
-        Vertex{ .m_position{M.x, m.y, M.z}, .m_normal{0, -1, 0}, .m_texcoord{}, .m_color{0,1,0,a}},
-        Vertex{ .m_position{M.x, m.y, m.z}, .m_normal{0, -1, 0}, .m_texcoord{}, .m_color{0,1,0,a}},
+        Vertex{ .position{m.x, m.y, m.z}, .normal{0, -1, 0}, .texcoord{}, .color{0,1,0,a}},
+        Vertex{ .position{m.x, m.y, M.z}, .normal{0, -1, 0}, .texcoord{}, .color{0,1,0,a}},
+        Vertex{ .position{M.x, m.y, M.z}, .normal{0, -1, 0}, .texcoord{}, .color{0,1,0,a}},
+        Vertex{ .position{M.x, m.y, m.z}, .normal{0, -1, 0}, .texcoord{}, .color{0,1,0,a}},
 
         // Top
-        Vertex{ .m_position{m.x, M.y, m.z}, .m_normal{0, 1, 0}, .m_texcoord{}, .m_color{0,1,0,a}},
-        Vertex{ .m_position{m.x, M.y, M.z}, .m_normal{0, 1, 0}, .m_texcoord{}, .m_color{0,1,0,a}},
-        Vertex{ .m_position{M.x, M.y, M.z}, .m_normal{0, 1, 0}, .m_texcoord{}, .m_color{0,1,0,a}},
-        Vertex{ .m_position{M.x, M.y, m.z}, .m_normal{0, 1, 0}, .m_texcoord{}, .m_color{0,1,0,a}},
+        Vertex{ .position{m.x, M.y, m.z}, .normal{0, 1, 0}, .texcoord{}, .color{0,1,0,a}},
+        Vertex{ .position{m.x, M.y, M.z}, .normal{0, 1, 0}, .texcoord{}, .color{0,1,0,a}},
+        Vertex{ .position{M.x, M.y, M.z}, .normal{0, 1, 0}, .texcoord{}, .color{0,1,0,a}},
+        Vertex{ .position{M.x, M.y, m.z}, .normal{0, 1, 0}, .texcoord{}, .color{0,1,0,a}},
 
         // Left
-        Vertex{ .m_position{m.x, m.y, m.z}, .m_normal{-1, 0, 0}, .m_texcoord{}, .m_color{1,0,0,a}},
-        Vertex{ .m_position{m.x, m.y, M.z}, .m_normal{-1, 0, 0}, .m_texcoord{}, .m_color{1,0,0,a}},
-        Vertex{ .m_position{m.x, M.y, M.z}, .m_normal{-1, 0, 0}, .m_texcoord{}, .m_color{1,0,0,a}},
-        Vertex{ .m_position{m.x, M.y, m.z}, .m_normal{-1, 0, 0}, .m_texcoord{}, .m_color{1,0,0,a}},
+        Vertex{ .position{m.x, m.y, m.z}, .normal{-1, 0, 0}, .texcoord{}, .color{1,0,0,a}},
+        Vertex{ .position{m.x, m.y, M.z}, .normal{-1, 0, 0}, .texcoord{}, .color{1,0,0,a}},
+        Vertex{ .position{m.x, M.y, M.z}, .normal{-1, 0, 0}, .texcoord{}, .color{1,0,0,a}},
+        Vertex{ .position{m.x, M.y, m.z}, .normal{-1, 0, 0}, .texcoord{}, .color{1,0,0,a}},
 
         // Right
-        Vertex{ .m_position{M.x, m.y, m.z}, .m_normal{1, 0, 0}, .m_texcoord{}, .m_color{1,0,0,a}},
-        Vertex{ .m_position{M.x, m.y, M.z}, .m_normal{1, 0, 0}, .m_texcoord{}, .m_color{1,0,0,a}},
-        Vertex{ .m_position{M.x, M.y, M.z}, .m_normal{1, 0, 0}, .m_texcoord{}, .m_color{1,0,0,a}},
-        Vertex{ .m_position{M.x, M.y, m.z}, .m_normal{1, 0, 0}, .m_texcoord{}, .m_color{1,0,0,a}},
+        Vertex{ .position{M.x, m.y, m.z}, .normal{1, 0, 0}, .texcoord{}, .color{1,0,0,a}},
+        Vertex{ .position{M.x, m.y, M.z}, .normal{1, 0, 0}, .texcoord{}, .color{1,0,0,a}},
+        Vertex{ .position{M.x, M.y, M.z}, .normal{1, 0, 0}, .texcoord{}, .color{1,0,0,a}},
+        Vertex{ .position{M.x, M.y, m.z}, .normal{1, 0, 0}, .texcoord{}, .color{1,0,0,a}},
 
         // Front
-        Vertex{ .m_position{m.x, m.y, m.z}, .m_normal{0, 0, -1}, .m_texcoord{0, 1}, .m_color{0,0,1,a}},
-        Vertex{ .m_position{m.x, M.y, m.z}, .m_normal{0, 0, -1}, .m_texcoord{0 ,0}, .m_color{0,0,1,a}},
-        Vertex{ .m_position{M.x, M.y, m.z}, .m_normal{0, 0, -1}, .m_texcoord{1, 0}, .m_color{0,0,1,a}},
-        Vertex{ .m_position{M.x, m.y, m.z}, .m_normal{0, 0, -1}, .m_texcoord{1, 1}, .m_color{0,0,1,a}},
+        Vertex{ .position{m.x, m.y, m.z}, .normal{0, 0, -1}, .texcoord{0, 1}, .color{0,0,1,a}},
+        Vertex{ .position{m.x, M.y, m.z}, .normal{0, 0, -1}, .texcoord{0 ,0}, .color{0,0,1,a}},
+        Vertex{ .position{M.x, M.y, m.z}, .normal{0, 0, -1}, .texcoord{1, 0}, .color{0,0,1,a}},
+        Vertex{ .position{M.x, m.y, m.z}, .normal{0, 0, -1}, .texcoord{1, 1}, .color{0,0,1,a}},
 
         // Back
-        Vertex{ .m_position{m.x, m.y, M.z}, .m_normal{0, 0, 1}, .m_texcoord{}, .m_color{0,0,1,a}},
-        Vertex{ .m_position{m.x, M.y, M.z}, .m_normal{0, 0, 1}, .m_texcoord{}, .m_color{0,0,1,a}},
-        Vertex{ .m_position{M.x, M.y, M.z}, .m_normal{0, 0, 1}, .m_texcoord{}, .m_color{0,0,1,a}},
-        Vertex{ .m_position{M.x, m.y, M.z}, .m_normal{0, 0, 1}, .m_texcoord{}, .m_color{0,0,1,a}},
+        Vertex{ .position{m.x, m.y, M.z}, .normal{0, 0, 1}, .texcoord{}, .color{0,0,1,a}},
+        Vertex{ .position{m.x, M.y, M.z}, .normal{0, 0, 1}, .texcoord{}, .color{0,0,1,a}},
+        Vertex{ .position{M.x, M.y, M.z}, .normal{0, 0, 1}, .texcoord{}, .color{0,0,1,a}},
+        Vertex{ .position{M.x, m.y, M.z}, .normal{0, 0, 1}, .texcoord{}, .color{0,0,1,a}},
     };
 
-    mesh.m_indices = {
+    mesh.indices = {
         0, 1, 2, 0, 2, 3,        // Bottom
         4, 5, 6, 4, 6, 7,        // Top
         8, 9, 10, 8, 10, 11,     // Left
@@ -278,12 +278,12 @@ Model create_model_from_triangle(const Triangle& triangle, const glm::vec4& colo
 {
     Model model{};
     Mesh& mesh = model.m_meshes.emplace_back();
-    mesh.m_vertices = {
-        Vertex{ .m_position{triangle.m_a}, .m_normal{}, .m_texcoord{}, .m_color{1,0,0,1} },
-        Vertex{ .m_position{triangle.m_b}, .m_normal{}, .m_texcoord{}, .m_color{0,1,0,1} },
-        Vertex{ .m_position{triangle.m_c}, .m_normal{}, .m_texcoord{}, .m_color{0,0,1,1} },
+    mesh.vertices = {
+        Vertex{ .position{triangle.m_a}, .normal{}, .texcoord{}, .color{1,0,0,1} },
+        Vertex{ .position{triangle.m_b}, .normal{}, .texcoord{}, .color{0,1,0,1} },
+        Vertex{ .position{triangle.m_c}, .normal{}, .texcoord{}, .color{0,0,1,1} },
     };
-    mesh.m_indices = {0, 1, 2};
+    mesh.indices = {0, 1, 2};
     return model;
 }
 
@@ -296,14 +296,14 @@ Model create_model_from_polygon(std::vector<glm::vec3> polygon, const glm::vec4&
 
     for (const glm::vec3& v : polygon)
     {
-        mesh.m_vertices.emplace_back(Vertex{.m_position{v}, .m_normal{}, .m_texcoord{}, .m_color{color}});
+        mesh.vertices.emplace_back(Vertex{.position{v}, .normal{}, .texcoord{}, .color{color}});
     }
 
     for (int i = 1; i < polygon.size() - 1; i++)
     {
-        mesh.m_indices.emplace_back(0);
-        mesh.m_indices.emplace_back(i);
-        mesh.m_indices.emplace_back((i + 1) % polygon.size());
+        mesh.indices.emplace_back(0);
+        mesh.indices.emplace_back(i);
+        mesh.indices.emplace_back((i + 1) % polygon.size());
     }
 
     return model;

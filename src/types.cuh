@@ -9,21 +9,20 @@
 namespace lego_builder
 {
 
-/// A struct representing a placement within a slice: (x, y) and brick ID (= bid).
+/// A struct representing a placement within a slice.
 struct Placement
 {
     /* Keys */
-    uint8_t m_bid; ///< The Brick Index to bricks.hpp
-    uint8_t m_x;   ///< The X coordinate of the brick's top-left corner within the slice
-    uint8_t m_y;   ///< The Y coordinate of the brick's top-left corner within the slice
-    // TODO rename m_y to m_z please
+    uint8_t bid; ///< The Brick Index to bricks.hpp
+    uint8_t x;   ///< The X coordinate of the brick's top-left corner within the slice
+    uint8_t z;   ///< The Z coordinate of the brick's top-left corner within the slice
 
-    mutable uint8_t m_cid = UINT8_MAX;           ///< The Color Index to brick_colors.hpp
-    mutable uint8_t m_subslice_mask = UINT8_MAX; ///< 3 bits bitmask; if i-th is set, this placement occupies the i-th subslice (out of 3)
+    mutable uint8_t cid = UINT8_MAX;           ///< The Color Index to brick_colors.hpp
+    mutable uint8_t subslice_mask = UINT8_MAX; ///< 3 bits bitmask; if i-th is set, this placement occupies the i-th subslice (out of 3)
 
-    bool operator==(const Placement& other) const { return m_bid == other.m_bid && m_x == other.m_x && m_y == other.m_y; }
+    bool operator==(const Placement& other) const { return bid == other.bid && x == other.x && z == other.z; }
 
-    bool is_subslice() const { return m_subslice_mask & 0x7; }
+    bool is_subslice() const { return subslice_mask & 0x7; }
     bool is_full() const { return !is_subslice(); }
 };
 
@@ -32,9 +31,9 @@ struct PlacementHash // Used for stacking placements
     uint64_t operator()(const Placement& key) const
     {
         uint32_t hash = 0;
-        hash |= key.m_bid;
-        hash |= key.m_x << 8;
-        hash |= key.m_y << 16;
+        hash |= key.bid;
+        hash |= key.x << 8;
+        hash |= key.z << 16;
         return hash;
     }
 };

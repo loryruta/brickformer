@@ -5,7 +5,10 @@
 
 #include "ScreenQuad.hpp"
 #include "gl_helpers.hpp"
+#include "log.hpp"
 #include "util/misc.hpp"
+
+#define ARP_LOG_CONTEXT "ModelRenderer"
 
 using namespace lego_builder;
 
@@ -16,7 +19,15 @@ GLuint bake_texture(const Texture& texture)
     GLuint gl_texture;
     glGenTextures(1, &gl_texture);
     glBindTexture(GL_TEXTURE_2D, gl_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture.m_width, texture.m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture.m_image_data.data());
+    glTexImage2D(GL_TEXTURE_2D,
+                 0,
+                 GL_RGBA,
+                 texture.m_width,
+                 texture.m_height,
+                 0,
+                 GL_RGBA,
+                 GL_UNSIGNED_BYTE,
+                 texture.m_image_data.data());
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -108,27 +119,20 @@ const char* k_shading_shader_src = R"(#version 460 core
 
 } // namespace
 
-BakedMesh::BakedMesh(BakedMesh&& other) noexcept :
-    m_vao(other.m_vao),
-    m_vbo(other.m_vbo),
-    m_ebo(other.m_ebo),
-    m_num_elements(other.m_num_elements),
-    m_color(other.m_color),
-    m_texture_idx(other.m_texture_idx)
+BakedMesh::BakedMesh(BakedMesh&& other) noexcept
+    : vao(other.vao), vbo(other.vbo), ebo(other.ebo), num_vertices(other.num_vertices),
+      num_elements(other.num_elements), color(other.color), texture_idx(other.texture_idx)
 {
-    other.m_vao = 0; // Prevent moved element from being deleted
-    other.m_vbo = 0;
-    other.m_ebo = 0;
+    other.vao = 0; // Prevent moved element from being deleted
+    other.vbo = 0;
+    other.ebo = 0;
 }
 
 BakedMesh::~BakedMesh()
 {
-    if (m_ebo)
-        glDeleteBuffers(1, &m_ebo);
-    if (m_vbo)
-        glDeleteBuffers(1, &m_vbo);
-    if (m_vao)
-        glDeleteVertexArrays(1, &m_vao);
+    if (ebo) glDeleteBuffers(1, &ebo);
+    if (vbo) glDeleteBuffers(1, &vbo);
+    if (vao) glDeleteVertexArrays(1, &vao);
 }
 
 BakedModel::~BakedModel()
@@ -138,9 +142,7 @@ BakedModel::~BakedModel()
     glDeleteTextures(m_textures.size(), m_textures.data());
 }
 
-BlurredSSAOTarget::BlurredSSAOTarget(int width, int height) :
-    width(width),
-    height(height)
+BlurredSSAOTarget::BlurredSSAOTarget(int width, int height) : width(width), height(height)
 {
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -149,10 +151,7 @@ BlurredSSAOTarget::BlurredSSAOTarget(int width, int height) :
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
-BlurredSSAOTarget::~BlurredSSAOTarget()
-{
-    glDeleteTextures(1, &texture);
-}
+BlurredSSAOTarget::~BlurredSSAOTarget() { glDeleteTextures(1, &texture); }
 
 ModelRenderer::ModelRenderer()
 {
@@ -224,23 +223,24 @@ void ModelRenderer::store_geometry(const BakedModel& model, const Camera& camera
 
     glUniform1f(get_uniform_location(m_program, "u_alpha_test_threshold"), m_alpha_test_threshold);
 
-    for (const BakedMesh& baked_mesh : model.m_meshes)
-    {
-        if (baked_mesh.m_num_elements > 0)
-        {
-            glUniformMatrix4fv(get_uniform_location(m_program, "u_transform"), 1, GL_FALSE, glm::value_ptr(transform));
+    for (const BakedMesh& baked_mesh : model.m_meshes) {
+        glUniformMatrix4fv(get_uniform_location(m_program, "u_transform"), 1, GL_FALSE, glm::value_ptr(transform));
 
-            glUniformMatrix4fv(get_uniform_location(m_program, "u_view"), 1, GL_FALSE, glm::value_ptr(camera.view()));
-            glUniformMatrix4fv(get_uniform_location(m_program, "u_projection"), 1, GL_FALSE, glm::value_ptr(camera.projection()));
+        glUniformMatrix4fv(get_uniform_location(m_program, "u_view"), 1, GL_FALSE, glm::value_ptr(camera.view()));
+        glUniformMatrix4fv(
+            get_uniform_location(m_program, "u_projection"), 1, GL_FALSE, glm::value_ptr(camera.projection()));
 
-            glUniform4fv(get_uniform_location(m_program, "u_mesh_color"), 1, glm::value_ptr(baked_mesh.m_color));
+        glUniform4fv(get_uniform_location(m_program, "u_mesh_color"), 1, glm::value_ptr(baked_mesh.color));
 
-            glActiveTexture(GL_TEXTURE0);
-            GLuint texture = baked_mesh.m_texture_idx >= 0 ? model.m_textures[baked_mesh.m_texture_idx] : m_white_texture;
-            glBindTexture(GL_TEXTURE_2D, texture);
+        glActiveTexture(GL_TEXTURE0);
+        GLuint texture = baked_mesh.texture_idx >= 0 ? model.m_textures[baked_mesh.texture_idx] : m_white_texture;
+        glBindTexture(GL_TEXTURE_2D, texture);
 
-            glBindVertexArray(baked_mesh.m_vao);
-            glDrawElements(GL_TRIANGLES, baked_mesh.m_num_elements, GL_UNSIGNED_INT, nullptr);
+        glBindVertexArray(baked_mesh.vao);
+        if (baked_mesh.ebo) {
+            glDrawElements(GL_TRIANGLES, baked_mesh.num_elements, GL_UNSIGNED_INT, nullptr);
+        } else {
+            glDrawArrays(GL_TRIANGLES, 0, baked_mesh.num_vertices);
         }
     }
 }
@@ -268,8 +268,7 @@ void ModelRenderer::render(const BakedModel& model, const Camera& camera, const 
     store_geometry(model, camera, transform);
 
     /* SSAO */
-    if (!m_ssao_target || m_ssao_target->width != width || m_ssao_target->height != height)
-    {
+    if (!m_ssao_target || m_ssao_target->width != width || m_ssao_target->height != height) {
         m_ssao_target = std::make_unique<SSAOTarget>(width, height);
         m_blurred_ssao_target = std::make_unique<BlurredSSAOTarget>(width, height);
     }
@@ -302,67 +301,73 @@ void ModelRenderer::render(const BakedModel& model, const Camera& camera, const 
     ScreenQuad::get().draw();
 }
 
-BakedMesh ModelRenderer::bake_mesh(const Mesh& mesh)
+bool ModelRenderer::bake_mesh(const Mesh& mesh, BakedMesh& out_baked_mesh)
 {
-    assert(mesh.m_indices.size() % 3 == 0); // TODO no assert
+    if (mesh.vertices.empty()) {
+        ARP_WARN("Empty mesh; won't be baked");
+        return false;
+    }
+    if (mesh.indices.empty()) {
+        CHECK_ARG(mesh.vertices.size() % 3 == 0, "Only triangular meshes are supported");
+    } else {
+        CHECK_ARG(mesh.indices.size() % 3 == 0, "Only triangular meshes are supported");
+    }
 
-    BakedMesh baked_mesh{};
+    glGenVertexArrays(1, &out_baked_mesh.vao);
+    glBindVertexArray(out_baked_mesh.vao);
 
-    glGenVertexArrays(1, &baked_mesh.m_vao);
-    glBindVertexArray(baked_mesh.m_vao);
+    // Upload vertices
+    glGenBuffers(1, &out_baked_mesh.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, out_baked_mesh.vbo);
+    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex), mesh.vertices.data(), GL_STATIC_DRAW);
+    ARP_DEBUG("VBO created with %zu vertices", mesh.vertices.size());
+    out_baked_mesh.num_vertices = mesh.vertices.size();
 
-    glGenBuffers(1, &baked_mesh.m_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, baked_mesh.m_vbo);
-    glBufferData(GL_ARRAY_BUFFER, mesh.m_vertices.size() * sizeof(Vertex), mesh.m_vertices.data(), GL_STATIC_DRAW);
+    // Upload indices (elements)
+    if (!mesh.indices.empty()) {
+        glGenBuffers(1, &out_baked_mesh.ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, out_baked_mesh.ebo);
+        glBufferData(
+            GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(uint32_t), mesh.indices.data(), GL_STATIC_DRAW);
+        ARP_DEBUG("EBO created with %zu indices", mesh.indices.size());
+    }
+    out_baked_mesh.num_elements = mesh.indices.size();
 
-    glGenBuffers(1, &baked_mesh.m_ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, baked_mesh.m_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.m_indices.size() * sizeof(uint32_t), mesh.m_indices.data(), GL_STATIC_DRAW);
-    baked_mesh.m_num_elements = mesh.m_indices.size();
-
-    // Position
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_position));
-
-    // Normal
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_normal));
-
-    // Texcoord
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_texcoord));
-
-    // Color
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, m_color));
+    glEnableVertexAttribArray(0); // Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, position));
+    glEnableVertexAttribArray(1); // Normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, normal));
+    glEnableVertexAttribArray(2); // Texcoord
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, texcoord));
+    glEnableVertexAttribArray(3); // Color
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, color));
+    ARP_DEBUG("VAO created");
 
     //
     glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, out_baked_mesh.vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, out_baked_mesh.ebo);
 
-    baked_mesh.m_color = mesh.m_color;
-    baked_mesh.m_texture_idx = mesh.m_texture_idx;
+    out_baked_mesh.color = mesh.m_color;
+    out_baked_mesh.texture_idx = mesh.m_texture_idx;
 
-    return baked_mesh;
+    return true;
 }
 
 BakedModel ModelRenderer::bake_model(const Model& model)
 {
     BakedModel baked_model{};
-
     // printf("[ModelRenderer] Baking %zu textures...\n", model.m_textures.size());
-    for (const Texture& texture : model.m_textures)
-    {
+    for (const Texture& texture : model.m_textures) {
         baked_model.m_textures.emplace_back(bake_texture(texture));
     }
-
     // printf("[ModelRenderer] Baking %zu meshes...\n", model.m_meshes.size());
-    for (const Mesh& mesh : model.m_meshes)
-    {
-        BakedMesh baked_mesh = bake_mesh(mesh);
-        baked_model.m_meshes.emplace_back(std::move(baked_mesh));
+    for (const Mesh& mesh : model.m_meshes) {
+        BakedMesh baked_mesh{};
+        if (bake_mesh(mesh, baked_mesh)) {
+            baked_model.m_meshes.emplace_back(std::move(baked_mesh));
+        }
     }
-
     // printf("[ModelRenderer] Model baked\n");
-
     return baked_model;
 }

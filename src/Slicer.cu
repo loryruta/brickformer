@@ -28,14 +28,14 @@ void Slicer::linearize_triangles(const Model& model)
     {
         const Mesh& mesh = model.m_meshes.at(mi);
 
-        assert(mesh.m_indices.size() % 3 == 0);
+        assert(mesh.indices.size() % 3 == 0);
 
-        for (uint32_t ti = 0; ti < mesh.m_indices.size() / 3; ti++)
+        for (uint32_t ti = 0; ti < mesh.indices.size() / 3; ti++)
         {
             TriRef tri{};
-            tri.m_vertices[0] = mesh.m_vertices[mesh.m_indices[ti * 3 + 0]].m_position;
-            tri.m_vertices[1] = mesh.m_vertices[mesh.m_indices[ti * 3 + 1]].m_position;
-            tri.m_vertices[2] = mesh.m_vertices[mesh.m_indices[ti * 3 + 2]].m_position;
+            tri.m_vertices[0] = mesh.vertices[mesh.indices[ti * 3 + 0]].position;
+            tri.m_vertices[1] = mesh.vertices[mesh.indices[ti * 3 + 1]].position;
+            tri.m_vertices[2] = mesh.vertices[mesh.indices[ti * 3 + 2]].position;
             tri.m_triangle_idx = ti;
             tri.m_mesh_idx = mi;
             triangles.push_back(tri);
@@ -101,7 +101,7 @@ glm::vec4 interp_triangle_color(const glm::vec3& p, const TriRef& tri_ref, const
     const Vertex& v1a = mesh.m_vertices[mesh.m_indices[tri_ref.m_triangle_idx * 3 + 1]];
     const Vertex& v2a = mesh.m_vertices[mesh.m_indices[tri_ref.m_triangle_idx * 3 + 2]];
 
-    glm::vec2 texcoord = v0a.m_texcoord * w0 + v1a.m_texcoord * w1 + v2a.m_texcoord * w2;
+    glm::vec2 texcoord = v0a.texcoord * w0 + v1a.texcoord * w1 + v2a.texcoord * w2;
     //glm::vec4 color = v0a.m_color * w0 + v1a.m_color * w1 + v2a.m_color * w2; TODO apply vertex color (remember it's [0, 1])
 
     glm::vec4 out_color = mesh.m_color;

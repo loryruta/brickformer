@@ -15,18 +15,19 @@ namespace lego_builder
 {
     struct BakedMesh
     {
-        GLuint m_vao, m_vbo, m_ebo;
-        size_t m_num_elements;
-
-        glm::vec4 m_color{1.f};
-
+        GLuint vao = 0;
+        GLuint vbo = 0;
+        GLuint ebo = 0;
+        size_t num_vertices = 0;
+        size_t num_elements = 0;
+        glm::vec4 color{1.f};
         /// A non-owned reference to the baked texture, stored in BakedModel.
         /// If negative, a white texture is used.
-        int m_texture_idx = -1;
+        int texture_idx = -1;
 
         BakedMesh() = default;
-        BakedMesh(const BakedMesh& other) = delete;
-        BakedMesh(BakedMesh&& other) noexcept;
+        BakedMesh(const BakedMesh&) = delete;
+        BakedMesh(BakedMesh&&) noexcept;
 
         ~BakedMesh();
     };
@@ -86,6 +87,6 @@ namespace lego_builder
 
         GLuint create_white_texture();
 
-        static BakedMesh bake_mesh(const Mesh& mesh);
+        static bool bake_mesh(const Mesh& mesh, BakedMesh& out_baked_mesh);
     };
 }

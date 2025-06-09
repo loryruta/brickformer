@@ -70,17 +70,17 @@ void ConverterVisualizationBridge::copy_placement_maps()
     }
 
     for (const Placement& placement : m_converter.m_linear_stacked_placements) {
-        uint8_t subslice_mask = placement.m_subslice_mask;
+        uint8_t subslice_mask = placement.subslice_mask;
         assert(subslice_mask); // Shouldn't be zero
 
         glm::vec<4, uint8_t> hashed_color = eval_placement_hashed_color(placement);
-        glm::vec<4, uint8_t> color = k_brick_colors[placement.m_cid].color_u8();
-        auto& brick = k_bricks[placement.m_bid];
-        for (int bz = 0; bz < BRICK_MAX_HEIGHT; bz++) {
-            for (int bx = 0; bx < BRICK_MAX_WIDTH; bx++) {
+        glm::vec<4, uint8_t> color = k_brick_colors[placement.cid].color_u8();
+        auto& brick = k_bricks[placement.bid];
+        for (int bz = 0; bz < BRICK_MAX_EXTENT_Z; bz++) {
+            for (int bx = 0; bx < BRICK_MAX_EXTENT_X; bx++) {
                 if (brick[bz][bx]) {
-                    int px = placement.m_x + bx;
-                    int pz = placement.m_y + bz;
+                    int px = placement.x + bx;
+                    int pz = placement.z + bz;
                     if (subslice_mask & 0x1) {
                         hashed_color_images.at(0).write_pixel(px, pz, hashed_color);
                         color_images.at(0).write_pixel(px, pz, color);
@@ -134,31 +134,27 @@ void ConverterVisualizationBridge::add_placements_to_construction_model()
 {
     printf("[App] UPDATE CONSTRUCTION MODEL; Updating vertices...\n");
 
-    int pi = 0;
+    uint32_t pid = 0; // TODO make global for any slice
     for (const Placement& placement : m_converter.m_linear_stacked_placements) {
-        const BrickColor& brick_color = k_brick_colors[placement.m_cid];
+        const BrickColor& brick_color = k_brick_colors[placement.cid];
 
         ARP_DEBUG("  %3d Slice: %d, Placement BID: %2d, X: %3d, Y: %3d, Subslice mask: %d, Color: %s",
-                  pi,
+                  pid,
                   m_converter.m_slice_y,
-                  placement.m_bid,
-                  placement.m_x,
-                  placement.m_y,
-                  placement.m_subslice_mask,
+                  placement.bid,
+                  placement.x,
+                  placement.z,
+                  placement.subslice_mask,
                   brick_color.name);
-        ++pi;
+        ++pid; // TODO
 
-        m_brick_model_builder->place(m_converter.m_slice_y,
-                                     placement.m_x,
-                                     placement.m_y,
-                                     placement.m_bid,
-                                     placement.m_subslice_mask,
-                                     glm::vec4(brick_color.color_u8()) / 255.0f);
+        m_brick_model_builder->add_placement(m_converter.m_slice_y, pid, placement);
     }
 
     printf("[App] UPDATE CONSTRUCTION MODEL; Baking...\n");
 
-    m_baked_brick_model = std::make_unique<BakedModel>(ModelRenderer::bake_model(m_brick_model_builder->model()));
+    const Model& brick_model = m_brick_model_builder->model();
+    m_baked_brick_model = std::make_unique<BakedModel>(ModelRenderer::bake_model(brick_model));
 
     printf("[App] UPDATE CONSTRUCTION MODEL; Done\n");
 }

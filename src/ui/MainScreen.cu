@@ -159,7 +159,31 @@ void MainScreen::update(float dt)
     }
 }
 
-void MainScreen::render() {
+void MainScreen::render() {}
+
+void MainScreen::ui_conversion_window()
+{
+    if (ImGui::Begin("Conversion")) {
+        if (!m_converter_should_run) {
+            if (ImGui::Button("Resume")) {
+                m_converter_should_run = true;
+                m_converter_should_run.notify_all();
+            }
+        } else {
+            if (ImGui::Button("Pause")) {
+                m_converter_should_run = false;
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Stop")) {
+            stop_conversion();
+        }
+        bool autorun = m_converter_autorun.load();
+        if (ImGui::Checkbox("Autorun", &autorun)) {
+            m_converter_autorun.store(autorun);
+        }
+    }
+    ImGui::End();
 }
 
 void MainScreen::ui()
@@ -179,11 +203,21 @@ void MainScreen::ui()
     ImGui::End();
 
     m_ui.input.show();
+    if (m_converter) {
+        ui_conversion_window();
+    }
     m_ui.view_settings.show();
     m_ui.maps.show();
     m_ui.view_3d_window->show();
 }
 
+void MainScreen::on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements)
+{
+    if (!m_converter_autorun) {
+        m_converter_should_run = false;
+        m_converter_should_run.wait(false); // Block until the flag should_run is false
+    }
+}
 
 void MainScreen::render_3d_scene()
 {
@@ -250,7 +284,7 @@ void MainScreen::render_3d_scene()
 
 void MainScreen::on_input_change()
 {
-    clear_conversion();
+    stop_conversion();
 
     ui::InputWindow& input_ui = m_ui.input;
 
@@ -323,6 +357,8 @@ void MainScreen::start_conversion()
 
     // Converter -> Visualization bridge (internally set itself as a listener)
     m_converter_visualization_bridge = std::make_unique<ConverterVisualizationBridge>(*m_converter);
+    // Add MainScreen as a listener (must be the last one)
+    m_converter->add_listener(this);
 
     // Maps UI textures -> Visualization bridge textures
     m_ui.maps.color_map = m_converter_visualization_bridge->color_map_texture();
@@ -343,7 +379,7 @@ void MainScreen::start_conversion()
     m_converter_thread = std::make_unique<std::thread>([this]() { m_converter->start(); });
 }
 
-void MainScreen::clear_conversion()
+void MainScreen::stop_conversion()
 {
     if (!m_converter) {
         ARP_DEBUG("Clear conversion called, but nothing to clear");

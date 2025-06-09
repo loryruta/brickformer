@@ -53,20 +53,20 @@ void BuildInstructionsExporter::on_model_load(const Model& model) {}
 
 void BuildInstructionsExporter::put_in_pid_map(uint16_t pid, const Placement& placement)
 {
-    auto brick = k_bricks[placement.m_bid];
-    for (int by = 0; by < BRICK_MAX_HEIGHT; by++) {
-        for (int bx = 0; bx < BRICK_MAX_WIDTH; bx++) {
-            int px = placement.m_x + bx;
-            int py = placement.m_y + by;
+    auto brick = k_bricks[placement.bid];
+    for (int by = 0; by < BRICK_MAX_EXTENT_Z; by++) {
+        for (int bx = 0; bx < BRICK_MAX_EXTENT_X; bx++) {
+            int px = placement.x + bx;
+            int py = placement.z + by;
             if (brick[by][bx]) {
                 CHECK_STATE(px >= 0 && px < m_resolution && py >= 0 && py < m_resolution); // No out-of-bounds
                 int i = py * m_resolution + px;
-                if (placement.m_subslice_mask == 0x7) {
+                if (placement.subslice_mask == 0x7) {
                     m_full_pid_map[i] = pid;
                 } else {
-                    if (placement.m_subslice_mask & 1) m_subslice0_pid_map[i] = pid;
-                    if (placement.m_subslice_mask & 2) m_subslice1_pid_map[i] = pid;
-                    if (placement.m_subslice_mask & 4) m_subslice2_pid_map[i] = pid;
+                    if (placement.subslice_mask & 1) m_subslice0_pid_map[i] = pid;
+                    if (placement.subslice_mask & 2) m_subslice1_pid_map[i] = pid;
+                    if (placement.subslice_mask & 4) m_subslice2_pid_map[i] = pid;
                 }
             }
         }
