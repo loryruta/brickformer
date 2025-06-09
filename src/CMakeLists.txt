@@ -14,11 +14,13 @@ add_library(arpenteur STATIC
 
 target_include_directories(arpenteur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(arpenteur PUBLIC CCCL::CCCL)
-target_link_libraries(arpenteur PUBLIC glm)
-target_link_libraries(arpenteur PUBLIC stb)
-target_link_libraries(arpenteur PUBLIC tinyformat)
-target_link_libraries(arpenteur PUBLIC tinygltf)
+target_link_libraries(arpenteur PUBLIC CCCL::CCCL glm stb tinyformat tinygltf)
+# It's important for the Firebase dependencies to be in this order!
+target_link_libraries(arpenteur PUBLIC
+        firebase_firestore
+        firebase_auth
+        firebase_app
+        secret-1)
 
 if (NOT LEGO_BUILDER_NO_VIDEO)
     add_subdirectory(ui)

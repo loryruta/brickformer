@@ -57,6 +57,10 @@ if (NOT LEGO_BUILDER_NO_VIDEO)
     add_subdirectory(external/glfw)
 endif ()
 
+# Firebase SDK
+set(FIREBASE_CPP_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/firebase_cpp_sdk)
+add_subdirectory(${FIREBASE_CPP_SDK_DIR} bin/ EXCLUDE_FROM_ALL)
+
 # GLM
 add_library(glm INTERFACE)
 target_include_directories(glm INTERFACE external/glm)
