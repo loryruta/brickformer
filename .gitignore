@@ -5,3 +5,5 @@
 /docker-build
 
 /venv
+
+/external/firebase_cpp_sdk
