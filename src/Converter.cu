@@ -153,11 +153,11 @@ void Converter::place(const Placement& placement)
 
     // TODO 64 iterations... not very efficient...
     //  every write is a host-to-device copy...
-    const auto& brick = k_bricks[placement.m_bid];
-    for (uint8_t bx = 0; bx < BRICK_MAX_WIDTH; bx++) {
-        for (uint8_t by = 0; by < BRICK_MAX_HEIGHT; by++) {
+    const auto& brick = k_bricks[placement.bid];
+    for (uint8_t bx = 0; bx < BRICK_MAX_EXTENT_X; bx++) {
+        for (uint8_t by = 0; by < BRICK_MAX_EXTENT_Z; by++) {
             if (brick[by][bx]) {
-                m_cur_placements.write_pixel(placement.m_x + bx, placement.m_y + by, glm::vec<1, uint16_t>{pid});
+                m_cur_placements.write_pixel(placement.x + bx, placement.z + by, glm::vec<1, uint16_t>{pid});
             }
         }
     }
@@ -186,10 +186,10 @@ size_t Converter::place_on_subslice(uint32_t slice_y, int subslice)
 
         place(placement);
 
-        placement.m_subslice_mask = 1 << subslice;
-        placement.m_cid = 0;
+        placement.subslice_mask = 1 << subslice;
+        placement.cid = 0;
         auto [iterator, inserted] = m_stacked_placements.emplace(placement);
-        if (!inserted) iterator->m_subslice_mask |= 1 << subslice;
+        if (!inserted) iterator->subslice_mask |= 1 << subslice;
         // If the placement is stacked 3 times (3 equal placements for the slice), then can be compacted
 
         for (const auto& listener : m_listeners) listener->on_place(m_slice_y, placement, reward);
@@ -199,9 +199,9 @@ size_t Converter::place_on_subslice(uint32_t slice_y, int subslice)
                    "Reward threshold: %.3f\n",
                    subslice,
                    num_placed_bricks,
-                   placement.m_x,
-                   placement.m_y,
-                   placement.m_bid,
+                   placement.x,
+                   placement.z,
+                   placement.bid,
                    reward,
                    m_min_reward);
             log_stopwatch.reset();
@@ -259,11 +259,11 @@ void Converter::linearize_placements_to_output()
         const Placement& placement = m_linear_stacked_placements[pi];
         ARP_DEBUG("  %3d Placement BID: %2d, X: %3d, Y: %3d, Subslice mask: %d, CID: %2d",
                   pi,
-                  placement.m_bid,
-                  placement.m_x,
-                  placement.m_y,
-                  placement.m_subslice_mask,
-                  placement.m_cid);
+                  placement.bid,
+                  placement.x,
+                  placement.z,
+                  placement.subslice_mask,
+                  placement.cid);
     }
 
     tfm::printf("[Converter] Colored!\n");

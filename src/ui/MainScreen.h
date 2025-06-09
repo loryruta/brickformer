@@ -70,7 +70,7 @@ struct MapsWindow {
 };
 } // namespace ui
 
-class MainScreen : public Screen
+class MainScreen : public Screen, public ConverterListener
 {
 private:
     Camera m_camera;
@@ -99,7 +99,8 @@ private:
     std::unique_ptr<ConverterVisualizationBridge> m_converter_visualization_bridge;
 
     std::atomic<bool> m_converter_should_run = true; ///< Used to manually stop the Converter thread
-    std::atomic<bool> m_autorun = false; ///< If \c true, l'Arpenteur runs without having to be manually restarted
+    std::atomic<bool> m_converter_autorun =
+        false; ///< If \c true, l'Arpenteur runs without having to be manually restarted
 
 public:
     static constexpr float k_max_view_side = 100.f;
@@ -112,13 +113,21 @@ public:
     void resize(glm::ivec2 resolution) override {}
     void update(float dt) override;
     void render() override;
+
+    void ui_conversion_window();
     void ui() override;
+
+    /* ConverterListener */
+    void on_model_load(const Model& model) override {};
+    void on_placement_begin(uint32_t slice_y) override {} ;
+    void on_place(uint32_t slice_y, const Placement& placement, float reward) override {};
+    void on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements) override;
 
 private:
     void on_input_change();
 
     void start_conversion();
-    void clear_conversion();
+    void stop_conversion();
 
     void render_3d_scene();
 };

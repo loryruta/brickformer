@@ -8,7 +8,7 @@
 #define CHECK_STATE_MSG(condition, message) \
     lego_builder::check_state(condition, #condition, __FILE__, __LINE__, message)
 
-#define CHECK_ARG(condition) \
+#define CHECK_ARG(condition, ...) \
     CHECK_STATE(condition)
 
 namespace lego_builder

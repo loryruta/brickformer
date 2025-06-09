@@ -2,9 +2,9 @@
 
 #include <cstdint>
 
-#define BRICK_MAX_WIDTH  8 // Must be a power of 2
-#define BRICK_MAX_HEIGHT 8 // TODO "HEIGHT"? IT'S NOT AN HEIGHT!
-#define BRICK_MAX_SIZE   (BRICK_MAX_WIDTH * BRICK_MAX_HEIGHT)
+#define BRICK_MAX_EXTENT_X 8 // Must be a power of 2
+#define BRICK_MAX_EXTENT_Z 8 // TODO "HEIGHT"? IT'S NOT AN HEIGHT!
+#define BRICK_MAX_SIZE   (BRICK_MAX_EXTENT_X * BRICK_MAX_EXTENT_Z)
 
 #ifndef __CUDACC__
 #   define __constant__
@@ -12,7 +12,7 @@
 
 namespace lego_builder
 {
-    using BlockLayoutT = uint8_t[BRICK_MAX_HEIGHT][BRICK_MAX_WIDTH];
+    using BlockLayoutT = uint8_t[BRICK_MAX_EXTENT_Z][BRICK_MAX_EXTENT_X];
 
     // clang-format off
     __constant__

@@ -4,9 +4,9 @@ using namespace lego_builder;
 
 void Mesh::apply_transform(const glm::mat4& transform)
 {
-    for (Vertex& vertex : m_vertices)
+    for (Vertex& vertex : vertices)
     {
-        vertex.m_position = transform * glm::vec4(vertex.m_position, 1.0f);
+        vertex.position = transform * glm::vec4(vertex.position, 1.0f);
     }
 }
 
@@ -15,10 +15,10 @@ void Mesh::update_min_max()
     m_min = glm::vec3(INFINITY);
     m_max = glm::vec3(-INFINITY);
 
-    for (const Vertex& vertex : m_vertices)
+    for (const Vertex& vertex : vertices)
     {
-        m_min = glm::min(m_min, vertex.m_position);
-        m_max = glm::max(m_max, vertex.m_position);
+        m_min = glm::min(m_min, vertex.position);
+        m_max = glm::max(m_max, vertex.position);
     }
 }
 

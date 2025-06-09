@@ -49,8 +49,8 @@ const DeviceModel* lego_builder::upload_model(const Model& model)
     {
         DeviceMesh d_mesh{};
 
-        d_mesh.m_vertices = to_device(mesh.m_vertices.data(), mesh.m_vertices.size());
-        d_mesh.m_indices = to_device(mesh.m_indices.data(), mesh.m_indices.size());
+        d_mesh.m_vertices = to_device(mesh.vertices.data(), mesh.vertices.size());
+        d_mesh.m_indices = to_device(mesh.indices.data(), mesh.indices.size());
 
         d_mesh.m_color = mesh.m_color;
         d_mesh.m_texture_idx = mesh.m_texture_idx;

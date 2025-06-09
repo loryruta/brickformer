@@ -12,40 +12,40 @@ void VoxelModelBuilder::set_voxel(int x, int y, int z, const glm::vec4& color)
     std::vector<Vertex> vertices{
         // TODO no texcoords!
         // Bottom
-        Vertex{.m_position = {p.x, p.y, p.z}, .m_normal = {0, -1, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x, p.y, p.z + 1}, .m_normal = {0, -1, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y, p.z + 1}, .m_normal = {0, -1, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y, p.z}, .m_normal = {0, -1, 0}, .m_texcoord = {}, .m_color = color},
+        Vertex{.position = {p.x, p.y, p.z}, .normal = {0, -1, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x, p.y, p.z + 1}, .normal = {0, -1, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x + 1, p.y, p.z + 1}, .normal = {0, -1, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x + 1, p.y, p.z}, .normal = {0, -1, 0}, .texcoord = {}, .color = color},
 
         // Top
-        Vertex{.m_position = {p.x, p.y + 1, p.z}, .m_normal = {0, 1, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x, p.y + 1, p.z + 1}, .m_normal = {0, 1, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y + 1, p.z + 1}, .m_normal = {0, 1, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y + 1, p.z}, .m_normal = {0, 1, 0}, .m_texcoord = {}, .m_color = color},
+        Vertex{.position = {p.x, p.y + 1, p.z}, .normal = {0, 1, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x, p.y + 1, p.z + 1}, .normal = {0, 1, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x + 1, p.y + 1, p.z + 1}, .normal = {0, 1, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x + 1, p.y + 1, p.z}, .normal = {0, 1, 0}, .texcoord = {}, .color = color},
 
         // Left
-        Vertex{.m_position = {p.x, p.y, p.z}, .m_normal = {-1, 0, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x, p.y, p.z + 1}, .m_normal = {-1, 0, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x, p.y + 1, p.z + 1}, .m_normal = {-1, 0, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x, p.y + 1, p.z}, .m_normal = {-1, 0, 0}, .m_texcoord = {}, .m_color = color},
+        Vertex{.position = {p.x, p.y, p.z}, .normal = {-1, 0, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x, p.y, p.z + 1}, .normal = {-1, 0, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x, p.y + 1, p.z + 1}, .normal = {-1, 0, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x, p.y + 1, p.z}, .normal = {-1, 0, 0}, .texcoord = {}, .color = color},
 
         // Right
-        Vertex{.m_position = {p.x + 1, p.y, p.z}, .m_normal = {1, 0, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y, p.z + 1}, .m_normal = {1, 0, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y + 1, p.z + 1}, .m_normal = {1, 0, 0}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y + 1, p.z}, .m_normal = {1, 0, 0}, .m_texcoord = {}, .m_color = color},
+        Vertex{.position = {p.x + 1, p.y, p.z}, .normal = {1, 0, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x + 1, p.y, p.z + 1}, .normal = {1, 0, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x + 1, p.y + 1, p.z + 1}, .normal = {1, 0, 0}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x + 1, p.y + 1, p.z}, .normal = {1, 0, 0}, .texcoord = {}, .color = color},
 
         // Front
-        Vertex{.m_position = {p.x, p.y, p.z}, .m_normal = {0, 0, -1}, .m_texcoord = {0, 1}, .m_color = color},
-        Vertex{.m_position = {p.x, p.y + 1, p.z}, .m_normal = {0, 0, -1}, .m_texcoord = {0, 0}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y + 1, p.z}, .m_normal = {0, 0, -1}, .m_texcoord = {1, 0}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y, p.z}, .m_normal = {0, 0, -1}, .m_texcoord = {1, 1}, .m_color = color},
+        Vertex{.position = {p.x, p.y, p.z}, .normal = {0, 0, -1}, .texcoord = {0, 1}, .color = color},
+        Vertex{.position = {p.x, p.y + 1, p.z}, .normal = {0, 0, -1}, .texcoord = {0, 0}, .color = color},
+        Vertex{.position = {p.x + 1, p.y + 1, p.z}, .normal = {0, 0, -1}, .texcoord = {1, 0}, .color = color},
+        Vertex{.position = {p.x + 1, p.y, p.z}, .normal = {0, 0, -1}, .texcoord = {1, 1}, .color = color},
 
         // Back
-        Vertex{.m_position = {p.x, p.y, p.z + 1}, .m_normal = {0, 0, 1}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x, p.y + 1, p.z + 1}, .m_normal = {0, 0, 1}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y + 1, p.z + 1}, .m_normal = {0, 0, 1}, .m_texcoord = {}, .m_color = color},
-        Vertex{.m_position = {p.x + 1, p.y, p.z + 1}, .m_normal = {0, 0, 1}, .m_texcoord = {}, .m_color = color},
+        Vertex{.position = {p.x, p.y, p.z + 1}, .normal = {0, 0, 1}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x, p.y + 1, p.z + 1}, .normal = {0, 0, 1}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x + 1, p.y + 1, p.z + 1}, .normal = {0, 0, 1}, .texcoord = {}, .color = color},
+        Vertex{.position = {p.x + 1, p.y, p.z + 1}, .normal = {0, 0, 1}, .texcoord = {}, .color = color},
     };
 
     std::vector<uint32_t> indices{
@@ -57,10 +57,10 @@ void VoxelModelBuilder::set_voxel(int x, int y, int z, const glm::vec4& color)
         20, 21, 22, 20, 22, 23, // Back
     };
 
-    size_t index_offset = m_mesh->m_vertices.size();
+    size_t index_offset = m_mesh->vertices.size();
     assert(index_offset % 24 == 0);
     for (uint32_t& i : indices) i += index_offset;
 
-    m_mesh->m_vertices.insert(m_mesh->m_vertices.end(), vertices.begin(), vertices.end());
-    m_mesh->m_indices.insert(m_mesh->m_indices.end(), indices.begin(), indices.end());
+    m_mesh->vertices.insert(m_mesh->vertices.end(), vertices.begin(), vertices.end());
+    m_mesh->indices.insert(m_mesh->indices.end(), indices.begin(), indices.end());
 }

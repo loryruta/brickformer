@@ -84,19 +84,19 @@ void GltfLoader::parse_vertices(const tinygltf::Primitive& primitive, Mesh& mesh
     assert(num_vertices == texcoord_accessor.count);
     assert(!color_accessor || num_vertices == color_accessor->count);
 
-    mesh.m_vertices.resize(num_vertices);
+    mesh.vertices.resize(num_vertices);
 
     printf("[GltfLoader] Uploading %zu vertices...\n", num_vertices);
 
-    uint8_t* dst_vertices = (uint8_t*) mesh.m_vertices.data();
+    uint8_t* dst_vertices = (uint8_t*) mesh.vertices.data();
 
-    copy_accessor_data(pos_accessor, TINYGLTF_TYPE_VEC3, dst_vertices + offsetof(Vertex, m_position), sizeof(Vertex));
-    copy_accessor_data(normal_accessor, TINYGLTF_TYPE_VEC3, dst_vertices + offsetof(Vertex, m_normal), sizeof(Vertex));
-    copy_accessor_data(texcoord_accessor, TINYGLTF_TYPE_VEC2, dst_vertices + offsetof(Vertex, m_texcoord), sizeof(Vertex));
+    copy_accessor_data(pos_accessor, TINYGLTF_TYPE_VEC3, dst_vertices + offsetof(Vertex, position), sizeof(Vertex));
+    copy_accessor_data(normal_accessor, TINYGLTF_TYPE_VEC3, dst_vertices + offsetof(Vertex, normal), sizeof(Vertex));
+    copy_accessor_data(texcoord_accessor, TINYGLTF_TYPE_VEC2, dst_vertices + offsetof(Vertex, texcoord), sizeof(Vertex));
 
     if (color_accessor)
     {
-        copy_accessor_data(*color_accessor, color_accessor->type, dst_vertices + offsetof(Vertex, m_color), sizeof(Vertex));
+        copy_accessor_data(*color_accessor, color_accessor->type, dst_vertices + offsetof(Vertex, color), sizeof(Vertex));
     }
     else
     {
@@ -121,11 +121,11 @@ void GltfLoader::parse_indices(const tinygltf::Primitive& primitive, Mesh& mesh)
            );
     assert(indices_accessor.type == TINYGLTF_TYPE_SCALAR);
 
-    mesh.m_indices.resize(indices_accessor.count);
+    mesh.indices.resize(indices_accessor.count);
 
     if (indices_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
     {
-        copy_accessor_data(indices_accessor, TINYGLTF_TYPE_SCALAR, (uint8_t*) mesh.m_indices.data(), 0);
+        copy_accessor_data(indices_accessor, TINYGLTF_TYPE_SCALAR, (uint8_t*) mesh.indices.data(), 0);
     }
     else if (indices_accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
     {
@@ -133,7 +133,7 @@ void GltfLoader::parse_indices(const tinygltf::Primitive& primitive, Mesh& mesh)
         copy_accessor_data(indices_accessor, TINYGLTF_TYPE_SCALAR, (uint8_t*) indices16.data(), 0);
 
         // Yay! Iterate them... :')
-        for (size_t i = 0; i < indices_accessor.count; i++) mesh.m_indices[i] = indices16[i];
+        for (size_t i = 0; i < indices_accessor.count; i++) mesh.indices[i] = indices16[i];
     }
     else
     {
