@@ -25,7 +25,7 @@ public:
 
     [[nodiscard]] GLFWwindow* handle() const { return m_glfw_window; };
 
-    [[nodiscard]] glm::ivec2 get_framebuffer_size() const;
+    [[nodiscard]] glm::ivec2 framebuffer_size() const;
 
     void begin_frame();
     void end_frame();

@@ -5,46 +5,44 @@
 
 #include <glm/glm.hpp>
 
-#include "ArpenteurListener.hpp"
-#include "PlacementSolver.cuh"
+#include "ConverterListener.h"
+#include "PlacementSolver.h"
 #include "Slicer.cuh"
-#include "SpreadValue.cuh"
+#include "SpreadValue.h"
 #include "types.cuh"
 
 namespace lego_builder
 {
-
-struct ArpenteurInput
-{
+struct ConverterParams {
     std::string model_path = "";
     int resolution = -1;
     bool flip_x = false;
     bool flip_y = false;
     bool flip_z = false;
     float alpha_test_threshold = 0.7f;
+    uint8_t proximity_threshold =
+        1; ///< If a floating placement's proximity value is below this value, then it's allowed
 
-    /// If a floating placement's proximity value is below this value, then it's allowed.
-    uint8_t proximity_threshold = 1;
-
-    /// The value to which the proximity map is initialized where voxels are set (UINT8_MAX to make it automatically assigned).
+    /// The value to which the proximity map is initialized where voxels are set (UINT8_MAX to make it automatically
+    /// assigned).
     uint8_t proximity_max_value = UINT8_MAX;
 };
 
 /// The class that manages the whole conversion process: from the raw Model to the Construction.
 /// Important: this data structure must also be available in device code.
-class Arpenteur // Arpenteur in French = Surveyor in English (= Geometra in Italian)
+class Converter
 {
 public:
     /// A copy of this class' data on device.
-    Arpenteur* m_self_d; // Used to avoid having kernels with many parameters
+    Converter* m_self_d; // Used to avoid having kernels with many parameters
 
     /* Input */
-    const ArpenteurInput m_input;
+    const ConverterParams m_params;
 
     uint8_t m_proximity_threshold = UINT8_MAX;
     uint8_t m_proximity_max_value = UINT8_MAX;
 
-    std::vector<ArpenteurListener*> m_listeners;
+    std::vector<ConverterListener*> m_listeners;
 
     /// The minimum accepted reward.
     /// If the best placement for a subslice has its reward lower than this threshold, the subslice is completed.
@@ -84,17 +82,12 @@ public:
 
     bool m_stop = false;
 
-    explicit Arpenteur(const ArpenteurInput& input);
+    explicit Converter(const ConverterParams& params);
+    ~Converter() = default;
 
-    // @param model_path valid path to the input model
-    // @param grid the grid that the model has to fit in. "Slice side" would be a sufficient input, but 3D grid is more user-friendly
-    //explicit Arpenteur(const std::filesystem::path& model_path, const glm::uvec3& grid); // TODO :)
+    void add_listener(ConverterListener* listener) { m_listeners.emplace_back(listener); }
 
-    ~Arpenteur() = default;
-
-    void add_listener(ArpenteurListener* listener) { m_listeners.emplace_back(listener); }
-
-    void run();
+    void start();
 
     static uint8_t calc_proximity_threshold(int resolution);
 

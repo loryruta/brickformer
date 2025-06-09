@@ -45,9 +45,8 @@ public:
         m_height(other.m_height),
         m_data(other.m_data)
     {
-        m_data = nullptr;
+        other.m_data = nullptr;
     }
-
     ~DeviceImage()
     {
         if (m_data)
