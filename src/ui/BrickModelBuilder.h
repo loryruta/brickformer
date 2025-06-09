@@ -1,14 +1,18 @@
 #pragma once
 
 #include "model/Model.hpp"
+#include "types.cuh"
 
 namespace lego_builder
 {
-class BrickModelBuilder  // TODO Rename to BrickConstructionBuilder ?
+/// Given several placements, procedurally generate a brick model.
+class BrickModelBuilder
 {
 private:
+    /// The brick model under construction.
     Model m_model;
-    Mesh* m_mesh;  // A pointer to the first and only mesh of the model
+    /// A pointer to the first and only mesh of the model.
+    Mesh* m_mesh;
 
 public:
     explicit BrickModelBuilder();
@@ -16,9 +20,7 @@ public:
 
     [[nodiscard]] const Model& model() const { return m_model; }
 
-    void place(int slice_y, int x, int z, int bid, uint8_t subslice_mask, const glm::vec4& color);
-
-private:
-    void place_1x1(int slice_y, int x, int z, uint8_t subslice_mask, const glm::vec4& color);
+    /// Procedurally generate the vertices for the given placement.
+    void add_placement(int slice_y, uint32_t pid, const Placement& placement);
 };
-}
+} // namespace lego_builder

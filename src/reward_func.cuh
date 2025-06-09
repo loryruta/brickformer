@@ -18,8 +18,8 @@ inline void iterate_brick_grid(CALLBACK callback)
     int lane_x = lane_i % 5;
     int lane_y = lane_i / 5;
 
-    int num_items_x = div_ceil(BRICK_MAX_WIDTH, 5);   // 2
-    int num_items_y = div_ceil(BRICK_MAX_HEIGHT, 5);  // 2
+    int num_items_x = div_ceil(BRICK_MAX_EXTENT_X, 5);   // 2
+    int num_items_y = div_ceil(BRICK_MAX_EXTENT_Z, 5);  // 2
 
     for (int ix = 0; ix < num_items_x; ix++)
     {
@@ -28,7 +28,7 @@ inline void iterate_brick_grid(CALLBACK callback)
             int bx = lane_x * num_items_x + ix;
             int by = lane_y * num_items_y + iy;
 
-            if (bx < BRICK_MAX_WIDTH && by < BRICK_MAX_HEIGHT) callback(bx, by);
+            if (bx < BRICK_MAX_EXTENT_X && by < BRICK_MAX_EXTENT_Z) callback(bx, by);
         }
     }
 }
@@ -42,18 +42,18 @@ inline void inspect_neighborhood(
     int& inout_num_connectible_sides
     )
 {
-    auto& brick = k_bricks[placement.m_bid];
+    auto& brick = k_bricks[placement.bid];
 
-    int mx = placement.m_x + bx;
-    int my = placement.m_y + by;
+    int mx = placement.x + bx;
+    int my = placement.z + by;
 
-    if (mx + 1 < placement_map->m_width && (bx + 1 >= BRICK_MAX_WIDTH || !brick[by][bx + 1]))
+    if (mx + 1 < placement_map->m_width && (bx + 1 >= BRICK_MAX_EXTENT_X || !brick[by][bx + 1]))
     {
         if (placement_map->read_pixel(mx + 1, my).x > 0) ++inout_num_neighbors; // TODO: bug: increment atomically
         ++inout_num_connectible_sides;
     }
 
-    if (my + 1 < placement_map->m_height && (by + 1 >= BRICK_MAX_HEIGHT || !brick[by + 1][bx]))
+    if (my + 1 < placement_map->m_height && (by + 1 >= BRICK_MAX_EXTENT_Z || !brick[by + 1][bx]))
     {
         if (placement_map->read_pixel(mx, my + 1).x > 0) ++inout_num_neighbors;
         ++inout_num_connectible_sides;
@@ -76,7 +76,7 @@ template<bool IS_SUBSLICE0>
 __device__
 inline bool eval_placement(const Converter& converter, Placement& placement, float& out_reward)
 {
-    auto& brick = k_bricks[placement.m_bid];
+    auto& brick = k_bricks[placement.bid];
 
     int warp_i = threadIdx.x >> 5;
 
@@ -105,8 +105,8 @@ inline bool eval_placement(const Converter& converter, Placement& placement, flo
 
     iterate_brick_grid([&](int32_t bx, int32_t by)
     {
-        int mx = placement.m_x + bx;
-        int my = placement.m_y + by;
+        int mx = placement.x + bx;
+        int my = placement.z + by;
 
         if (brick[by][bx])
         {
@@ -192,7 +192,7 @@ inline bool eval_placement(const Converter& converter, Placement& placement, flo
     // Evaluate the reward: how good is this placement?
 
     float an = float(num_neighbors) / float(num_connectible_sides);
-    float bn = float(brick_size) / float(BRICK_MAX_WIDTH * BRICK_MAX_HEIGHT);
+    float bn = float(brick_size) / float(BRICK_MAX_EXTENT_X * BRICK_MAX_EXTENT_Z);
     float cn = float(num_covered_map_cells) / float(brick_size);
     float dn = float(num_connected_bricks) / float(brick_size);
     float pn = float(highest_proximity) / float(converter.m_proximity_max_value);

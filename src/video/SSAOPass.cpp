@@ -170,7 +170,7 @@ void SSAOPass::init_noise_texture()
     for (int i = 0; i < k_noise_texture_size; i++)
     {
         noise_data[i].x = g_random_float(g_generator) * 2.f - 1.f;
-        noise_data[i].y = g_random_float(g_generator) * 2.f - 1.f;
+        noise_data[i].z = g_random_float(g_generator) * 2.f - 1.f;
         noise_data[i].z = 0.f;
     }
 

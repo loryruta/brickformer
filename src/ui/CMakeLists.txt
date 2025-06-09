@@ -7,7 +7,7 @@ add_executable(arpenteur_ui
         MainScreen.cu
         MainScreen.h
         Queue.h
-        BrickModelBuilder.cpp
+        BrickModelBuilder.cu
         BrickModelBuilder.h
         ConverterVisualizationBridge.cu
         ConverterVisualizationBridge.h

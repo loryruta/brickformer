@@ -146,7 +146,7 @@ namespace lego_builder
         // test for triangle-plane/box overlap
         glm::vec3 c = glm::vec3(
             n.x > 0.0f ? dp.x : 0.0f,
-            n.y > 0.0f ? dp.y : 0.0f,
+            n.y > 0.0f ? dp.z : 0.0f,
             n.z > 0.0f ? dp.z : 0.0f
         );
 
@@ -166,9 +166,9 @@ namespace lego_builder
         auto v1xy = glm::vec4{tri.m_b.x, tri.m_b.y, 0.0f, 0.0f};
         auto v2xy = glm::vec4{tri.m_c.x, tri.m_c.y, 0.0f, 0.0f};
 
-        float de0xy = -glm::dot(ne0xy, v0xy) + std::max(0.0f, dp.x * ne0xy.x) + std::max(0.0f, dp.y * ne0xy.y);
-        float de1xy = -glm::dot(ne1xy, v1xy) + std::max(0.0f, dp.x * ne1xy.x) + std::max(0.0f, dp.y * ne1xy.y);
-        float de2xy = -glm::dot(ne2xy, v2xy) + std::max(0.0f, dp.x * ne2xy.x) + std::max(0.0f, dp.y * ne2xy.y);
+        float de0xy = -glm::dot(ne0xy, v0xy) + std::max(0.0f, dp.x * ne0xy.x) + std::max(0.0f, dp.z * ne0xy.z);
+        float de1xy = -glm::dot(ne1xy, v1xy) + std::max(0.0f, dp.x * ne1xy.x) + std::max(0.0f, dp.z * ne1xy.z);
+        float de2xy = -glm::dot(ne2xy, v2xy) + std::max(0.0f, dp.x * ne2xy.x) + std::max(0.0f, dp.z * ne2xy.z);
 
         auto pxy = glm::vec4(p.x, p.y, 0.0f, 0.0f);
 
@@ -185,9 +185,9 @@ namespace lego_builder
         auto v1yz = glm::vec4{tri.m_b.y, tri.m_b.z, 0.0f, 0.0f};
         auto v2yz = glm::vec4{tri.m_c.y, tri.m_c.z, 0.0f, 0.0f};
 
-        float de0yz = -glm::dot(ne0yz, v0yz) + std::max(0.0f, dp.y * ne0yz.x) + std::max(0.0f, dp.z * ne0yz.y);
-        float de1yz = -glm::dot(ne1yz, v1yz) + std::max(0.0f, dp.y * ne1yz.x) + std::max(0.0f, dp.z * ne1yz.y);
-        float de2yz = -glm::dot(ne2yz, v2yz) + std::max(0.0f, dp.y * ne2yz.x) + std::max(0.0f, dp.z * ne2yz.y);
+        float de0yz = -glm::dot(ne0yz, v0yz) + std::max(0.0f, dp.z * ne0yz.x) + std::max(0.0f, dp.z * ne0yz.z);
+        float de1yz = -glm::dot(ne1yz, v1yz) + std::max(0.0f, dp.z * ne1yz.x) + std::max(0.0f, dp.z * ne1yz.z);
+        float de2yz = -glm::dot(ne2yz, v2yz) + std::max(0.0f, dp.z * ne2yz.x) + std::max(0.0f, dp.z * ne2yz.z);
 
         auto pyz = glm::vec4(p.y, p.z, 0.0f, 0.0f);
 
@@ -204,9 +204,9 @@ namespace lego_builder
         auto v1zx = glm::vec4{tri.m_b.z, tri.m_b.x, 0.0f, 0.0f};
         auto v2zx = glm::vec4{tri.m_c.z, tri.m_c.x, 0.0f, 0.0f};
 
-        float de0zx = -glm::dot(ne0zx, v0zx) + std::max(0.0f, dp.y * ne0zx.x) + std::max(0.0f, dp.z * ne0zx.y);
-        float de1zx = -glm::dot(ne1zx, v1zx) + std::max(0.0f, dp.y * ne1zx.x) + std::max(0.0f, dp.z * ne1zx.y);
-        float de2zx = -glm::dot(ne2zx, v2zx) + std::max(0.0f, dp.y * ne2zx.x) + std::max(0.0f, dp.z * ne2zx.y);
+        float de0zx = -glm::dot(ne0zx, v0zx) + std::max(0.0f, dp.z * ne0zx.x) + std::max(0.0f, dp.z * ne0zx.z);
+        float de1zx = -glm::dot(ne1zx, v1zx) + std::max(0.0f, dp.z * ne1zx.x) + std::max(0.0f, dp.z * ne1zx.z);
+        float de2zx = -glm::dot(ne2zx, v2zx) + std::max(0.0f, dp.z * ne2zx.x) + std::max(0.0f, dp.z * ne2zx.z);
 
         auto pzx = glm::vec4(p.z, p.x, 0.0f, 0.0f);
 

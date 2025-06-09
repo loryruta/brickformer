@@ -1,6 +1,10 @@
 add_library(arpenteur_video STATIC
     BoxFilter.cpp
+    BoxFilter.hpp
+    BrickRenderer.cpp
+    BrickRenderer.h
     Camera.cpp
+    Camera.hpp
     cuda_interop_helpers.cu
     gl_helpers.cpp
     GridRenderer.cpp
