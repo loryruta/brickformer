@@ -34,16 +34,16 @@ CUDAMappedGLTexture::~CUDAMappedGLTexture()
     }
 }
 
-void CUDAMappedGLTexture::copy_from(DeviceImage<4, uint8_t>& image)
+void CUDAMappedGLTexture::copy_from(DeviceImage<4, uint8_t>& image, cudaStream_t stream)
 {
-    CHECK_CU(cudaMemcpy2DToArray(
+    CHECK_CU(cudaMemcpy2DToArrayAsync(
         m_mapped_ptr,
         0, 0,
         image.m_data,
         image.m_width * image.pixel_size(), // spitch (tightly packed)
         image.m_width * image.pixel_size(), // width
         image.m_height,
-        cudaMemcpyDeviceToDevice
+        cudaMemcpyDeviceToDevice,
+        stream
     ));
-    CHECK_CU(cudaDeviceSynchronize());
 }

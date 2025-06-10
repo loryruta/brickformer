@@ -190,13 +190,13 @@ void MainScreen::ui()
 {
     ImGui::DockSpaceOverViewport();
 
-    if (ImGui::Begin("###LeftSidebarWindow", nullptr, ImGuiWindowFlags_NoTitleBar)) {
+    if (ImGui::Begin("LeftSidebar", nullptr, ImGuiWindowFlags_NoTitleBar)) {
         ImGuiID dockspace_id = ImGui::GetID("LeftSidebarDockspace");
         ImGui::DockSpace(dockspace_id);
     }
     ImGui::End();
 
-    if (ImGui::Begin("###RightSidebarWindow", nullptr, ImGuiWindowFlags_NoTitleBar)) {
+    if (ImGui::Begin("RightSidebar", nullptr, ImGuiWindowFlags_NoTitleBar)) {
         ImGuiID dockspace_id = ImGui::GetID("RightSidebarDockspace");
         ImGui::DockSpace(dockspace_id);
     }
@@ -238,7 +238,6 @@ void MainScreen::render_3d_scene()
                 transform *= m_undo_brick_height_adjustment_matrix;
             }
             transform *= m_model_to_view_transform;
-
             g_app->model_renderer().render(*m_baked_model, m_camera, transform);
         }
     }
@@ -264,9 +263,15 @@ void MainScreen::render_3d_scene()
     // Render brick model
     if (m_ui.view_settings.show_construction) {
         if (m_converter_visualization_bridge) {
-            const std::unique_ptr<BakedModel>& brick_model = m_converter_visualization_bridge->brick_model();
+
+            const std::unique_ptr<BrickRenderer_BakedModel>& brick_model = m_converter_visualization_bridge->brick_model();
             if (brick_model) {
-                g_app->model_renderer().render(*brick_model, m_camera, m_conversion_to_view_transform);
+                BrickRenderer_RenderParams params{};
+                params.baked_model = brick_model.get();
+                params.camera = &m_camera;
+                params.kernel_r = 3;
+                params.border_color = glm::vec4(0, 0, 0, 1); // Black
+                g_app->brick_renderer().render(params);
             }
         }
     }
@@ -276,7 +281,7 @@ void MainScreen::render_3d_scene()
         if (m_converter_visualization_bridge) {
             const std::unique_ptr<BakedModel>& voxel_model = m_converter_visualization_bridge->voxel_model();
             if (voxel_model) {
-                g_app->model_renderer().render(*voxel_model, m_camera, m_conversion_to_view_transform);
+                // g_app->model_renderer().render(*voxel_model, m_camera, m_conversion_to_view_transform);
             }
         }
     }

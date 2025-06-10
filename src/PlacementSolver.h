@@ -48,7 +48,7 @@ public:
     int* m_highest_proximity_d;
     float* m_rewards_d;
 
-    explicit PlacementSolver(size_t num_placements, int resolution);
+    explicit PlacementSolver(size_t num_placements, int resolution, cudaStream_t stream);
     ~PlacementSolver();
 
     struct Input
@@ -60,8 +60,8 @@ public:
         ProximityMapT* proximity_map_d;
     };
 
-    /// @return a pair containing the optimal placement and its reward
-    std::pair<Placement, float> solve(const Input& input);
+    /// \return A pair containing the optimal placement and its reward
+    std::pair<Placement, float> solve(const Input& input, cudaStream_t stream);
 };
 
 namespace internal

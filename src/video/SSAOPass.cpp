@@ -146,9 +146,9 @@ void SSAOPass::draw(const GBuffer& gbuffer, const Camera& camera, const SSAOTarg
     glUseProgram(m_program);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, gbuffer.get_position_texture());
+    glBindTexture(GL_TEXTURE_2D, gbuffer.position_texture());
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, gbuffer.get_normal_texture());
+    glBindTexture(GL_TEXTURE_2D, gbuffer.normal_texture());
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, m_noise_texture);
 
