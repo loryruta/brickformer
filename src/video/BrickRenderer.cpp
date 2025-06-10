@@ -19,26 +19,24 @@ const char* k_gbuffer_vshader_src = R"(#version 460 core
     layout(location = 1) in vec3 a_normal;
     layout(location = 2) in vec2 a_uv;
     layout(location = 3) in vec4 a_color;
-    layout(location = 4) in uint a_pid;
+    layout(location = 4) in uvec2 a_outline_guide;
 
     layout(location = 0) uniform mat4 u_transform;
     layout(location = 1) uniform mat4 u_view;
     layout(location = 2) uniform mat4 u_projection;
 
-    out vec4 v_normal;
-    out vec2 v_uv;
     out vec4 v_color;
-    out flat uint v_pid;
+    out vec2 v_uv;
+    out flat uvec2 v_outline_guide;
 
     void main()
     {
         mat4 VT = u_view * u_transform;
         vec4 normal = VT * vec4(a_normal, 0);
 
-        v_normal = normal;
-        v_uv = a_uv;
         v_color = a_color;
-        v_pid = a_pid;
+        v_uv = a_uv;
+        v_outline_guide = a_outline_guide;
 
         gl_Position = u_projection * VT * vec4(a_position, 1);
     }
@@ -46,20 +44,19 @@ const char* k_gbuffer_vshader_src = R"(#version 460 core
 
 const char* k_gbuffer_fshader_src = R"(#version 460 core
 
-    in vec4 v_normal;
-    in vec2 v_uv;
     in vec4 v_color;
-    in flat uint v_pid;
+    in vec2 v_uv;
+    in flat uvec2 v_outline_guide;
 
-    layout(location = 1) out vec4 f_normal;
-    layout(location = 2) out vec4 f_color;
-    layout(location = 3) out uint f_pid;
+    layout(location = 0) out vec4 f_color;
+    layout(location = 1) out vec2 f_uv;
+    layout(location = 2) out uvec2 f_outline_guide;
 
     void main()
     {
-        f_normal = vec4(normalize(v_normal.xyz), 1);
         f_color = v_color;
-        f_pid = v_pid;
+        f_uv = v_uv;
+        f_outline_guide = v_outline_guide;
     }
 )";
 
@@ -68,9 +65,9 @@ const char* k_color_fshader_src = R"(#version 460 core
     layout(location = 0) in vec2 v_uv;
 
     // GBuffer
-    layout(binding = 0, rgba16f) uniform image2D u_normal;
-    layout(binding = 1, rgba8) uniform image2D u_color;
-    layout(binding = 2, r32ui) uniform uimage2D u_pid;
+    layout(binding = 0, rgba8) uniform image2D u_color;
+    layout(binding = 1, rg8) uniform image2D u_uv;
+    layout(binding = 2, rg32ui) uniform uimage2D u_outline_guide;
     layout(binding = 3, r32f) uniform image2D u_depth_buffer;
 
     layout(location = 0) uniform int u_kernel_r;
@@ -80,20 +77,21 @@ const char* k_color_fshader_src = R"(#version 460 core
 
     void main()
     {
-        ivec2 resolution = imageSize(u_normal);
+        ivec2 resolution = imageSize(u_color);
         ivec2 coord = ivec2(v_uv * resolution);
-        uint pid = imageLoad(u_pid, coord).r;
-        if (pid == 0) discard;
-        vec3 normal = imageLoad(u_normal, coord).rgb;
+        vec2 uv = imageLoad(u_uv, coord).rg;
+        uvec2 outline_guide = imageLoad(u_outline_guide, coord).rg;
         float depth = imageLoad(u_depth_buffer, coord).r;
+        if (outline_guide.r /* pid */ == 0) {
+            discard;
+            return;
+        }
         gl_FragDepth = depth;
         for (int x = -u_kernel_r; x <= u_kernel_r; ++x) {
             for (int y = -u_kernel_r; y <= u_kernel_r; ++y) {
-                ivec2 rcoord = coord + ivec2(x, y);
-                vec3 rnormal = normalize(imageLoad(u_normal, rcoord).rgb);
-                uint rpid = imageLoad(u_pid, rcoord).r;
-                float rdepth = imageLoad(u_depth_buffer, rcoord).r;
-                if (dot(rnormal, normal) < 0.1 || rpid != pid || abs(depth - rdepth) > 0.0001) {
+                ivec2 neighbor_coord = coord + ivec2(x, y);
+                uvec2 neighbor_outline_guide = imageLoad(u_outline_guide, neighbor_coord).rg;
+                if (outline_guide != neighbor_outline_guide) {
                     f_color = u_border_color;
                     return;
                 }
@@ -110,17 +108,6 @@ BrickRenderer_GBuffer::BrickRenderer_GBuffer(int width, int height) : width(widt
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
-    // Normal attachment
-    glGenTextures(1, &normal_texture);
-    glBindTexture(GL_TEXTURE_2D, normal_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normal_texture, 0);
-    ARP_DEBUG("Normal attachment created");
-
     // Color attachment
     glGenTextures(1, &color_texture);
     glBindTexture(GL_TEXTURE_2D, color_texture);
@@ -129,21 +116,32 @@ BrickRenderer_GBuffer::BrickRenderer_GBuffer(int width, int height) : width(widt
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, color_texture, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_texture, 0);
     ARP_DEBUG("Color attachment created");
 
-    // PID attachment
-    glGenTextures(1, &pid_texture);
-    glBindTexture(GL_TEXTURE_2D, pid_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, width, height, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
+    // UV attachment
+    glGenTextures(1, &uv_texture);
+    glBindTexture(GL_TEXTURE_2D, uv_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, width, height, 0, GL_RG, GL_UNSIGNED_BYTE, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, pid_texture, 0);
-    ARP_DEBUG("PID attachment created");
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, uv_texture, 0);
+    ARP_DEBUG("UV attachment created");
 
-    uint32_t attachments[]{GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+    // Outline guide attachment
+    glGenTextures(1, &outline_guide_texture);
+    glBindTexture(GL_TEXTURE_2D, outline_guide_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32UI, width, height, 0, GL_RG_INTEGER, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, outline_guide_texture, 0);
+    ARP_DEBUG("Outline guide attachment created");
+
+    GLenum attachments[]{GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
     glDrawBuffers(std::size(attachments), attachments);
 
     // Depthbuffer
@@ -167,18 +165,18 @@ BrickRenderer_GBuffer::BrickRenderer_GBuffer(int width, int height) : width(widt
 
 BrickRenderer_GBuffer::~BrickRenderer_GBuffer()
 {
-    glDeleteTextures(1, &normal_texture);
     glDeleteTextures(1, &color_texture);
-    glDeleteTextures(1, &pid_texture);
+    glDeleteTextures(1, &uv_texture);
+    glDeleteTextures(1, &outline_guide_texture);
     glDeleteTextures(1, &depth_buffer);
     glDeleteFramebuffers(1, &framebuffer);
 }
 
 void BrickRenderer_GBuffer::clear()
 {
-    glClearTexImage(normal_texture, 0, GL_RGBA, GL_FLOAT, nullptr);
     glClearTexImage(color_texture, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glClearTexImage(pid_texture, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
+    glClearTexImage(uv_texture, 0, GL_RG, GL_FLOAT, nullptr);
+    glClearTexImage(outline_guide_texture, 0, GL_RG_INTEGER, GL_UNSIGNED_INT, nullptr);
 }
 
 BrickRenderer::BrickRenderer()
@@ -252,14 +250,14 @@ void BrickRenderer::render(const BrickRenderer_RenderParams& params)
     glUseProgram(m_color_program);
     glBindFramebuffer(GL_FRAMEBUFFER, parent_framebuffer);
 
-    glEnable(GL_DEPTH_TEST); // Enable depth test because we want to write depths
-    glDepthFunc(GL_ALWAYS);  // Always pass (it's a screen quad)
-    glDepthMask(GL_TRUE);    // Enable depth buffer for writing
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
 
-    glBindImageTexture(0 /* u_normal */, m_gbuffer->normal_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-    glBindImageTexture(1 /* u_color */, m_gbuffer->color_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-    glBindImageTexture(2 /* u_pid */, m_gbuffer->pid_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32UI);
+    glBindImageTexture(0 /* u_color */, m_gbuffer->color_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+    glBindImageTexture(1 /* u_uv */, m_gbuffer->uv_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG8);
+    glBindImageTexture(
+        2 /* u_outline_guide */, m_gbuffer->outline_guide_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG32UI);
     glBindImageTexture(3 /* u_depth_buffer */, m_gbuffer->depth_buffer, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
 
     glUniform1i(0 /* u_kernel_r */, params.kernel_r);
@@ -285,12 +283,12 @@ BrickRenderer_BakedModel BrickRenderer::bake_model(const Model& model)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, position));
     glEnableVertexAttribArray(1 /* a_normal */);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, normal));
-    glEnableVertexAttribArray(2 /* a_texcoord */);
+    glEnableVertexAttribArray(2 /* a_uv */);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, texcoord));
     glEnableVertexAttribArray(3 /* a_color */);
     glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) offsetof(Vertex, color));
-    glEnableVertexAttribArray(4 /* a_pid */);
-    glVertexAttribIPointer(4, 1, GL_UNSIGNED_INT, sizeof(Vertex), (void*) offsetof(Vertex, p0));
+    glEnableVertexAttribArray(4 /* a_outline_guide */);
+    glVertexAttribIPointer(4, 2, GL_UNSIGNED_INT, sizeof(Vertex), (void*) offsetof(Vertex, p2));
 
     return baked_model;
 }

@@ -53,7 +53,7 @@ const float k_cube_vertices[]{
     0, 0, 1, 1, 1, std::bit_cast<float>(int(0))
 };
 
-const char* k_vertex_shader_src = R"(#version 460 core
+const char* k_gbuffer_vshader_src = R"(#version 460 core
 
     layout(location = 0) in vec3 a_position;
     layout(location = 1) in vec2 a_uv;
@@ -80,7 +80,7 @@ const char* k_vertex_shader_src = R"(#version 460 core
     }
 )";
 
-const char* k_fragment_shader_src = R"(#version 460 core
+const char* k_gbuffer_fshader_src = R"(#version 460 core
 
     in vec2 v_uv;
     flat in int v_axis;
@@ -136,10 +136,10 @@ GridRenderer::GridRenderer()
 {
     m_program = glCreateProgram();
 
-    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, k_vertex_shader_src);
+    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, k_gbuffer_vshader_src);
     glAttachShader(m_program, vertex_shader);
 
-    GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, k_fragment_shader_src);
+    GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, k_gbuffer_fshader_src);
     glAttachShader(m_program, fragment_shader);
 
     link_program(m_program);
@@ -194,6 +194,7 @@ void GridRenderer::render(const RenderParams& params) const
     glUseProgram(m_program);
 
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
 
