@@ -26,6 +26,7 @@ private:
     std::unique_ptr<CUDAMappedGLTexture> m_proximity_map_texture;
 
     std::unique_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
+    uint32_t m_next_pid_id = 1;
     std::unique_ptr<BrickModelBuilder> m_brick_model_builder;
     std::unique_ptr<BakedModel> m_baked_voxel_model;
     std::unique_ptr<VoxelModelBuilder> m_voxel_model_builder;

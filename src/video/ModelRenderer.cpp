@@ -37,7 +37,7 @@ GLuint bake_texture(const Texture& texture)
     return gl_texture;
 }
 
-const char* k_vertex_shader_src = R"(#version 460 core
+const char* k_gbuffer_vshader_src = R"(#version 460 core
 
     layout(location = 0) in vec3 a_position;
     layout(location = 1) in vec3 a_normal;
@@ -68,7 +68,7 @@ const char* k_vertex_shader_src = R"(#version 460 core
     }
 )";
 
-const char* k_fragment_shader_src = R"(#version 460 core
+const char* k_gbuffer_fshader_src = R"(#version 460 core
 
     in vec4 v_position;
     in vec4 v_normal;
@@ -94,7 +94,7 @@ const char* k_fragment_shader_src = R"(#version 460 core
     }
 )";
 
-const char* k_shading_shader_src = R"(#version 460 core
+const char* k_shading_fshader_src = R"(#version 460 core
 
     layout(location = 0) in vec2 v_uv;
 
@@ -109,6 +109,7 @@ const char* k_shading_shader_src = R"(#version 460 core
     {
         float depth = texture(u_depth_buffer, v_uv).r;
         vec4 albedo = texture(u_albedo_texture, v_uv);
+        if (albedo.a < 0.0001) discard;
         float occlusion = texture(u_occlusion_texture, v_uv).r;
 
         f_color.rgb = albedo.rgb * occlusion;
@@ -158,9 +159,9 @@ ModelRenderer::ModelRenderer()
     m_white_texture = create_white_texture(); // Create a white texture, used in case of missing texture
 
     // Create program
-    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, k_vertex_shader_src);
-    GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, k_fragment_shader_src);
-    GLuint shading_shader = create_shader(GL_FRAGMENT_SHADER, k_shading_shader_src);
+    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, k_gbuffer_vshader_src);
+    GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, k_gbuffer_fshader_src);
+    GLuint shading_shader = create_shader(GL_FRAGMENT_SHADER, k_shading_fshader_src);
 
     // Create program
     m_program = glCreateProgram();
@@ -218,9 +219,6 @@ void ModelRenderer::store_geometry(const BakedModel& model, const Camera& camera
 
     glUseProgram(m_program);
 
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-
     glUniform1f(get_uniform_location(m_program, "u_alpha_test_threshold"), m_alpha_test_threshold);
 
     for (const BakedMesh& baked_mesh : model.m_meshes) {
@@ -262,6 +260,10 @@ void ModelRenderer::render(const BakedModel& model, const Camera& camera, const 
     glBindFramebuffer(GL_FRAMEBUFFER, m_gbuffer->framebuffer());
     glViewport(0, 0, width, height);
 
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDisable(GL_BLEND);
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     m_gbuffer->clear();
 
@@ -286,9 +288,8 @@ void ModelRenderer::render(const BakedModel& model, const Camera& camera, const 
     glBindFramebuffer(GL_FRAMEBUFFER, parent_framebuffer);
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glEnable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
 
     glUseProgram(m_shading_program);
 
