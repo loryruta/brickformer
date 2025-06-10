@@ -15,7 +15,7 @@ namespace lego_builder
 class CUDAMappedGLTexture
 {
 private:
-    GLuint m_texture;  // Not owned!
+    GLuint m_texture; // Not owned!
     cudaGraphicsResource* m_resource;
     cudaArray_t m_mapped_ptr;
 
@@ -27,6 +27,6 @@ public:
 
     [[nodiscard]] GLuint texture() const { return m_texture; }
 
-    void copy_from(DeviceImage<4, uint8_t>& image);
+    void copy_from(DeviceImage<4, uint8_t>& image, cudaStream_t stream);
 };
-}
+} // namespace lego_builder

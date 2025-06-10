@@ -23,5 +23,5 @@ namespace lego_builder
         const DeviceMesh* m_meshes;
     };
 
-    const DeviceModel* upload_model(const Model& model);
+    const DeviceModel* upload_model(const Model& model, cudaStream_t stream);
 }

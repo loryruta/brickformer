@@ -1,7 +1,6 @@
 #include "Converter.h"
 
 #include <cuda_profiler_api.h>
-#include <thrust/extrema.h>
 #include <tinyformat.h>
 
 #include "assign_placements_color.cuh"
@@ -14,6 +13,23 @@
 #define ARP_LOG_CONTEXT "Converter"
 
 using namespace lego_builder;
+
+namespace
+{
+__global__ void
+init_proximity_map_from_color_map_kernel(const ColorMapT* color_map, uint8_t init_val, ProximityMapT* out_proximity_map)
+{
+    assert(color_map->m_width == out_proximity_map->m_width && color_map->m_height == out_proximity_map->m_height);
+
+    uint32_t px = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t py = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (px < color_map->m_width && py < color_map->m_height) {
+        bool is_colored = color_map->read_pixel(px, py).a > 0;
+        if (is_colored) out_proximity_map->write_pixel(px, py, glm::vec<1, uint8_t>{init_val});
+    }
+}
+} // namespace
 
 Converter::Converter(const ConverterParams& params) : m_params(params)
 {
@@ -39,21 +55,26 @@ Converter::Converter(const ConverterParams& params) : m_params(params)
     m_num_placements = resolution * resolution * k_num_bricks;
     // init_placements();
 
-    CHECK_CU(cudaMalloc(&m_valid_placements_d, m_num_placements * sizeof(bool)));
+    // Create a dedicate CUDA stream on which execute all operations
+    CHECK_CU(cudaStreamCreate(&m_stream));
 
-    m_color_map = ColorMapT::create(resolution, resolution, nullptr);
-    m_color_map_d = to_device(m_color_map);
+    CHECK_CU(cudaMallocAsync(&m_valid_placements_d, m_num_placements * sizeof(bool), m_stream));
+    CHECK_CU(cudaStreamSynchronize(m_stream));
 
-    m_prev_proximity_map = ProximityMapT::create(resolution, resolution, nullptr);
-    m_prev_proximity_map_d = to_device(m_prev_proximity_map);
+    m_color_map = ColorMapT::create(resolution, resolution, nullptr, m_stream);
+    m_color_map_d = to_device(m_color_map, m_stream);
 
-    m_prev_placements = PlacementMapT::create(resolution, resolution, nullptr);
-    m_prev_placements_d = to_device(m_prev_placements);
+    m_prev_proximity_map = ProximityMapT::create(resolution, resolution, nullptr, m_stream);
+    m_prev_proximity_map_d = to_device(m_prev_proximity_map, m_stream);
 
-    m_cur_placements = PlacementMapT::create(resolution, resolution, nullptr);
-    m_cur_placements_d = to_device(m_cur_placements);
+    m_prev_placements = PlacementMapT::create(resolution, resolution, nullptr, m_stream);
+    m_prev_placements_d = to_device(m_prev_placements, m_stream);
 
-    m_placement_solver = std::make_unique<PlacementSolver>(m_num_placements, resolution);
+    m_cur_placements = PlacementMapT::create(resolution, resolution, nullptr, m_stream);
+    m_cur_placements_d = to_device(m_cur_placements, m_stream);
+
+    m_placement_solver = std::make_unique<PlacementSolver>(m_num_placements, resolution, m_stream);
+    CHECK_CU(cudaStreamSynchronize(m_stream));
 
     tfm::printf("[INFO ] [Converter] Allocations:\n");
     tfm::printf("[INFO ] [Converter]   Num placements: %zu\n", m_num_placements);
@@ -78,11 +99,11 @@ Converter::Converter(const ConverterParams& params) : m_params(params)
                 m_cur_placements_d,
                 m_cur_placements.data_size());
 
-    cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size_t(1) << 30 /* 1GB */);
+    CHECK_CU(cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size_t(1) << 30 /* 1GB */));
 
     tfm::printf("[DEBUG] [Converter] Device capabilities:\n");
     size_t printf_buffer_size;
-    cudaDeviceGetLimit(&printf_buffer_size, cudaLimitPrintfFifoSize);
+    CHECK_CU(cudaDeviceGetLimit(&printf_buffer_size, cudaLimitPrintfFifoSize));
     tfm::printf("[DEBUG] [Converter]   cudaLimitPrintfFifoSize: %zu KB\n", printf_buffer_size >> 10);
 }
 
@@ -117,33 +138,17 @@ void Converter::transform_model()
     m_model->update_min_max(true /* update_mesh_min_max */);
 }
 
-__global__ void
-init_proximity_map_from_color_map_kernel(const ColorMapT* color_map, uint8_t init_val, ProximityMapT* out_proximity_map)
-{
-    assert(color_map->m_width == out_proximity_map->m_width && color_map->m_height == out_proximity_map->m_height);
-
-    uint32_t px = blockIdx.x * blockDim.x + threadIdx.x;
-    uint32_t py = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (px < color_map->m_width && py < color_map->m_height) {
-        bool is_colored = color_map->read_pixel(px, py).a > 0;
-        if (is_colored) out_proximity_map->write_pixel(px, py, glm::vec<1, uint8_t>{init_val});
-    }
-}
-
 void Converter::init_proximity_map_from_color_map()
 {
-    m_prev_proximity_map.fill(0);
+    m_prev_proximity_map.fill(0, m_stream);
 
     dim3 num_blocks{};
     num_blocks.x = div_ceil<size_t>(m_params.resolution, 32);
     num_blocks.y = div_ceil<size_t>(m_params.resolution, 32);
     num_blocks.z = 1;
-
     dim3 block_dim(32, 32, 1);
-    init_proximity_map_from_color_map_kernel<<<num_blocks, block_dim>>>(
+    init_proximity_map_from_color_map_kernel<<<num_blocks, block_dim, 0, m_stream>>>(
         m_color_map_d, m_proximity_max_value /* init_val */, m_prev_proximity_map_d);
-    CHECK_CU(cudaDeviceSynchronize());
 }
 
 void Converter::place(const Placement& placement)
@@ -157,7 +162,7 @@ void Converter::place(const Placement& placement)
     for (uint8_t bx = 0; bx < BRICK_MAX_EXTENT_X; bx++) {
         for (uint8_t by = 0; by < BRICK_MAX_EXTENT_Z; by++) {
             if (brick[by][bx]) {
-                m_cur_placements.write_pixel(placement.x + bx, placement.z + by, glm::vec<1, uint16_t>{pid});
+                m_cur_placements.write_pixel(placement.x + bx, placement.z + by, glm::vec<1, uint16_t>{pid}, m_stream);
             }
         }
     }
@@ -171,8 +176,7 @@ size_t Converter::place_on_subslice(uint32_t slice_y, int subslice)
 
     StopWatch log_stopwatch{};
 
-    CHECK_CU(cudaMemset(m_valid_placements_d, true, m_num_placements * sizeof(bool)));
-    CHECK_CU(cudaDeviceSynchronize());
+    CHECK_CU(cudaMemsetAsync(m_valid_placements_d, true, m_num_placements * sizeof(bool), m_stream));
 
     while (true) {
         PlacementSolver::Input params{};
@@ -181,7 +185,7 @@ size_t Converter::place_on_subslice(uint32_t slice_y, int subslice)
         params.current_placement_map_d = m_cur_placements_d;
         params.previous_placement_map_d = m_prev_placements_d;
         params.proximity_map_d = m_prev_proximity_map_d;
-        auto [placement, reward] = m_placement_solver->solve(params);
+        auto [placement, reward] = m_placement_solver->solve(params, m_stream);
         if (reward < m_min_reward) break;
 
         place(placement);
@@ -233,25 +237,28 @@ void Converter::linearize_placements_to_output()
     ARP_DEBUG("%zu placements linearized", m_linear_stacked_placements.size());
 
     // Upload placements on GPU
-    CHECK_CU(cudaMalloc(&m_linear_stacked_placements_d, num_placements * sizeof(Placement)));
-    CHECK_CU(cudaMemcpy(m_linear_stacked_placements_d,
-                        m_linear_stacked_placements.data(),
-                        num_placements * sizeof(Placement),
-                        cudaMemcpyHostToDevice));
+    CHECK_CU(cudaMallocAsync(&m_linear_stacked_placements_d, num_placements * sizeof(Placement), m_stream));
+    CHECK_CU(cudaMemcpyAsync(m_linear_stacked_placements_d,
+                             m_linear_stacked_placements.data(),
+                             num_placements * sizeof(Placement),
+                             cudaMemcpyHostToDevice,
+                             m_stream));
 
     // Colorize!
-    const size_t num_blocks = div_ceil<size_t>(num_placements, 32);
-    const size_t block_dim = 1024;
-    assign_placements_color_kernel<<<num_blocks, block_dim>>>(m_self_d, m_linear_stacked_placements_d, num_placements);
-    CHECK_CU(cudaDeviceSynchronize());
-
+    {
+        dim3 num_blocks = div_ceil<size_t>(num_placements, 32);
+        dim3 block_dim = 1024;
+        assign_placements_color_kernel<<<num_blocks, block_dim, 0, m_stream>>>(
+            m_self_d, m_linear_stacked_placements_d, num_placements);
+    }
     // Copy placements from GPU back to host to get the color assignments
-    CHECK_CU(cudaMemcpy(m_linear_stacked_placements.data(),
-                        m_linear_stacked_placements_d,
-                        num_placements * sizeof(Placement),
-                        cudaMemcpyDeviceToHost));
-
-    CHECK_CU(cudaFree(m_linear_stacked_placements_d));
+    CHECK_CU(cudaMemcpyAsync(m_linear_stacked_placements.data(),
+                             m_linear_stacked_placements_d,
+                             num_placements * sizeof(Placement),
+                             cudaMemcpyDeviceToHost,
+                             m_stream));
+    CHECK_CU(cudaFreeAsync(m_linear_stacked_placements_d, m_stream));
+    CHECK_CU(cudaStreamSynchronize(m_stream));
     m_linear_stacked_placements_d = nullptr;
 
     ARP_DEBUG("Placements:");
@@ -271,7 +278,7 @@ void Converter::linearize_placements_to_output()
 
 void Converter::start()
 {
-    m_self_d = to_device(*this); // Make a screenshot of "this" and transfer it on device
+    m_self_d = to_device(*this, m_stream); // Make a screenshot of "this" and transfer it on device
 
     StopWatch stop_watch{};
     std::string dur_str;
@@ -294,16 +301,18 @@ void Converter::start()
     //
     int num_slices = glm::ceil(m_model->size().y);
 
-    m_slicer = std::make_unique<Slicer>(*m_model, m_params.resolution, m_params.alpha_test_threshold);
+    m_slicer = std::make_unique<Slicer>(*m_model, m_params.resolution, m_params.alpha_test_threshold, m_stream);
     m_model.reset(); // We don't need host-side model anymore
 
     // INIT
-    m_prev_placements.fill(ARP_NO_PLACEMENT_VALUE);
-    m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE);
-    m_prev_proximity_map.fill(0);
+    m_prev_placements.fill(ARP_NO_PLACEMENT_VALUE, m_stream);
+    m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE, m_stream);
+    m_prev_proximity_map.fill(0, m_stream);
 
     for (m_slice_y = 0; m_slice_y < num_slices; m_slice_y++) {
-        if (m_stop) return;
+        if (m_stop) {
+            return;
+        }
 
         ARP_INFO(
             "---------------------------------------------------------------- Slice %d/%d", m_slice_y + 1, num_slices);
@@ -314,12 +323,14 @@ void Converter::start()
         // COMPUTE SLICE (i.e. voxelization)
         stop_watch.reset();
 
-        m_slicer->slice(m_slice_y, m_color_map);
+        m_slicer->slice(m_slice_y, m_color_map, m_stream);
 
         ARP_INFO("Voxelization performed in %s", stop_watch.elapsed_time_str().c_str());
 
         // PLACEMENT BEGIN
-        for (const auto& listener : m_listeners) listener->on_placement_begin(m_slice_y);
+        for (const auto& listener : m_listeners) {
+            listener->on_placement_begin(m_slice_y);
+        }
 
         size_t num_placed_bricks;
 
@@ -328,8 +339,8 @@ void Converter::start()
 
         num_placed_bricks = place_on_subslice(m_slice_y, 0 /* subslice */);
 
-        m_prev_placements.copy_from(m_cur_placements);
-        m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE);
+        m_prev_placements.copy_from(m_cur_placements, m_stream);
+        m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE, m_stream);
 
         ARP_INFO(
             "Subslice 0 covered in %s; Placed bricks: %zu", stop_watch.elapsed_time_str().c_str(), num_placed_bricks);
@@ -339,8 +350,8 @@ void Converter::start()
 
         num_placed_bricks = place_on_subslice(m_slice_y, 1 /* subslice */);
 
-        m_prev_placements.copy_from(m_cur_placements);
-        m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE);
+        m_prev_placements.copy_from(m_cur_placements, m_stream);
+        m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE, m_stream);
 
         ARP_INFO(
             "Subslice 1 covered in %s; Placed bricks: %zu", stop_watch.elapsed_time_str().c_str(), num_placed_bricks);
@@ -350,8 +361,8 @@ void Converter::start()
 
         num_placed_bricks = place_on_subslice(m_slice_y, 2 /* subslice */);
 
-        m_prev_placements.copy_from(m_cur_placements);
-        m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE);
+        m_prev_placements.copy_from(m_cur_placements, m_stream);
+        m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE, m_stream);
 
         ARP_INFO(
             "Subslice 2 covered in %s; Placed bricks: %zu", stop_watch.elapsed_time_str().c_str(), num_placed_bricks);
@@ -360,16 +371,19 @@ void Converter::start()
         linearize_placements_to_output();
 
         // SLICE END
-        for (const auto& listener : m_listeners) listener->on_placement_end(m_slice_y, m_linear_stacked_placements);
+        for (const auto& listener : m_listeners) {
+            listener->on_placement_end(m_slice_y, m_linear_stacked_placements);
+        }
 
         // COMPUTE PROXIMITY MAP
         stop_watch.reset();
 
+        // Seed the proximity map with initial values and spread them
         init_proximity_map_from_color_map();
-        m_spread_value.spread(
-            m_prev_proximity_map,
-            m_proximity_max_value /* num_iterations */); // Spread the init values on the proximity map
+        m_spread_value.spread(m_prev_proximity_map, m_proximity_max_value /* num_iterations */, m_stream);
 
         printf("[Converter]   COMPUTE PROXIMITY MAP; %s\n", stop_watch.elapsed_time_str().c_str());
+
+        CHECK_CU(cudaStreamSynchronize(m_stream));
     }
 }

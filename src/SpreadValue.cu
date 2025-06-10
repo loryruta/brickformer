@@ -33,39 +33,31 @@ void spread_kernel(SpreadValue::DeviceImageT* src_image, SpreadValue::DeviceImag
     }
 }
 
-void SpreadValue::spread(DeviceImageT& image, int num_iterations)
+void SpreadValue::spread(DeviceImageT& image, int num_iterations, cudaStream_t stream)
 {
-    DeviceImageT* src_image_d = to_device(image);
+    DeviceImageT* src_image_d = to_device(image, stream);
 
-    DeviceImageT tmp_image = DeviceImageT::create(image.m_width, image.m_height);
-    tmp_image.fill(0);
+    DeviceImageT tmp_image = DeviceImageT::create(image.m_width, image.m_height, nullptr, stream);
+    tmp_image.fill(0, stream);
 
-    DeviceImageT* tmp_image_d = to_device(tmp_image);
+    DeviceImageT* tmp_image_d = to_device(tmp_image, stream);
     DeviceImageT* paired_images[2]{src_image_d, tmp_image_d};
 
     int i = 0;
     while (true)
     {
-        CHECK_CU(cudaDeviceSynchronize());
-
         dim3 num_blocks{};
         num_blocks.x = div_ceil<int>(image.m_width, 32);
         num_blocks.y = div_ceil<int>(image.m_height, 32);
-        num_blocks.z = 1;
-
-        dim3 block_dim{};
-        block_dim.x = 32;
-        block_dim.y = 32;
-        block_dim.z = 1;
-        spread_kernel<<<num_blocks, block_dim>>>(paired_images[i % 2], paired_images[(i + 1) % 2]);
-        CHECK_CU(cudaDeviceSynchronize());
-
+        dim3 block_dim = 32;
+        spread_kernel<<<num_blocks, block_dim, 0, stream>>>(paired_images[i % 2], paired_images[(i + 1) % 2]);
+        CHECK_CU(cudaStreamSynchronize(stream)); // Not to overload the device
         ++i;
         if (i == num_iterations) break;
     }
 
-    if (i % 2 == 1) image.copy_from(tmp_image);
+    if (i % 2 == 1) image.copy_from(tmp_image, stream);
 
-    CHECK_CU(cudaFree(src_image_d));
-    CHECK_CU(cudaFree(tmp_image_d));
+    CHECK_CU(cudaFreeAsync(src_image_d, stream));
+    CHECK_CU(cudaFreeAsync(tmp_image_d, stream));
 }

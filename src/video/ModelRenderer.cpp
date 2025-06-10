@@ -256,10 +256,10 @@ void ModelRenderer::render(const BakedModel& model, const Camera& camera, const 
     int height = viewport[3];
 
     /* Store geometry */
-    if (!m_gbuffer || m_gbuffer->get_width() != width || m_gbuffer->get_height() != height)
+    if (!m_gbuffer || m_gbuffer->width() != width || m_gbuffer->height() != height)
         m_gbuffer = std::make_unique<GBuffer>(width, height);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, m_gbuffer->get_framebuffer());
+    glBindFramebuffer(GL_FRAMEBUFFER, m_gbuffer->framebuffer());
     glViewport(0, 0, width, height);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -287,14 +287,15 @@ void ModelRenderer::render(const BakedModel& model, const Camera& camera, const 
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     glEnable(GL_BLEND);
 
     glUseProgram(m_shading_program);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_gbuffer->get_depth_buffer());
+    glBindTexture(GL_TEXTURE_2D, m_gbuffer->depth_buffer());
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_gbuffer->get_albedo_texture());
+    glBindTexture(GL_TEXTURE_2D, m_gbuffer->albedo_texture());
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, m_blurred_ssao_target->texture);
 

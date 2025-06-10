@@ -46,5 +46,7 @@ ScreenQuad::ScreenQuad()
 void ScreenQuad::draw() const
 {
     glBindVertexArray(m_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }

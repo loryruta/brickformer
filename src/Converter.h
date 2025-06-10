@@ -38,6 +38,7 @@ public:
 
     /* Input */
     const ConverterParams m_params;
+    cudaStream_t m_stream;
 
     uint8_t m_proximity_threshold = UINT8_MAX;
     uint8_t m_proximity_max_value = UINT8_MAX;

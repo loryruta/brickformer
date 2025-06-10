@@ -12,6 +12,7 @@
 #include "exporters/BuildInstructionsExporter.h"
 #include "util/BoundingBox3f.hpp"
 #include "util/StopWatch.hpp"
+#include "video/BrickRenderer.h"
 #include "video/CustomFramebuffer.hpp"
 #include "video/GridRenderer.hpp"
 #include "video/ModelRenderer.hpp"
@@ -31,6 +32,7 @@ private:
     std::unique_ptr<ModelRenderer> m_model_renderer;
     std::unique_ptr<TextureRenderer> m_texture_renderer;
     std::unique_ptr<GridRenderer> m_grid_renderer;
+    std::unique_ptr<BrickRenderer> m_brick_renderer;
 
     /// If the placement takes too long, this stopwatch is used to visualize intermediate result at fixed intervals.
     StopWatch m_placement_stopwatch;
@@ -64,6 +66,7 @@ public:
     ModelRenderer& model_renderer() const { return *m_model_renderer; }
     TextureRenderer& texture_renderer() const { return *m_texture_renderer; }
     GridRenderer& grid_renderer() const { return *m_grid_renderer; }
+    BrickRenderer& brick_renderer() const { return *m_brick_renderer; }
 
     firebase::App* firebase_app() const { return m_firebase_app; }
     firebase::auth::Auth* firebase_auth() const { return m_firebase_auth; }
@@ -106,4 +109,6 @@ private:
 };
 
 inline App* g_app = nullptr;
+/// CUDA stream used by the main thread, generally for visualization purposes.
+inline cudaStream_t g_stream = nullptr;
 } // namespace lego_builder

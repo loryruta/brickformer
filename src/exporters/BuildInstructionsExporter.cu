@@ -87,7 +87,7 @@ void BuildInstructionsExporter::create_and_save_instruction_image(const uint16_t
     num_blocks.y = div_ceil(m_image_resolution, 16);
     dim3 block_dims(16, 16);
     write_out_image_kernel<<<num_blocks, block_dims>>>(m_resolution, m_pid_map_d, m_image_resolution, m_out_image_d);
-    CHECK_CU(cudaDeviceSynchronize());
+    // CHECK_CU(cudaDeviceSynchronize()); // TODO NOT
     // Write out_image to the file specified
     std::vector<uint8_t> out_image(m_image_resolution * m_image_resolution * 4);
     CHECK_CU(cudaMemcpy(out_image.data(), m_out_image_d, out_image_bytesize, cudaMemcpyDeviceToHost));
