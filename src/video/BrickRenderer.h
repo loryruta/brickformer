@@ -21,9 +21,9 @@ struct BrickRenderer_GBuffer {
     const int height;
 
     GLuint framebuffer;
-    GLuint normal_texture;
     GLuint color_texture;
-    GLuint pid_texture;
+    GLuint uv_texture;
+    GLuint outline_guide_texture;
     GLuint depth_buffer;
 
     explicit BrickRenderer_GBuffer(int width, int height);

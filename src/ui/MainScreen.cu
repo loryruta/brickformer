@@ -269,7 +269,7 @@ void MainScreen::render_3d_scene()
                 BrickRenderer_RenderParams params{};
                 params.baked_model = brick_model.get();
                 params.camera = &m_camera;
-                params.kernel_r = 3;
+                params.kernel_r = 1;
                 params.border_color = glm::vec4(0, 0, 0, 1); // Black
                 g_app->brick_renderer().render(params);
             }

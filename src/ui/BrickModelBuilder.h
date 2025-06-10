@@ -22,5 +22,8 @@ public:
 
     /// Procedurally generate the vertices for the given placement.
     void add_placement(int slice_y, uint32_t pid, const Placement& placement);
+
+private:
+    void add_placement(float y, int subslice, uint32_t pid, const Placement& placement, std::vector<Vertex>& out_vertices);
 };
 } // namespace lego_builder

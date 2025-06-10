@@ -15,7 +15,7 @@ const float k_vertices[]{
     1.0f, 0.0f,
 };
 
-const char* k_vertex_shader_src = R"(#version 460 core
+const char* k_gbuffer_vshader_src = R"(#version 460 core
 in vec2 a_position;
 
 layout(location = 0) out vec2 v_uv;
@@ -40,7 +40,7 @@ ScreenQuad::ScreenQuad()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
 
-    m_vertex_shader = create_shader(GL_VERTEX_SHADER, k_vertex_shader_src);
+    m_vertex_shader = create_shader(GL_VERTEX_SHADER, k_gbuffer_vshader_src);
 }
 
 void ScreenQuad::draw() const

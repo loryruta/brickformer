@@ -139,19 +139,18 @@ void ConverterVisualizationBridge::add_placements_to_construction_model(cudaStre
     StopWatch stopwatch{};
     ARP_DEBUG("Update Brick Model; Adding vertices...");
 
-    uint32_t pid = 0; // TODO make global for any slice
     for (const Placement& placement : m_converter.m_linear_stacked_placements) {
-        const BrickColor& brick_color = k_brick_colors[placement.cid];
-        ARP_DEBUG("  %03d Slice: %d, BID: %2d, X: %3d, Z: %3d, Subslice mask: %d, Color: %s",
-                  pid,
-                  m_converter.m_slice_y,
-                  placement.bid,
-                  placement.x,
-                  placement.z,
-                  placement.subslice_mask,
-                  brick_color.name);
-        ++pid;
-        m_brick_model_builder->add_placement(m_converter.m_slice_y, pid, placement);
+//        const BrickColor& brick_color = k_brick_colors[placement.cid];
+//        ARP_DEBUG("  %03d Slice: %d, BID: %2d, X: %3d, Z: %3d, Subslice mask: %d, Color: %s",
+//                  m_next_pid_id,
+//                  m_converter.m_slice_y,
+//                  placement.bid,
+//                  placement.x,
+//                  placement.z,
+//                  placement.subslice_mask,
+//                  brick_color.name);
+        m_brick_model_builder->add_placement(m_converter.m_slice_y, m_next_pid_id, placement);
+        ++m_next_pid_id;
     }
 
     std::string dt_str;
