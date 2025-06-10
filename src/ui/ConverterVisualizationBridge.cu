@@ -47,9 +47,12 @@ ConverterVisualizationBridge::ConverterVisualizationBridge(Converter& converter)
     m_converter.add_listener(this);
 }
 
-void ConverterVisualizationBridge::copy_color_map() { m_color_map_texture->copy_from(m_converter.m_color_map); }
+void ConverterVisualizationBridge::copy_color_map(cudaStream_t stream)
+{
+    m_color_map_texture->copy_from(m_converter.m_color_map, g_stream);
+}
 
-void ConverterVisualizationBridge::copy_placement_maps()
+void ConverterVisualizationBridge::copy_placement_maps(cudaStream_t stream)
 {
     StopWatch stopwatch{};
 
@@ -60,13 +63,13 @@ void ConverterVisualizationBridge::copy_placement_maps()
     std::vector<DeviceImage<4, uint8_t>> hashed_color_images;
     std::vector<DeviceImage<4, uint8_t>> color_images;
     for (int i = 0; i < 3; ++i) {
-        hashed_color_images.emplace_back(DeviceImage<4, uint8_t>::create(resolution, resolution, nullptr));
-        color_images.emplace_back(DeviceImage<4, uint8_t>::create(resolution, resolution, nullptr));
+        hashed_color_images.emplace_back(DeviceImage<4, uint8_t>::create(resolution, resolution, nullptr, g_stream));
+        color_images.emplace_back(DeviceImage<4, uint8_t>::create(resolution, resolution, nullptr, g_stream));
     }
 
     for (int i = 0; i < 3; ++i) {
-        hashed_color_images.at(i).fill(0);
-        color_images.at(i).fill(0);
+        hashed_color_images.at(i).fill(0, g_stream);
+        color_images.at(i).fill(0, g_stream);
     }
 
     for (const Placement& placement : m_converter.m_linear_stacked_placements) {
@@ -82,16 +85,16 @@ void ConverterVisualizationBridge::copy_placement_maps()
                     int px = placement.x + bx;
                     int pz = placement.z + bz;
                     if (subslice_mask & 0x1) {
-                        hashed_color_images.at(0).write_pixel(px, pz, hashed_color);
-                        color_images.at(0).write_pixel(px, pz, color);
+                        hashed_color_images.at(0).write_pixel(px, pz, hashed_color, g_stream);
+                        color_images.at(0).write_pixel(px, pz, color, g_stream);
                     }
                     if (subslice_mask & 0x2) {
-                        hashed_color_images.at(1).write_pixel(px, pz, hashed_color);
-                        color_images.at(1).write_pixel(px, pz, color);
+                        hashed_color_images.at(1).write_pixel(px, pz, hashed_color, g_stream);
+                        color_images.at(1).write_pixel(px, pz, color, g_stream);
                     }
                     if (subslice_mask & 0x4) {
-                        hashed_color_images.at(2).write_pixel(px, pz, hashed_color);
-                        color_images.at(2).write_pixel(px, pz, color);
+                        hashed_color_images.at(2).write_pixel(px, pz, hashed_color, g_stream);
+                        color_images.at(2).write_pixel(px, pz, color, g_stream);
                     }
                 }
             }
@@ -99,22 +102,22 @@ void ConverterVisualizationBridge::copy_placement_maps()
     }
 
     for (int i = 0; i < 3; ++i) {
-        m_placement_map_hashed_color_textures.at(i).copy_from(hashed_color_images.at(i));
-        m_placement_map_color_textures.at(i).copy_from(color_images.at(i));
+        m_placement_map_hashed_color_textures.at(i).copy_from(hashed_color_images.at(i), g_stream);
+        m_placement_map_color_textures.at(i).copy_from(color_images.at(i), g_stream);
     }
 
     std::string duration_str = stopwatch.elapsed_time_str();
     ARP_INFO("Placement maps filled in %s", duration_str.c_str());
 }
 
-void ConverterVisualizationBridge::copy_proximity_map()
+void ConverterVisualizationBridge::copy_proximity_map(cudaStream_t stream)
 {
     int resolution = m_converter.m_params.resolution;
 
     // Allocate a temporary image that hosts the conversion of the proximity map to RGBA (remember: proximity map is
     // a grayscale image). This is necessary as I've not found a way to directly write to a cudaArray (i.e. CUDA mapped
     // texture)
-    DeviceImage<4, uint8_t> tmp_image = DeviceImage<4, uint8_t>::create(resolution, resolution, nullptr);
+    DeviceImage<4, uint8_t> tmp_image = DeviceImage<4, uint8_t>::create(resolution, resolution, nullptr, g_stream);
 
     int proximity_max_val = m_converter.m_proximity_max_value;
 
@@ -124,21 +127,22 @@ void ConverterVisualizationBridge::copy_proximity_map()
         return glm::vec<4, uint8_t>{new_val, 0, 0, 255};
     };
 
-    tmp_image.fill(0);
-    m_converter.m_prev_proximity_map.transform_to(tmp_image, transform_proximity_val);
+    tmp_image.fill(0, g_stream);
+    m_converter.m_prev_proximity_map.transform_to(tmp_image, transform_proximity_val, g_stream);
 
-    m_proximity_map_texture->copy_from(tmp_image);
+    m_proximity_map_texture->copy_from(tmp_image, g_stream);
 }
 
-void ConverterVisualizationBridge::add_placements_to_construction_model()
+void ConverterVisualizationBridge::add_placements_to_construction_model(cudaStream_t)
 {
-    printf("[App] UPDATE CONSTRUCTION MODEL; Updating vertices...\n");
+    /* Add geometry */
+    StopWatch stopwatch{};
+    ARP_DEBUG("Update Brick Model; Adding vertices...");
 
     uint32_t pid = 0; // TODO make global for any slice
     for (const Placement& placement : m_converter.m_linear_stacked_placements) {
         const BrickColor& brick_color = k_brick_colors[placement.cid];
-
-        ARP_DEBUG("  %3d Slice: %d, Placement BID: %2d, X: %3d, Y: %3d, Subslice mask: %d, Color: %s",
+        ARP_DEBUG("  %03d Slice: %d, BID: %2d, X: %3d, Z: %3d, Subslice mask: %d, Color: %s",
                   pid,
                   m_converter.m_slice_y,
                   placement.bid,
@@ -146,20 +150,26 @@ void ConverterVisualizationBridge::add_placements_to_construction_model()
                   placement.z,
                   placement.subslice_mask,
                   brick_color.name);
-        ++pid; // TODO
-
+        ++pid;
         m_brick_model_builder->add_placement(m_converter.m_slice_y, pid, placement);
     }
 
-    printf("[App] UPDATE CONSTRUCTION MODEL; Baking...\n");
+    std::string dt_str;
+    dt_str = stopwatch.elapsed_time_str();
+    ARP_DEBUG("Update Brick Model; Vertices added in %s", dt_str);
+
+    /* Baking */
+    stopwatch.reset();
+    ARP_DEBUG("Update Brick Model; Baking...");
 
     const Model& brick_model = m_brick_model_builder->model();
-    m_baked_brick_model = std::make_unique<BakedModel>(ModelRenderer::bake_model(brick_model));
+    m_baked_brick_model = std::make_unique<BrickRenderer_BakedModel>(BrickRenderer::bake_model(brick_model));
 
-    printf("[App] UPDATE CONSTRUCTION MODEL; Done\n");
+    dt_str = stopwatch.elapsed_time_str();
+    ARP_DEBUG("Update Brick Model; Model baked in %s", dt_str);
 }
 
-void ConverterVisualizationBridge::add_color_map_voxels()
+void ConverterVisualizationBridge::add_color_map_voxels(cudaStream_t)
 {
     const ColorMapT& color_map = m_converter.m_color_map;
     int slice_y = m_converter.m_slice_y;
@@ -179,23 +189,18 @@ void ConverterVisualizationBridge::add_color_map_voxels()
 
 void ConverterVisualizationBridge::on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements)
 {
-    // Important: this function is called asynchronously
-
+    // Reminder: this function is called asynchronously
     g_app->enqueue_job([this]() {
-        copy_color_map();
-        copy_proximity_map();
-        copy_placement_maps();
-        add_placements_to_construction_model();
-        add_color_map_voxels(); // TODO slow down too much
+        cudaStream_t stream = g_stream;
+
+        copy_color_map(stream);
+        copy_proximity_map(stream);
+        copy_placement_maps(stream);
+        add_placements_to_construction_model(stream);
+        // add_color_map_voxels(stream);
+
+        CHECK_CU(cudaStreamSynchronize(stream));
     });
-
-    // Wait for the pushed jobs to be executed before continuing (avoid concurrency)
+    // Make the Converter wait for the completion of the jobs above
     g_app->wait_job_completion();
-
-    // TODO
-    //    if (!m_autorun) {
-    //        // Block until manually resumed (ENTER pressed)
-    //        m_arpenteur_should_run = false;
-    //        m_arpenteur_should_run.wait(false);
-    //    }
 }

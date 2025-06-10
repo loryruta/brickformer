@@ -13,6 +13,6 @@ public:
     explicit SpreadValue() = default;
     ~SpreadValue() = default;
 
-    void spread(DeviceImageT& image, int num_iterations);
+    void spread(DeviceImageT& image, int num_iterations, cudaStream_t stream);
 };
 } // namespace lego_builder

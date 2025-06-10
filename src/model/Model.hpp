@@ -9,14 +9,15 @@
 
 namespace lego_builder
 {
+
 struct Vertex {
-    glm::vec3 position;
-    float p0;
-    glm::vec3 normal;
-    float p1;
-    glm::vec2 texcoord;
-    float p2[2];
-    glm::vec4 color{1.0f}; ///< The vertex color (multiplied to the texture); ranged in [0, 1]
+    // clang-format off
+    glm::vec3 position; float p0;
+    glm::vec3 normal;   float p1;
+    glm::vec2 texcoord; float p2[2];
+    /// The vertex color ranged within [0, 1] (is multiplied to the texture)
+    glm::vec4 color{1.0f};
+    // clang-format on
 };
 
 struct Mesh {

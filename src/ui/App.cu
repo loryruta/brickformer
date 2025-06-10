@@ -34,9 +34,13 @@ App::App(Window& window) : m_window(window)
     ImGui_ImplGlfw_InitForOpenGL(m_window.handle(), true);
     ImGui_ImplOpenGL3_Init("#version 460 core");
 
+    // Create visualization stream
+    CHECK_CU(cudaStreamCreate(&g_stream));
+
     // Init renderers
     m_model_renderer = std::make_unique<ModelRenderer>();
     m_grid_renderer = std::make_unique<GridRenderer>();
+    m_brick_renderer = std::make_unique<BrickRenderer>();
 
     // Init firebase
     setup_firebase();
@@ -80,20 +84,6 @@ std::optional<firebase::auth::User> App::auth_user() const
 
 void App::start()
 {
-    //    m_window.set_key_callback([&](int key, int scancode, int action, int mods) {
-    //        bool is_autorun_pressed = key == GLFW_KEY_F1 && action == GLFW_PRESS;
-    //
-    //        if ((key == GLFW_KEY_ENTER && action == GLFW_PRESS) || is_autorun_pressed) {
-    //            // Resume the Arpenteur thread (by default it stops after a slice is completed)
-    //            m_arpenteur_should_run = true;
-    //            m_arpenteur_should_run.notify_all();
-    //        }
-    //
-    //        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) m_window.set_should_close(true); // Bye bye! :)
-    //
-    //        if (is_autorun_pressed) m_autorun = !m_autorun;
-    //    });
-
     // Loop
     while (!m_window.should_close()) {
         m_window.begin_frame();

@@ -23,16 +23,16 @@ public:
     GBuffer(const GBuffer&&) = delete; // TODO
     ~GBuffer();
 
-    [[nodiscard]] int get_width() const { return m_width; }
-    [[nodiscard]] int get_height() const { return m_height; }
+    [[nodiscard]] int width() const { return m_width; }
+    [[nodiscard]] int height() const { return m_height; }
 
-    [[nodiscard]] GLuint get_framebuffer() const { return m_framebuffer; }
+    [[nodiscard]] GLuint depth_buffer() const { return m_depth_buffer; }
+    [[nodiscard]] GLuint framebuffer() const { return m_framebuffer; }
 
-    [[nodiscard]] GLuint get_position_texture() const { return m_position_texture; }
-    [[nodiscard]] GLuint get_normal_texture() const { return m_normal_texture; }
-    [[nodiscard]] GLuint get_albedo_texture() const { return m_albedo_texture; }
-    [[nodiscard]] GLuint get_depth_buffer() const { return m_depth_buffer; }
+    [[nodiscard]] GLuint position_texture() const { return m_position_texture; }
+    [[nodiscard]] GLuint normal_texture() const { return m_normal_texture; }
+    [[nodiscard]] GLuint albedo_texture() const { return m_albedo_texture; }
 
     void clear();
 };
-}
+} // namespace lego_builder
