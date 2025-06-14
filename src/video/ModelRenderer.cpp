@@ -288,7 +288,8 @@ void ModelRenderer::render(const BakedModel& model, const Camera& camera, const 
     glBindFramebuffer(GL_FRAMEBUFFER, parent_framebuffer);
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 
-    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
 
     glUseProgram(m_shading_program);

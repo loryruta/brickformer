@@ -13,29 +13,6 @@
 
 using namespace lego_builder;
 
-/// Iterates the brick grid within the warp and callbacks every occurrence.
-/// Important: don't perform warp operations within the callback.
-template <typename CALLBACK>
-__device__ void iterate_brick_grid(CALLBACK callback)
-{
-    int lane_i = threadIdx.x & 0x1f;
-    int lane_x = lane_i % 5;
-    int lane_y = lane_i / 5;
-
-    int num_items_x = div_ceil(BRICK_MAX_EXTENT_X, 5); // 2
-    int num_items_y = div_ceil(BRICK_MAX_EXTENT_Z, 5); // 2
-
-    for (int ix = 0; ix < num_items_x; ix++) {
-        for (int iy = 0; iy < num_items_y; iy++) {
-            int bx = lane_x * num_items_x + ix;
-            int by = lane_y * num_items_y + iy;
-            if (bx < BRICK_MAX_EXTENT_X && by < BRICK_MAX_EXTENT_Z) {
-                callback(bx, by);
-            }
-        }
-    }
-}
-
 /// The index of the placement. Only valid in a setup where every warp is dedicated to one placement.
 __device__ int get_placement_index() { return ((blockIdx.x << 5) + (threadIdx.x >> 5)); }
 
@@ -67,8 +44,8 @@ internal::eval_brick_size_kernel(const Placement* placements, size_t num_placeme
 
     const Placement& placement = placements[pi];
     auto const& brick = k_bricks[placement.bid];
-    iterate_brick_grid([&](int bx, int by) {
-        if (brick[by][bx]) atomicAdd_block(&brick_size[wi], 1);
+    iterate_brick_grid([&](int bx, int bz) {
+        if (brick[bz][bx]) atomicAdd_block(&brick_size[wi], 1);
     });
 
     if (ARP_IS_WARP_THREAD_0) out_brick_sizes[pi] = brick_size[wi];
@@ -93,13 +70,13 @@ __global__ void internal::eval_num_connectible_sides_kernel(const Placement* pla
 
     const Placement& placement = placements[pi];
     auto const& brick = k_bricks[placement.bid];
-    iterate_brick_grid([&](int bx, int by) {
-        if (brick[by][bx]) {
+    iterate_brick_grid([&](int bx, int bz) {
+        if (brick[bz][bx]) {
             int current_connectible_sides = 0;
-            current_connectible_sides += bx - 1 < 0 ? 1 : !brick[by][bx - 1];
-            current_connectible_sides += by - 1 < 0 ? 1 : !brick[by - 1][bx];
-            current_connectible_sides += bx + 1 >= BRICK_MAX_EXTENT_X ? 1 : !brick[by][bx + 1];
-            current_connectible_sides += by + 1 >= BRICK_MAX_EXTENT_Z ? 1 : !brick[by + 1][bx];
+            current_connectible_sides += bx - 1 < 0 ? 1 : !brick[bz][bx - 1];
+            current_connectible_sides += bz - 1 < 0 ? 1 : !brick[bz - 1][bx];
+            current_connectible_sides += bx + 1 >= BRICK_MAX_EXTENT_X ? 1 : !brick[bz][bx + 1];
+            current_connectible_sides += bz + 1 >= BRICK_MAX_EXTENT_Z ? 1 : !brick[bz + 1][bx];
             atomicAdd_block(&connectible_sides[wi], current_connectible_sides);
         }
     });
@@ -128,10 +105,10 @@ __global__ void internal::eval_color_map_coverage_kernel(const Placement* placem
 
     const Placement& placement = placements[pi];
     auto const& brick = k_bricks[placement.bid];
-    iterate_brick_grid([&](int bx, int by) {
-        if (brick[by][bx]) {
+    iterate_brick_grid([&](int bx, int bz) {
+        if (brick[bz][bx]) {
             int mx = placement.x + bx;
-            int my = placement.z + by;
+            int my = placement.z + bz;
             if (!color_map->is_valid_pixel(mx, my)) return; // Out of bounds
 
             glm::vec<4, uint8_t> v = color_map->read_pixel(mx, my);
@@ -228,37 +205,37 @@ __global__ void internal::eval_num_connected_bricks_kernel(const Placement* plac
     int pi = blockIdx.x * 1024 + threadIdx.x;
     if (pi >= num_placements) return;
 
-    uint16_t unique_bid_list[BRICK_MAX_SIZE]; // List of unique underlying BIDs (128 bytes per thread)
-    int unique_bid_list_length = 0;
+    // List of unique underlying PIDs that the placement connects
+    uint16_t pid_list[BRICK_MAX_SIZE]; // 128 bytes per thread
+    int pid_list_length = 0;
 
     const Placement& placement = placements[pi];
     const auto& brick = k_bricks[placement.bid];
-    for (int bx = 0; bx < BRICK_MAX_EXTENT_X; ++bx) {
-        for (int by = 0; by < BRICK_MAX_EXTENT_Z; ++by) {
-            if (brick[by][bx]) {
+    for (int bz = 0; bz < BRICK_MAX_EXTENT_Z; ++bz) {
+        for (int bx = 0; bx < BRICK_MAX_EXTENT_X; ++bx) {
+            if (brick[bz][bx]) {
                 int mx = placement.x + bx;
-                int my = placement.z + by;
-                if (!previous_placement_map->is_valid_pixel(mx, my)) continue;
-
-                uint16_t underlying_bid = previous_placement_map->read_pixel(mx, my).x;
-                if (underlying_bid == ARP_NO_PLACEMENT_VALUE) continue; // No placement
-
+                int mz = placement.z + bz;
+                if (!previous_placement_map->is_valid_pixel(mx, mz)) continue;
+                uint16_t underlying_pid = previous_placement_map->read_pixel(mx, mz).x;
+                if (underlying_pid == ARP_NO_PLACEMENT_VALUE) {
+                    continue; // No placement
+                }
                 // Was the BID already added to the list? (non-unique)
                 int i = 0;
-                for (; i < unique_bid_list_length; ++i) {
-                    if (unique_bid_list[i] == underlying_bid) break; // Already added
+                for (; i < pid_list_length; ++i) {
+                    if (pid_list[i] == underlying_pid) break; // Already added
                 }
-
-                if (i == unique_bid_list_length) // Not added, add it!
-                {
-                    unique_bid_list[i] = underlying_bid;
-                    ++unique_bid_list_length;
+                // Not added, add it!
+                if (i == pid_list_length) {
+                    pid_list[i] = underlying_pid;
+                    ++pid_list_length;
                 }
             }
         }
     }
 
-    out_num_connected_bricks[pi] = unique_bid_list_length;
+    out_num_connected_bricks[pi] = pid_list_length;
 }
 
 __global__ void internal::eval_highest_proximity_kernel(const Placement* placements,
@@ -276,17 +253,17 @@ __global__ void internal::eval_highest_proximity_kernel(const Placement* placeme
     __syncwarp();
 
     const Placement& placement = placements[pi];
-    iterate_brick_grid([&](int bx, int by) {
+    iterate_brick_grid([&](int bx, int bz) {
         int mx = placement.x + bx;
-        int my = placement.z + by;
-        if (proximity_map->is_valid_pixel(mx, my)) {
-            int proximity = proximity_map->read_pixel(mx, my).x;
-            atomicMax_block(&highest_proximity[wi], proximity);
+        int mz = placement.z + bz;
+        if (proximity_map->is_valid_pixel(mx, mz)) {
+            int proximity = proximity_map->read_pixel(mx, mz).r;
+            atomicMax(&highest_proximity[wi], proximity);
         }
     });
     __syncwarp();
 
-    out_highest_proximity[wi] = highest_proximity[wi];
+    out_highest_proximity[pi] = highest_proximity[wi];
 }
 
 /// Check whether the supplied placement is outside the slice, or overlapping a previous placement of the same slice.
@@ -313,6 +290,15 @@ __device__ bool is_outside_or_overlapping(const Placement& placement, const Plac
     __syncwarp();
 
     return result[wi];
+}
+
+__device__ float controlled_sigmoid(float x, float slope, float threshold)
+{
+    // See:
+    // https://www.geogebra.org/calculator/taud4wrr
+
+    float exp_arg = -slope * 2.0f * (x - threshold);
+    return 1.0f / (1.0f + expf(exp_arg));
 }
 
 /// Evaluate the reward function for the placement at index `pi`.
@@ -365,6 +351,7 @@ __device__ float eval_reward(const PlacementSolver* self, int pi, const Placemen
     float dn = float(num_connected_bricks) / float(brick_size);
     float hn = std::max(color_map_coverage.color_distance, 0);
     hn /= (float) internal::ColorMapCoverageResult::k_max_color_distance;
+    hn = controlled_sigmoid(hn, 16.0f, 0.13071895f); // Threshold: 100/(255+255+255)
     hn = 1.0f - hn;
 
     // float pn = float(highest_proximity) / float(arpenteur.m_proximity_max_value);
@@ -376,22 +363,28 @@ __device__ float eval_reward(const PlacementSolver* self, int pi, const Placemen
 
     // Connectivity factor [0.0, 1.0]
     if (!input->is_subslice0) {
-        // For subslice >0, we want to stack up bricks. So we reverse the connectivity factor!
+        // For subslice > 0, we want to stack up bricks. So we reverse the connectivity factor!
         dn = 1.0f - dn;
     }
 
     // If a placement doesn't cover any colored cell, it is only allowed to fill holes!
-    if (color_map_coverage.num_covered_cells == 0 && num_neighbors != num_connectible_sides) {
-        assert(num_neighbors < num_connectible_sides);
+    if (color_map_coverage.num_covered_cells == 0) {
+        if (num_neighbors != num_connectible_sides) {
+            assert(num_neighbors < num_connectible_sides);
+            return -INFINITY;
+        } else {
+            // Hole filling: prefer wide bricks covering wide holes
+            return bn;
+        }
+    }
+
+    if (cn < 0.2f) { // Color map not covered enough
         return -INFINITY;
     }
 
-    // Hole filling: the wider the hole, the better
-    if (color_map_coverage.num_covered_cells == 0 && num_neighbors == num_connectible_sides) return bn;
-
-    if (cn < 0.2f) return 0.f;
-
-    float reward = bn * (an + dn + hn) + (.2f + cn * .8f);
+    // Old:
+    float reward = bn * (dn + hn) + (0.8f * cn + 0.2f);
+    // float reward = (an > 0 ? 1.0f : 0) + bn * (0.6f * hn * powf(cn, 5.0f) + 0.4f * dn);
     return reward;
 }
 
@@ -427,14 +420,14 @@ PlacementSolver::PlacementSolver(size_t num_placements, int resolution, cudaStre
 
 PlacementSolver::~PlacementSolver()
 {
-    CHECK_CU(cudaFree(&m_placements_d));
-    CHECK_CU(cudaFree(&m_brick_size_d));
-    CHECK_CU(cudaFree(&m_num_connectible_sides_d));
-    CHECK_CU(cudaFree(&m_color_map_coverage_results_d));
-    CHECK_CU(cudaFree(&m_num_neighbors_d));
-    CHECK_CU(cudaFree(&m_num_connected_bricks_d));
-    CHECK_CU(cudaFree(&m_highest_proximity_d));
-    CHECK_CU(cudaFree(&m_rewards_d));
+    CHECK_CU(cudaFree(m_placements_d));
+    CHECK_CU(cudaFree(m_brick_size_d));
+    CHECK_CU(cudaFree(m_num_connectible_sides_d));
+    CHECK_CU(cudaFree(m_color_map_coverage_results_d));
+    CHECK_CU(cudaFree(m_num_neighbors_d));
+    CHECK_CU(cudaFree(m_num_connected_bricks_d));
+    CHECK_CU(cudaFree(m_highest_proximity_d));
+    CHECK_CU(cudaFree(m_rewards_d));
 }
 
 std::pair<Placement, float> PlacementSolver::solve(const Input& input, cudaStream_t stream)
@@ -446,13 +439,17 @@ std::pair<Placement, float> PlacementSolver::solve(const Input& input, cudaStrea
 
     /* Evaluate all rewards (parallel brute force) */
     // ARP_DEBUG("Evaluating rewards...");
-
-    // clang-format off
-    eval_color_map_coverage_kernel<<<m_num_blocks, 1024, 0, stream>>>(m_placements_d, m_num_placements, input.color_map_d, (internal::ColorMapCoverageResult*) m_color_map_coverage_results_d);
-    eval_num_neighbors_kernel<<<m_num_blocks, 1024, 0, stream>>>(m_placements_d, m_num_placements, input.current_placement_map_d, m_num_neighbors_d);
-    eval_num_connected_bricks_kernel<<<div_ceil<int>(m_num_placements, 1024), 1024, 0, stream>>>(m_placements_d, m_num_placements, input.previous_placement_map_d, m_num_connected_bricks_d);
-    eval_highest_proximity_kernel<<<m_num_blocks, 1024, 0, stream>>>(m_placements_d, m_num_placements, input.proximity_map_d, m_highest_proximity_d);
-    // clang-format on
+    eval_color_map_coverage_kernel<<<m_num_blocks, 1024, 0, stream>>>(
+        m_placements_d,
+        m_num_placements,
+        input.color_map_d,
+        (internal::ColorMapCoverageResult*) m_color_map_coverage_results_d);
+    eval_num_neighbors_kernel<<<m_num_blocks, 1024, 0, stream>>>(
+        m_placements_d, m_num_placements, input.current_placement_map_d, m_num_neighbors_d);
+    eval_num_connected_bricks_kernel<<<div_ceil<int>(m_num_placements, 1024), 1024, 0, stream>>>(
+        m_placements_d, m_num_placements, input.previous_placement_map_d, m_num_connected_bricks_d);
+    eval_highest_proximity_kernel<<<m_num_blocks, 1024, 0, stream>>>(
+        m_placements_d, m_num_placements, input.proximity_map_d, m_highest_proximity_d);
     eval_reward_kernel<<<m_num_blocks, 1024, 0, stream>>>(self_d, params_d, m_rewards_d);
 
     // ARP_DEBUG("Rewards evaluated");
@@ -461,6 +458,7 @@ std::pair<Placement, float> PlacementSolver::solve(const Input& input, cudaStrea
     // ARP_DEBUG("Searching maximum reward...");
     float* max_reward_d =
         thrust::max_element(thrust::cuda::par.on(stream), m_rewards_d, m_rewards_d + m_num_placements);
+    CHECK_CU(cudaStreamSynchronize(stream));
     size_t max_reward_idx = max_reward_d - m_rewards_d;
 
     /* Read to host both the best (placement, reward) */

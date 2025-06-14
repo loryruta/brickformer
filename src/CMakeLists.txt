@@ -5,13 +5,15 @@ add_library(arpenteur STATIC
         Converter.h
         ConverterListener.h
         exporters/BuildInstructionsExporter.cu
-#        exporters/GltfExporter.cu
+        # exporters/GltfExporter.cu
         model/DeviceModel.cu
         model/GltfLoader.cpp
         model/Model.cpp
         PlacementSolver.cu
         Slicer.cu
         SpreadValue.cu
+        User.cpp
+        User.h
 )
 
 target_include_directories(arpenteur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -22,7 +24,9 @@ target_link_libraries(arpenteur PUBLIC
         firebase_firestore
         firebase_auth
         firebase_app
-        secret-1)
+        secret-1
+        tbb # To use e.g. std parallel foreach
+)
 
 if (NOT LEGO_BUILDER_NO_VIDEO)
     add_subdirectory(ui)

@@ -1,5 +1,8 @@
 #include "ConverterVisualizationBridge.h"
 
+#include <algorithm>
+#include <execution>
+
 #include "App.h"
 #include "brick_colors.hpp"
 #include "bricks.hpp"
@@ -41,8 +44,8 @@ ConverterVisualizationBridge::ConverterVisualizationBridge(Converter& converter)
 
     m_proximity_map_texture = std::make_unique<CUDAMappedGLTexture>(create_gl_texture(resolution, resolution));
 
-    m_brick_model_builder = std::make_unique<BrickModelBuilder>();
-    m_voxel_model_builder = std::make_unique<VoxelModelBuilder>();
+    m_brick_model = std::make_shared<BrickModelBuilder>();
+    m_baked_brick_model = std::make_shared<BrickRenderer_BakedModel>();
 
     m_converter.add_listener(this);
 }
@@ -77,7 +80,7 @@ void ConverterVisualizationBridge::copy_placement_maps(cudaStream_t stream)
         assert(subslice_mask); // Shouldn't be zero
 
         glm::vec<4, uint8_t> hashed_color = eval_placement_hashed_color(placement);
-        glm::vec<4, uint8_t> color = k_brick_colors[placement.cid].color_u8();
+        glm::vec<4, uint8_t> color = k_brick_colors[placement.cid].color();
         auto& brick = k_bricks[placement.bid];
         for (int bz = 0; bz < BRICK_MAX_EXTENT_Z; bz++) {
             for (int bx = 0; bx < BRICK_MAX_EXTENT_X; bx++) {
@@ -137,22 +140,9 @@ void ConverterVisualizationBridge::add_placements_to_construction_model(cudaStre
 {
     /* Add geometry */
     StopWatch stopwatch{};
-    ARP_DEBUG("Update Brick Model; Adding vertices...");
-
-    for (const Placement& placement : m_converter.m_linear_stacked_placements) {
-//        const BrickColor& brick_color = k_brick_colors[placement.cid];
-//        ARP_DEBUG("  %03d Slice: %d, BID: %2d, X: %3d, Z: %3d, Subslice mask: %d, Color: %s",
-//                  m_next_pid_id,
-//                  m_converter.m_slice_y,
-//                  placement.bid,
-//                  placement.x,
-//                  placement.z,
-//                  placement.subslice_mask,
-//                  brick_color.name);
-        m_brick_model_builder->add_placement(m_converter.m_slice_y, m_next_pid_id, placement);
-        ++m_next_pid_id;
-    }
-
+    ARP_DEBUG("Update Brick Model; Adding vertices for %zu placements...",
+              m_converter.m_linear_stacked_placements.size());
+    m_brick_model->add_slice(m_converter.m_slice_y, m_converter.m_linear_stacked_placements);
     std::string dt_str;
     dt_str = stopwatch.elapsed_time_str();
     ARP_DEBUG("Update Brick Model; Vertices added in %s", dt_str);
@@ -161,29 +151,11 @@ void ConverterVisualizationBridge::add_placements_to_construction_model(cudaStre
     stopwatch.reset();
     ARP_DEBUG("Update Brick Model; Baking...");
 
-    const Model& brick_model = m_brick_model_builder->model();
-    m_baked_brick_model = std::make_unique<BrickRenderer_BakedModel>(BrickRenderer::bake_model(brick_model));
+    const Model& brick_model = m_brick_model->model();
+    *m_baked_brick_model = std::move(BrickRenderer::bake_model(brick_model));
 
     dt_str = stopwatch.elapsed_time_str();
     ARP_DEBUG("Update Brick Model; Model baked in %s", dt_str);
-}
-
-void ConverterVisualizationBridge::add_color_map_voxels(cudaStream_t)
-{
-    const ColorMapT& color_map = m_converter.m_color_map;
-    int slice_y = m_converter.m_slice_y;
-    std::vector<ColorMapT::PixelT> data(color_map.m_width * color_map.m_height);
-    CHECK_CU(
-        cudaMemcpy(data.data(), color_map.m_data, data.size() * sizeof(ColorMapT::PixelT), cudaMemcpyDeviceToHost));
-    for (size_t i = 0; i < data.size(); i++) {
-        if (data[i].a > 0) {
-            int x = i % color_map.m_width;
-            int z = i / color_map.m_width;
-            glm::vec4 color = glm::vec4{data[i]} / 255.0f;
-            m_voxel_model_builder->set_voxel(x, slice_y, z, color);
-        }
-    }
-    m_baked_voxel_model = std::make_unique<BakedModel>(ModelRenderer::bake_model(m_voxel_model_builder->model()));
 }
 
 void ConverterVisualizationBridge::on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements)
@@ -196,7 +168,6 @@ void ConverterVisualizationBridge::on_placement_end(uint32_t slice_y, const std:
         copy_proximity_map(stream);
         copy_placement_maps(stream);
         add_placements_to_construction_model(stream);
-        // add_color_map_voxels(stream);
 
         CHECK_CU(cudaStreamSynchronize(stream));
     });

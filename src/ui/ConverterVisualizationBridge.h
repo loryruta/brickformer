@@ -25,11 +25,8 @@ private:
     std::vector<CUDAMappedGLTexture> m_placement_map_color_textures;
     std::unique_ptr<CUDAMappedGLTexture> m_proximity_map_texture;
 
-    std::unique_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
-    uint32_t m_next_pid_id = 1;
-    std::unique_ptr<BrickModelBuilder> m_brick_model_builder;
-    std::unique_ptr<BakedModel> m_baked_voxel_model;
-    std::unique_ptr<VoxelModelBuilder> m_voxel_model_builder;
+    std::shared_ptr<BrickModelBuilder> m_brick_model;
+    std::shared_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
 
 public:
     explicit ConverterVisualizationBridge(Converter& converter);
@@ -48,10 +45,8 @@ public:
     }
     [[nodiscard]] GLuint proximity_map_texture() const { return m_proximity_map_texture->texture(); }
 
-    [[nodiscard]] const BrickModelBuilder& brick_model_builder() const { return *m_brick_model_builder; }
-    [[nodiscard]] const VoxelModelBuilder& voxel_model_builder() const { return *m_voxel_model_builder; }
-    [[nodiscard]] const std::unique_ptr<BrickRenderer_BakedModel>& brick_model() const { return m_baked_brick_model; }
-    [[nodiscard]] const std::unique_ptr<BakedModel>& voxel_model() const { return m_baked_voxel_model; }
+    [[nodiscard]] const std::shared_ptr<BrickModelBuilder>& brick_model() const { return m_brick_model; }
+    [[nodiscard]] const std::shared_ptr<BrickRenderer_BakedModel>& baked_brick_model() const { return m_baked_brick_model; }
 
     void copy_color_map(cudaStream_t stream);
     void copy_placement_maps(cudaStream_t stream);
@@ -59,8 +54,6 @@ public:
     /// Having the placements for the current slice, adds the vertices of them to create the 3d model of the
     /// construction (for visualization).
     void add_placements_to_construction_model(cudaStream_t stream);
-    /// Converts the pixels of the Color map to voxels shown in the 3d scene.
-    void add_color_map_voxels(cudaStream_t stream);
 
     void on_model_load(const Model& model) override {}
     void on_placement_begin(uint32_t slice_y) override {}
