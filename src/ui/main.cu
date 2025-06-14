@@ -26,6 +26,12 @@ int main(int argc, char* argv[])
     }
 
     enable_gl_debug_output();
+    // Increase printf buffer size for debugging purposes (CUDA)
+    CHECK_CU(cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size_t(1) << 30 /* 1GB */));
+    printf("[DEBUG] Device capabilities:\n");
+    size_t printf_buffer_size{};
+    CHECK_CU(cudaDeviceGetLimit(&printf_buffer_size, cudaLimitPrintfFifoSize));
+    printf("[DEBUG]   cudaLimitPrintfFifoSize: %zu KB\n", printf_buffer_size >> 10);
 
     // Start the app
     std::unique_ptr<App> app = std::make_unique<App>(window);

@@ -68,7 +68,7 @@ const char* k_color_fshader_src = R"(#version 460 core
     layout(binding = 0, rgba8) uniform image2D u_color;
     layout(binding = 1, rg8) uniform image2D u_uv;
     layout(binding = 2, rg32ui) uniform uimage2D u_outline_guide;
-    layout(binding = 3, r32f) uniform image2D u_depth_buffer;
+    uniform sampler2D u_depth_buffer;
 
     layout(location = 0) uniform int u_kernel_r;
     layout(location = 1) uniform vec4 u_border_color;
@@ -81,7 +81,7 @@ const char* k_color_fshader_src = R"(#version 460 core
         ivec2 coord = ivec2(v_uv * resolution);
         vec2 uv = imageLoad(u_uv, coord).rg;
         uvec2 outline_guide = imageLoad(u_outline_guide, coord).rg;
-        float depth = imageLoad(u_depth_buffer, coord).r;
+        float depth = texture(u_depth_buffer, v_uv).r; // Can't use imageLoad
         if (outline_guide.r /* pid */ == 0) {
             discard;
             return;
@@ -102,6 +102,29 @@ const char* k_color_fshader_src = R"(#version 460 core
     }
 )";
 } // namespace
+
+BrickRenderer_BakedModel::BrickRenderer_BakedModel(BrickRenderer_BakedModel&& other) noexcept
+    : vao(other.vao), vbo(other.vbo), num_vertices(other.num_vertices)
+{
+    vao = 0;
+    vbo = 0;
+}
+
+BrickRenderer_BakedModel::~BrickRenderer_BakedModel()
+{
+    if (vao) glDeleteVertexArrays(1, &vao);
+    if (vbo) glDeleteBuffers(1, &vbo);
+}
+
+BrickRenderer_BakedModel& BrickRenderer_BakedModel::operator=(BrickRenderer_BakedModel&& other) noexcept
+{
+    vao = other.vao;
+    vbo = other.vbo;
+    num_vertices = other.num_vertices;
+    other.vao = 0;
+    other.vbo = 0;
+    return *this;
+}
 
 BrickRenderer_GBuffer::BrickRenderer_GBuffer(int width, int height) : width(width), height(height)
 {
@@ -217,6 +240,8 @@ void BrickRenderer::render(const BrickRenderer_RenderParams& params)
     const BrickRenderer_BakedModel& baked_model = *params.baked_model;
     const Camera& camera = *params.camera;
 
+    if (baked_model.num_vertices == 0) return;
+
     GLint parent_framebuffer;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &parent_framebuffer);
     GLint viewport[4];
@@ -237,14 +262,18 @@ void BrickRenderer::render(const BrickRenderer_RenderParams& params)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     m_gbuffer->clear();
 
-    glUniformMatrix4fv(0 /* u_transform */, 1, GL_FALSE, glm::value_ptr(glm::identity<glm::mat4>()));
+    glUniformMatrix4fv(0 /* u_transform */, 1, GL_FALSE, glm::value_ptr(params.transform));
     glUniformMatrix4fv(1 /* u_view */, 1, GL_FALSE, glm::value_ptr(camera.view()));
     glUniformMatrix4fv(2 /* u_projection */, 1, GL_FALSE, glm::value_ptr(camera.projection()));
 
     glBindVertexArray(baked_model.vao);
     glBindBuffer(GL_ARRAY_BUFFER, baked_model.vbo);
 
-    glDrawArrays(GL_TRIANGLES, 0, baked_model.num_vertices);
+    if (params.start_vertex != UINT32_MAX && params.end_vertex != UINT32_MAX) {
+        glDrawArrays(GL_TRIANGLES, params.start_vertex, params.end_vertex - params.start_vertex);
+    } else {
+        glDrawArrays(GL_TRIANGLES, 0, baked_model.num_vertices);
+    }
 
     /* Color program */
     glUseProgram(m_color_program);
@@ -258,7 +287,8 @@ void BrickRenderer::render(const BrickRenderer_RenderParams& params)
     glBindImageTexture(1 /* u_uv */, m_gbuffer->uv_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG8);
     glBindImageTexture(
         2 /* u_outline_guide */, m_gbuffer->outline_guide_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG32UI);
-    glBindImageTexture(3 /* u_depth_buffer */, m_gbuffer->depth_buffer, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_gbuffer->depth_buffer);
 
     glUniform1i(0 /* u_kernel_r */, params.kernel_r);
     glUniform4fv(1 /* u_border_color */, 1, glm::value_ptr(params.border_color));

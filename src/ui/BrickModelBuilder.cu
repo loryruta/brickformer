@@ -1,9 +1,10 @@
 #include "BrickModelBuilder.h"
 
+#include <algorithm>
 #include <cstring>
+#include <execution> // For std::execution::par
 
 #include "brick_colors.hpp"
-#include "brick_models.hpp"
 #include "bricks.hpp"
 #include "util/misc.hpp"
 
@@ -113,9 +114,9 @@ void add_y_cylinder(const glm::vec3& p,
 BrickModelBuilder::BrickModelBuilder() { m_mesh = &m_model.m_meshes.emplace_back(); }
 
 void BrickModelBuilder::add_placement(
-    float y, int subslice, uint32_t pid, const Placement& placement, std::vector<Vertex>& out_vertices)
+    int slice_y, int subslice, uint32_t pid, const Placement& placement, std::vector<Vertex>& out_vertices)
 {
-    glm::vec4 color = k_brick_colors[placement.cid].color_u8();
+    glm::vec4 color = k_brick_colors[placement.cid].color();
     color /= 255.0f;
 
     const auto& brick = k_bricks[placement.bid];
@@ -137,7 +138,7 @@ void BrickModelBuilder::add_placement(
             if (brick[bz][bx]) {
                 int x = placement.x + bx;
                 int z = placement.z + bz;
-
+                float y = slice_y * k_brick_height + (subslice == -1 ? 0 : subslice * k_brick_slice_height);
                 // Bottom quad
                 template_.normal = glm::vec3(0, -1, 0);
                 set_outline_guide(pid, 0, subslice, template_);
@@ -212,27 +213,64 @@ void BrickModelBuilder::add_placement(
     }
 }
 
-void BrickModelBuilder::add_placement(int slice_y, uint32_t pid, const Placement& placement)
+void BrickModelBuilder::add_placement(int slice_y, const Placement& placement, std::vector<Vertex>& out_vertices)
 {
-    std::vector<Vertex> vertices{};
-    vertices.reserve(1 << 20 /* 1MB */);
+    uint32_t pid = m_next_pid++;
 
     const float k_brick_height = 1.23076923f;
     const float k_brick_slice_height = k_brick_height / 3.0f;
 
-    float y = slice_y * k_brick_height;
-
     if (placement.subslice_mask == 0x7) {
-        add_placement(y, -1 /* Complete brick */, pid, placement, vertices);
+        add_placement(slice_y, -1 /* Complete brick */, pid, placement, out_vertices);
     } else {
         for (int subslice = 0; subslice < 3; ++subslice) {
-            if ((placement.subslice_mask >> subslice) & 1) add_placement(y, subslice, pid, placement, vertices);
-            y += k_brick_slice_height;
+            if ((placement.subslice_mask >> subslice) & 1) {
+                add_placement(slice_y, subslice, pid, placement, out_vertices);
+            }
         }
     }
+}
 
-    m_mesh->vertices.insert(m_mesh->vertices.end(), vertices.begin(), vertices.end());
-    // No indices
+void BrickModelBuilder::add_slice(int slice_y, const std::vector<Placement>& placements)
+{
+    std::vector<Vertex> subslice0_vertices; // Will also include complete placements
+    std::vector<Vertex> subslice1_vertices;
+    std::vector<Vertex> subslice2_vertices;
+    std::mutex mutex;
+    std::for_each(std::execution::par, placements.begin(), placements.end(), [&](const Placement& placement) {
+        std::vector<Vertex> vertices;
+        vertices.reserve(1 << 20 /* 1MB */);
+        add_placement(slice_y, placement, vertices);
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (placement.subslice_mask == 0x7 || placement.subslice_mask == 1) {
+                subslice0_vertices.insert(subslice0_vertices.end(), vertices.begin(), vertices.end());
+            } else if (placement.subslice_mask == 2) {
+                subslice1_vertices.insert(subslice1_vertices.end(), vertices.begin(), vertices.end());
+            } else if (placement.subslice_mask == 4) {
+                subslice2_vertices.insert(subslice2_vertices.end(), vertices.begin(), vertices.end());
+            }
+        }
+    });
 
+    // Add subslice 0 vertices
+    size_t subslice0_start = m_mesh->vertices.size();
+    m_mesh->vertices.insert(m_mesh->vertices.end(), subslice0_vertices.begin(), subslice0_vertices.end());
+    size_t subslice1_start = m_mesh->vertices.size();
+    if (subslice0_start != subslice1_start) { // Remember [start, end] range
+        m_subslice_ranges.emplace_back(subslice0_start, subslice1_start);
+    }
+    // Add subslice 1 vertices
+    m_mesh->vertices.insert(m_mesh->vertices.end(), subslice1_vertices.begin(), subslice1_vertices.end());
+    size_t subslice2_start = m_mesh->vertices.size();
+    if (subslice1_start != subslice2_start) { // Remember [start, end] range
+        m_subslice_ranges.emplace_back(subslice1_start, subslice2_start);
+    }
+    // Add subslice 2 vertices
+    m_mesh->vertices.insert(m_mesh->vertices.end(), subslice2_vertices.begin(), subslice2_vertices.end());
+    size_t subslice2_end = m_mesh->vertices.size();
+    if (subslice2_start != subslice2_end) { // Remember [start, end] range
+        m_subslice_ranges.emplace_back(subslice2_start, subslice2_end);
+    }
     m_mesh->update_min_max();
 }

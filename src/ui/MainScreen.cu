@@ -6,6 +6,7 @@
 
 #include "App.h"
 #include "Converter.h"
+#include "brick_colors.hpp"
 #include "log.hpp"
 #include "model/GltfLoader.hpp"
 
@@ -15,7 +16,7 @@ using namespace lego_builder;
 
 void ui::InputWindow::show()
 {
-    if (ImGui::Begin("##Input")) {
+    if (ImGui::Begin("Input Window")) {
         ImGui::Text("Model: %s", model_path.filename().c_str());
 
         if (ImGui::Button("Select a model")) {
@@ -55,6 +56,20 @@ void ui::InputWindow::show()
         if (ImGui::SliderFloat("###alpha_test_threshold", &alpha_test_threshold, 0.f, 0.999f) && on_input_change)
             on_input_change();
 
+        ImGui::Text("Brick Colors");
+        ImGui::BeginChild("##BrickColorsWindow", ImVec2(0, 100), 0, ImGuiWindowFlags_HorizontalScrollbar);
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        for (int i = 0; i < std::size(k_brick_colors); ++i) {
+            if (i > 0 && i % 18 != 0) ImGui::SameLine();
+            ImVec2 p0 = ImGui::GetCursorScreenPos();
+            ImVec2 p1 = ImVec2(p0.x + 20, p0.y + 20);
+            uint32_t rgb = k_brick_colors[i].rgb;
+            uint32_t rgb_u32 = IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, 0xFF);
+            draw_list->AddRectFilled(p0, p1, rgb_u32);
+            ImGui::Dummy(ImVec2(20, 20));
+        }
+        ImGui::EndChild();
+
         ImGui::Text("Proximity");
         ImGui::Checkbox("Auto", &auto_proximity_settings);
         if (auto_proximity_settings) ImGui::BeginDisabled();
@@ -78,8 +93,7 @@ void ui::ViewSettingsWindow::show()
         ImGui::Checkbox("Show Brick height adjustment", &perform_brick_height_adjustment);
         ImGui::Checkbox("Show grid", &show_grid);
         ImGui::Checkbox("Show construction", &show_construction);
-        ImGui::Checkbox("Show voxels", &show_voxels);
-        ImGui::Checkbox("Ambient Occlusion", &ssao);
+        ImGui::Checkbox("SSAO", &ssao);
     }
     ImGui::End();
 }
@@ -149,6 +163,8 @@ MainScreen::MainScreen()
             if (dyaw != 0.f) m_camera.m_yaw += dyaw * 0.004f;
             if (dpitch != 0.f) m_camera.m_pitch += dpitch * 0.004f;
         });
+
+    m_ui.view_conversion_window = std::make_unique<ViewConversionWindow>(*this);
 }
 
 void MainScreen::update(float dt)
@@ -161,27 +177,12 @@ void MainScreen::update(float dt)
 
 void MainScreen::render() {}
 
-void MainScreen::ui_conversion_window()
+void MainScreen::ui_user_window()
 {
-    if (ImGui::Begin("Conversion")) {
-        if (!m_converter_should_run) {
-            if (ImGui::Button("Resume")) {
-                m_converter_should_run = true;
-                m_converter_should_run.notify_all();
-            }
-        } else {
-            if (ImGui::Button("Pause")) {
-                m_converter_should_run = false;
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Stop")) {
-            stop_conversion();
-        }
-        bool autorun = m_converter_autorun.load();
-        if (ImGui::Checkbox("Autorun", &autorun)) {
-            m_converter_autorun.store(autorun);
-        }
+    if (ImGui::Begin("User")) {
+        ImGui::Text("Email: %s", "ciaociao2@ciaociao2.com");
+        ImGui::Text("Plan:  Free");
+        // TODO when the license expires
     }
     ImGui::End();
 }
@@ -202,20 +203,34 @@ void MainScreen::ui()
     }
     ImGui::End();
 
-    m_ui.input.show();
-    if (m_converter) {
-        ui_conversion_window();
-    }
+    ui_user_window();
     m_ui.view_settings.show();
-    m_ui.maps.show();
     m_ui.view_3d_window->show();
+    if (m_converter) {
+        m_ui.conversion_window->ui();
+        m_ui.maps.show();
+    } else {
+        m_ui.input.show();
+    }
+    if (m_brick_model) {
+        m_ui.view_conversion_window->ui();
+    }
 }
 
 void MainScreen::on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements)
 {
-    if (!m_converter_autorun) {
-        m_converter_should_run = false;
-        m_converter_should_run.wait(false); // Block until the flag should_run is false
+    g_app->enqueue_job([this, slice_y]() {
+        ViewConversionWindow& view_conversion_window = *m_ui.view_conversion_window;
+        if (view_conversion_window.current_subslice_catch_conversion) {
+            view_conversion_window.current_subslice = (int) slice_y;
+        }
+    });
+
+    if (!m_converter->m_stop) {
+        if (!m_converter_autorun) {
+            m_converter_should_run = false;
+            m_converter_should_run.wait(false); // Block as long as the flag remains false
+        }
     }
 }
 
@@ -254,34 +269,27 @@ void MainScreen::render_3d_scene()
             params.divisions.y = calc_num_slices(*m_model, resolution);
             params.divisions.z = resolution;
             params.max = glm::vec3(params.divisions) / float(resolution) * k_max_view_side;
-            params.half_border_size = 0.1f;
-
+            params.half_border_size = 0.06f;
             g_app->grid_renderer().render(params);
         }
     }
 
     // Render brick model
     if (m_ui.view_settings.show_construction) {
-        if (m_converter_visualization_bridge) {
-
-            const std::unique_ptr<BrickRenderer_BakedModel>& brick_model = m_converter_visualization_bridge->brick_model();
-            if (brick_model) {
-                BrickRenderer_RenderParams params{};
-                params.baked_model = brick_model.get();
-                params.camera = &m_camera;
-                params.kernel_r = 1;
-                params.border_color = glm::vec4(0, 0, 0, 1); // Black
+        if (m_brick_model && m_baked_brick_model) {
+            BrickRenderer_RenderParams params{};
+            params.baked_model = m_baked_brick_model.get();
+            params.camera = &m_camera;
+            params.transform = m_conversion_to_view_transform;
+            params.kernel_r = 1;
+            params.border_color = glm::vec4(0, 0, 0, 1); // Black
+            params.start_vertex = 0;                     // Always start from the bottom slice
+            const auto& subslice_ranges = m_brick_model->subslice_ranges();
+            if (!subslice_ranges.empty()) {
+                int& current_subslice = m_ui.view_conversion_window->current_subslice;
+                if (current_subslice >= subslice_ranges.size()) current_subslice = subslice_ranges.size() - 1;
+                params.end_vertex = subslice_ranges.at(current_subslice).second;
                 g_app->brick_renderer().render(params);
-            }
-        }
-    }
-
-    // Render voxel model
-    if (m_ui.view_settings.show_voxels) {
-        if (m_converter_visualization_bridge) {
-            const std::unique_ptr<BakedModel>& voxel_model = m_converter_visualization_bridge->voxel_model();
-            if (voxel_model) {
-                // g_app->model_renderer().render(*voxel_model, m_camera, m_conversion_to_view_transform);
             }
         }
     }
@@ -359,12 +367,21 @@ void MainScreen::start_conversion()
     params.flip_y = m_ui.input.flip_y;
     params.flip_z = m_ui.input.flip_z;
     m_converter = std::make_unique<Converter>(params);
-
-    // Converter -> Visualization bridge (internally set itself as a listener)
+    // Setup the conversion visualization bridge (internally set itself as a listener)
     m_converter_visualization_bridge = std::make_unique<ConverterVisualizationBridge>(*m_converter);
     // Add MainScreen as a listener (must be the last one)
     m_converter->add_listener(this);
 
+    /* Brick Model */
+    // Discard any previously created brick model:
+    // if the user has loaded a pre-saved conversion this will be unloaded to give precedence to the new conversion
+    m_brick_model = m_converter_visualization_bridge->brick_model();
+    m_baked_brick_model = m_converter_visualization_bridge->baked_brick_model();
+    m_ui.view_conversion_window->current_subslice = 0;
+    m_ui.view_conversion_window->current_subslice_catch_conversion = true;
+
+    /* UI */
+    m_ui.view_settings.show_model = false;
     // Maps UI textures -> Visualization bridge textures
     m_ui.maps.color_map = m_converter_visualization_bridge->color_map_texture();
     for (int subslice = 0; subslice < 3; ++subslice) {
@@ -374,6 +391,7 @@ void MainScreen::start_conversion()
             m_converter_visualization_bridge->placement_map_color_texture(subslice);
     }
     m_ui.maps.proximity_map = m_converter_visualization_bridge->proximity_map_texture();
+    m_ui.conversion_window = std::make_unique<ConversionWindow>(*this);
 
     // Calculate view transforms
     m_conversion_to_view_transform = glm::identity<glm::mat4>();
@@ -396,9 +414,11 @@ void MainScreen::stop_conversion()
     CHECK_STATE(m_converter);
     CHECK_STATE(m_converter_thread);
 
-    // TODO Empty the queue of jobs in the application
+    // TODO Empty the queue of jobs in the application ?
+
     m_converter->m_stop = true;
-    m_converter_should_run = true; // Let another iteration so to stop
+    m_converter_autorun = false;   // Reset autorun to its default state
+    m_converter_should_run = true; // Unblock the thread if it's waiting
     m_converter_should_run.notify_all();
     m_converter_thread->join();
 
@@ -407,4 +427,8 @@ void MainScreen::stop_conversion()
     m_converter_visualization_bridge.reset();
 
     m_ui.view_settings.show_model = true;
+
+    /* Clean Conversion UI */
+    m_ui.conversion_window.reset();
+    // m_ui.maps
 }

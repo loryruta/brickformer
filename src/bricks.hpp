@@ -4,17 +4,17 @@
 
 #define BRICK_MAX_EXTENT_X 8 // Must be a power of 2
 #define BRICK_MAX_EXTENT_Z 8 // TODO "HEIGHT"? IT'S NOT AN HEIGHT!
-#define BRICK_MAX_SIZE   (BRICK_MAX_EXTENT_X * BRICK_MAX_EXTENT_Z)
+#define BRICK_MAX_SIZE (BRICK_MAX_EXTENT_X * BRICK_MAX_EXTENT_Z)
 
 #ifndef __CUDACC__
-#   define __constant__
+#define __constant__
 #endif
 
 namespace lego_builder
 {
-    using BlockLayoutT = uint8_t[BRICK_MAX_EXTENT_Z][BRICK_MAX_EXTENT_X];
+using BlockLayoutT = uint8_t[BRICK_MAX_EXTENT_Z][BRICK_MAX_EXTENT_X];
 
-    // clang-format off
+// clang-format off
     __constant__
     const BlockLayoutT k_bricks[] = {
             // 0: 1x1
@@ -32,7 +32,7 @@ namespace lego_builder
              {1, 1}},
 
             // 4
-            {{0, 1},
+            {{1, 0},
              {1, 1}},
 
             // 5
@@ -126,9 +126,7 @@ namespace lego_builder
             {{1,1,1,1,1,1,1,1},
              {1,1,1,1,1,1,1,1}},
     };
-    // clang-format on
+// clang-format on
 
-    __constant__
-    const size_t k_num_bricks = sizeof(k_bricks) / sizeof(k_bricks[0]);
-}
-
+__constant__ const size_t k_num_bricks = sizeof(k_bricks) / sizeof(k_bricks[0]);
+} // namespace lego_builder

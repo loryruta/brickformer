@@ -19,6 +19,7 @@ struct ConverterParams {
     bool flip_x = false;
     bool flip_y = false;
     bool flip_z = false;
+    bool use_subslices = false;
     float alpha_test_threshold = 0.7f;
     uint8_t proximity_threshold =
         1; ///< If a floating placement's proximity value is below this value, then it's allowed
@@ -26,6 +27,56 @@ struct ConverterParams {
     /// The value to which the proximity map is initialized where voxels are set (UINT8_MAX to make it automatically
     /// assigned).
     uint8_t proximity_max_value = UINT8_MAX;
+};
+
+struct CUDAStopwatch {
+private:
+    cudaEvent_t m_start;
+    cudaEvent_t m_stop;
+
+public:
+    explicit CUDAStopwatch()
+    {
+        CHECK_CU(cudaEventCreate(&m_start));
+        CHECK_CU(cudaEventCreate(&m_stop));
+    }
+    CUDAStopwatch(const CUDAStopwatch&) = delete;
+    CUDAStopwatch(CUDAStopwatch&&) = delete;
+    ~CUDAStopwatch()
+    {
+        CHECK_CU(cudaEventDestroy(m_start));
+        CHECK_CU(cudaEventDestroy(m_stop));
+    }
+
+    void start(cudaStream_t stream) { CHECK_CU(cudaEventRecord(m_start, stream)); }
+    void stop(cudaStream_t stream) { CHECK_CU(cudaEventRecord(m_stop, stream)); }
+    float pull_sync()
+    {
+        if (cudaEventSynchronize(m_stop) != cudaSuccess) {
+            float dt_ms;
+            CHECK_CU(cudaEventElapsedTime(&dt_ms, m_start, m_stop));
+            return dt_ms;
+        } else {
+            return -1.0f;
+        }
+    }
+};
+
+struct MeasurementSeries {
+    double min_ = std::numeric_limits<double>::max();
+    double max_ = std::numeric_limits<double>::min();
+    double sum = 0.0;
+    size_t count = 0;
+
+    void add(double measure)
+    {
+        min_ = std::min(measure, min_);
+        max_ = std::max(measure, max_);
+        sum += measure;
+        ++count;
+    }
+
+    [[nodiscard]] double avg() const { return sum / double(count); }
 };
 
 /// The class that manages the whole conversion process: from the raw Model to the Construction.
@@ -70,18 +121,27 @@ public:
     int m_slice_y;
 
     std::unique_ptr<Model> m_model;
+    int m_num_slices;
 
     std::unique_ptr<Slicer> m_slicer;
     SpreadValue m_spread_value;
 
     std::unordered_set<Placement, PlacementHash> m_stacked_placements;
     std::vector<Placement> m_linear_stacked_placements;
-    Placement* m_linear_stacked_placements_d = nullptr;
 
     /// The placement ID used for filling the Placement map.
     uint32_t m_next_pid = 0;
 
     bool m_stop = false;
+
+    /* Performance Stats */
+    struct {
+        MeasurementSeries voxelization_dt;
+        MeasurementSeries subslice_dt[3];
+        MeasurementSeries subslice_solve_placement_dt[3];
+        MeasurementSeries spread_proximity_map_dt;
+        MeasurementSeries color_placements_dt;
+    } m_stats;
 
     explicit Converter(const ConverterParams& params);
     ~Converter() = default;
@@ -103,13 +163,11 @@ private:
     /// Initializes the proximity map so that colored cells have a high value (others zero).
     void init_proximity_map_from_color_map();
 
-    /// Writes the given placement into the current placement map.
-    void place(const Placement& placement);
-
     size_t place_on_subslice(uint32_t slice_y, int subslice);
 
-    /// Linearizes the placements from a hashset to linear memory (for fast iteration).
-    void linearize_placements_to_output();
+    /// Linearize the placements from a hashset to linear memory.
+    void linearize_placements();
+    void color_placements();
 };
 
 } // namespace lego_builder

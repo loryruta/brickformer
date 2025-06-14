@@ -1,5 +1,7 @@
 #include "gl_helpers.hpp"
 
+#include <stb_image.h>
+
 #include "util/misc.hpp"
 
 using namespace lego_builder;
@@ -125,4 +127,25 @@ GLuint lego_builder::create_gl_texture(uint32_t width, uint32_t height)
     glBindTexture(GL_TEXTURE_2D, 0);
 
     return gl_texture;
+}
+
+GLuint lego_builder::load_gl_texture(const std::filesystem::path& filepath)
+{
+    int width, height, channels;
+    const stbi_uc* image_data = stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    CHECK_STATE(image_data, "Failed to load texture: %s", filepath.string());
+
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, GL_NONE, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    return texture;
 }
