@@ -32,23 +32,32 @@ public:
 
 public: // TODO make private ?
     uint32_t m_width, m_height;
-
     /// A device buffer for the image pixels.
     PixelT* m_data; // TODO rename to m_data_d
+    bool owned = false;
 
 public:
     DeviceImage() = default; // Should be private, but it's not to ease lazy initialization
-    DeviceImage(const DeviceImage&) = delete;
-    DeviceImage(DeviceImage&& other) noexcept : m_width(other.m_width), m_height(other.m_height), m_data(other.m_data)
+    /// Create a non-owning copy of the image.
+    DeviceImage(const DeviceImage& other)
+        : m_width(other.m_width), m_height(other.m_height), m_data(other.m_data), owned(false)
+    {
+    }
+    /// Move the image, possibly transferring ownership.
+    DeviceImage(DeviceImage&& other) noexcept
+        : m_width(other.m_width), m_height(other.m_height), m_data(other.m_data), owned(other.owned)
     {
         other.m_data = nullptr;
+        other.owned = false;
     }
     ~DeviceImage()
     {
-        if (m_data) {
+#ifndef __CUDA_ARC__
+        if (m_data && owned) {
             CHECK_CU(cudaFree(m_data));
             m_data = nullptr;
         }
+#endif
     }
 
     [[nodiscard]] uint32_t width() const { return m_width; }
@@ -81,7 +90,7 @@ public:
         }
     }
 
-    __device__ void write_pixel(uint32_t x, uint32_t y, const PixelT& value) { m_data[y * m_width + x] = value; }
+    __device__ void write_pixel(int x, int y, const PixelT& value) { m_data[y * m_width + x] = value; }
 
     __host__ void write_pixel(int x, int y, const PixelT& value, cudaStream_t stream)
     {
@@ -144,6 +153,7 @@ public:
         image.m_width = width;
         image.m_height = height;
         CHECK_CU(cudaMallocAsync(&image.m_data, image.data_size(), stream));
+        image.owned = true;
         if (data) {
             CHECK_CU(cudaMemcpyAsync(image.m_data, data, image.data_size(), cudaMemcpyHostToDevice, stream));
         }

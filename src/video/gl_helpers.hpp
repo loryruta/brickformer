@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <filesystem>
 #include <string>
 
 #include "glad/gl.h"
@@ -24,4 +25,6 @@ void enable_gl_debug_output();
 
 GLuint create_gl_texture(uint32_t width, uint32_t height);
 
-}  // namespace lego_builder
+GLuint load_gl_texture(const std::filesystem::path& filepath);
+
+} // namespace lego_builder

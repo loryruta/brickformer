@@ -11,9 +11,17 @@
 namespace lego_builder
 {
 struct BrickRenderer_BakedModel {
-    GLuint vao;
-    GLuint vbo;
-    uint32_t num_vertices;
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    uint32_t num_vertices = 0;
+
+    explicit BrickRenderer_BakedModel() = default;
+    BrickRenderer_BakedModel(const BrickRenderer_BakedModel&) = delete;
+    BrickRenderer_BakedModel(BrickRenderer_BakedModel&&) noexcept;
+    ~BrickRenderer_BakedModel();
+
+    BrickRenderer_BakedModel& operator=(const BrickRenderer_BakedModel&) = delete;
+    BrickRenderer_BakedModel& operator=(BrickRenderer_BakedModel&&) noexcept;
 };
 
 struct BrickRenderer_GBuffer {
@@ -37,8 +45,11 @@ struct BrickRenderer_GBuffer {
 struct BrickRenderer_RenderParams {
     BrickRenderer_BakedModel* baked_model;
     Camera* camera;
+    glm::mat4 transform;
     int kernel_r;
     glm::vec4 border_color;
+    uint32_t start_vertex = UINT32_MAX;
+    uint32_t end_vertex = UINT32_MAX;
 };
 
 class BrickRenderer

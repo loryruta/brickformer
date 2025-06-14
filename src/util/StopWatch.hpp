@@ -20,10 +20,20 @@ public:
 
     void reset() { m_start = std::chrono::system_clock::now(); }
 
-    ClockT::duration elapsed_time() { return std::chrono::system_clock::now() - m_start; }
+    [[nodiscard]] ClockT::duration elapsed_time() const { return std::chrono::system_clock::now() - m_start; }
 
-    uint64_t elapsed_millis() { return std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_time()).count(); }
-    uint64_t elapsed_nanos() { return std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed_time()).count(); }
+    [[nodiscard]] double elapsed_seconds() const
+    {
+        return std::chrono::duration_cast<std::chrono::duration<double>>(elapsed_time()).count();
+    }
+    [[nodiscard]] uint64_t elapsed_ms() const
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_time()).count();
+    }
+    [[nodiscard]] uint64_t elapsed_nanos() const
+    {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed_time()).count();
+    }
 
     std::string elapsed_time_str()
     {
@@ -31,20 +41,15 @@ public:
         double ms = double(ns / 1000.0) / 1000.0;
         double s = ms / 1000.0;
 
-        if (s >= 0.1)
-        {
-            std::stringstream stream;  // <format> header not available with g++-12
+        if (s >= 0.1) {
+            std::stringstream stream; // <format> header not available with g++-12
             stream << std::fixed << std::setprecision(1) << s;
             return stream.str() + " s";
-        }
-        else if (ms >= 0.001)
-        {
-            std::stringstream stream;  // <format> header not available with g++-12
+        } else if (ms >= 0.001) {
+            std::stringstream stream; // <format> header not available with g++-12
             stream << std::fixed << std::setprecision(3) << ms;
             return stream.str() + " ms";
-        }
-        else
-        {
+        } else {
             return std::to_string(ns) + " ns";
         }
     }

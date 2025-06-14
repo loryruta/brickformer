@@ -6,11 +6,13 @@
 
 #include <glad/gl.h>
 
+#include "ConversionWindow.h"
 #include "Converter.h"
 #include "ConverterVisualizationBridge.h"
 #include "Screen.h"
 #include "View3dWindow.h"
 #include "model/Model.hpp"
+#include "ui/ViewConversionWindow.h"
 #include "util/BoundingBox3f.hpp"
 #include "video/Camera.hpp"
 #include "video/ModelRenderer.hpp"
@@ -48,7 +50,6 @@ struct ViewSettingsWindow {
     bool perform_brick_height_adjustment = true;
     bool show_grid = true;
     bool show_construction = true;
-    bool show_voxels = false;
     bool ssao = true;
 
     void show();
@@ -72,6 +73,9 @@ struct MapsWindow {
 
 class MainScreen : public Screen, public ConverterListener
 {
+    friend class ConversionWindow;
+    friend class ViewConversionWindow;
+
 private:
     Camera m_camera;
     float m_camera_speed = 40.0f;
@@ -81,8 +85,10 @@ private:
     struct {
         ui::InputWindow input;
         ui::ViewSettingsWindow view_settings;
+        std::unique_ptr<ConversionWindow> conversion_window;
         ui::MapsWindow maps;
         std::unique_ptr<ui::View3dWindow> view_3d_window;
+        std::unique_ptr<ViewConversionWindow> view_conversion_window;
     } m_ui;
 
     /* Model */
@@ -93,14 +99,20 @@ private:
     BoundingBox3f m_model_bbox;               ///< Model bounding box in View space
     glm::mat4 m_conversion_to_view_transform; ///< Transform from Conversion space to View space
 
-    /* Conversion */
+    /* Converter */
     std::unique_ptr<Converter> m_converter;
     std::unique_ptr<std::thread> m_converter_thread;
     std::unique_ptr<ConverterVisualizationBridge> m_converter_visualization_bridge;
+    /// If \c false, the conversion stops after a slice is fully placed and has to be manually resumed.
+    std::atomic<bool> m_converter_should_run = true;
+    ///< If \c true, the conversion runs continuously without having to be manually resumed.
+    std::atomic<bool> m_converter_autorun = false;
 
-    std::atomic<bool> m_converter_should_run = true; ///< Used to manually stop the Converter thread
-    std::atomic<bool> m_converter_autorun =
-        false; ///< If \c true, l'Arpenteur runs without having to be manually restarted
+    /* View Conversion */
+    /// The brick model to visualize (to aid construction).
+    /// Can be either the live brick construction under conversion, or a pre-saved construction.
+    std::shared_ptr<BrickModelBuilder> m_brick_model;
+    std::shared_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
 
 public:
     static constexpr float k_max_view_side = 100.f;
@@ -114,13 +126,13 @@ public:
     void update(float dt) override;
     void render() override;
 
-    void ui_conversion_window();
+    void ui_user_window();
     void ui() override;
 
     /* ConverterListener */
-    void on_model_load(const Model& model) override {};
-    void on_placement_begin(uint32_t slice_y) override {} ;
-    void on_place(uint32_t slice_y, const Placement& placement, float reward) override {};
+    void on_model_load(const Model& model) override {}
+    void on_placement_begin(uint32_t slice_y) override {}
+    void on_place(uint32_t slice_y, const Placement& placement, float reward) override {}
     void on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements) override;
 
 private:

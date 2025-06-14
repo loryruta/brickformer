@@ -11,7 +11,7 @@ struct BrickColor
     int rgb;
 
     __host__ __device__
-    inline glm::vec<4, uint8_t> color_u8() const
+    inline glm::vec<4, uint8_t> color() const
     {
         glm::vec<4, uint8_t> result{};
         result.r = (rgb >> 16) & 0xFF;
