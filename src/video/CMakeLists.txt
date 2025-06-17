@@ -1,6 +1,8 @@
 add_library(arpenteur_video STATIC
     BoxFilter.cpp
     BoxFilter.hpp
+    BrickPlaneRenderer.cpp
+    BrickPlaneRenderer.h
     BrickRenderer.cpp
     BrickRenderer.h
     Camera.cpp
