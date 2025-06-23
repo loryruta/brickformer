@@ -3,7 +3,8 @@
 #include <cuda_profiler_api.h>
 #include <tinyformat.h>
 
-#include "assign_placements_color.cuh"
+#include "AssignPlacementColor.h"
+#include "BrickColors.h"
 #include "bricks.hpp"
 #include "log.hpp"
 #include "model/GltfLoader.hpp"
@@ -112,22 +113,28 @@ uint8_t Converter::calc_proximity_max_value(int resolution)
     return (uint8_t) std::min(v, 254);
 }
 
+glm::mat4 Converter::model2brick_matrix(const Model& model, const glm::mat4& model_orientation, int resolution)
+{
+    glm::vec3 a = model_orientation * glm::vec4(model.m_min, 1.0f);
+    glm::vec3 b = model_orientation * glm::vec4(model.m_max, 1.0f);
+    glm::vec3 min_ = glm::min(a, b);
+    glm::vec3 max_ = glm::max(a, b);
+    glm::vec3 model_size = max_ - min_;
+    float max_xz_side = glm::max(model_size.x, model_size.z);
+    // Transform from Model space to Brick space
+    glm::mat4 transform = glm::identity<glm::mat4>();
+    glm::vec3 scale{float(resolution) / max_xz_side};
+    scale.y /= 1.2f; // Brick height adjustment
+    transform = glm::scale(transform, scale);
+    transform = glm::translate(transform, -min_); // Bring to origin
+    transform = transform * model_orientation;
+    return transform;
+}
+
 void Converter::transform_model()
 {
-    glm::vec3 model_size = m_model->size();
-    float max_xz_side = glm::max(model_size.x, model_size.z);
-
-    // Transform from Model space to Conversion space
-    glm::vec3 scale_matrix{m_params.resolution / max_xz_side};
-    scale_matrix.y /= 1.2f; // Brick height adjustment
-
-    glm::mat4 transform = glm::identity<glm::mat4>();
-    transform = glm::scale(transform, scale_matrix);
-    transform = glm::translate(transform, -m_model->m_min); // Bring to origin
-
-    m_model->apply_flip(m_params.flip_x, m_params.flip_y, m_params.flip_z, transform);
-
-    m_model->apply_transform(transform);
+    glm::mat4 model2brick = model2brick_matrix(*m_model, m_params.model_orientation, m_params.resolution);
+    m_model->apply_transform(model2brick);
     m_model->update_min_max(true /* update_mesh_min_max */);
 }
 
@@ -250,17 +257,14 @@ void Converter::color_placements()
     if (m_linear_stacked_placements.empty()) return;
     size_t N = m_linear_stacked_placements.size();
     Placement* placements_d;
-    // Upload placements on GPU
+    /* Upload placements to GPU */
     CHECK_CU(cudaMallocAsync(&placements_d, N * sizeof(Placement), m_stream));
     CHECK_CU(cudaMemcpyAsync(
         placements_d, m_linear_stacked_placements.data(), N * sizeof(Placement), cudaMemcpyHostToDevice, m_stream));
-    // Colorize!
-    {
-        dim3 num_blocks = div_ceil<size_t>(N, 32); // One warp per placement
-        dim3 block_dim = 1024;
-        assign_placements_color_kernel<<<num_blocks, block_dim, 0, m_stream>>>(m_self_d, placements_d, N);
-    }
-    // Copy placements from GPU back to host to get the color assignments
+    /* Assign colors to placements */
+    BrickColors& colors = BrickColors::get();
+    AssignPlacementColor::assign(m_color_map, placements_d, N, colors.color_masks_d());
+    /* Bring colors to host */
     CHECK_CU(cudaMemcpyAsync(
         m_linear_stacked_placements.data(), placements_d, N * sizeof(Placement), cudaMemcpyDeviceToHost, m_stream));
     CHECK_CU(cudaFreeAsync(placements_d, m_stream));
@@ -269,6 +273,8 @@ void Converter::color_placements()
 
 void Converter::start()
 {
+    CHECK_STATE(!m_done, "The converter was already started and is done");
+
     m_self_d = to_device(*this, m_stream); // Make a screenshot of "this" and transfer it on device
 
     StopWatch stopwatch{};
@@ -415,4 +421,6 @@ void Converter::start()
         m_stats.spread_proximity_map_dt.add(spread_proximity_map_dt);
         m_stats.color_placements_dt.add(color_placements_dt);
     }
+
+    m_done = true;
 }

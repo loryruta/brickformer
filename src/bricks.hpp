@@ -83,13 +83,7 @@ using BlockLayoutT = uint8_t[BRICK_MAX_EXTENT_Z][BRICK_MAX_EXTENT_X];
              {1, 1},
              {1, 1}},
 
-            // 16: 4x4
-            {{1,1,1,1},
-             {1,1,1,1},
-             {1,1,1,1},
-             {1,1,1,1}},
-
-            // 17: 6x1
+            // 16: 6x1
             {{1},
              {1},
              {1},
@@ -97,10 +91,10 @@ using BlockLayoutT = uint8_t[BRICK_MAX_EXTENT_Z][BRICK_MAX_EXTENT_X];
              {1},
              {1}},
 
-            // 18: 1x6
+            // 17: 1x6
             {{1,1,1,1,1,1}},
 
-            // 19: 6x2
+            // 18: 6x2
             {{1,1},
              {1,1},
              {1,1},
@@ -108,11 +102,11 @@ using BlockLayoutT = uint8_t[BRICK_MAX_EXTENT_Z][BRICK_MAX_EXTENT_X];
              {1,1},
              {1,1}},
 
-            // 20: 2x6
+            // 19: 2x6
             {{1,1,1,1,1,1},
              {1,1,1,1,1,1}},
 
-            // 21: 8x2
+            // 20: 8x2
             {{1,1},
              {1,1},
              {1,1},
@@ -122,11 +116,40 @@ using BlockLayoutT = uint8_t[BRICK_MAX_EXTENT_Z][BRICK_MAX_EXTENT_X];
              {1,1},
              {1,1}},
 
-            // 22: 2x8
+            // 21: 2x8
             {{1,1,1,1,1,1,1,1},
              {1,1,1,1,1,1,1,1}},
     };
 // clang-format on
 
-__constant__ const size_t k_num_bricks = sizeof(k_bricks) / sizeof(k_bricks[0]);
+/// List of BrickLink IDs of the bricks.
+const uint32_t k_brick_design_ids[] = {
+    3005, // 1x1
+    3004, // 1x2
+    3004, // 1x2
+    2357, // 2x2 corner
+    2357, // 2x2 corner
+    2357, // 2x2 corner
+    2357, // 2x2 corner
+    3003, // 2x2
+    3622, // 1x3
+    3622, // 1x3
+    3002, // 2x3
+    3002, // 2x3
+    3010, // 1x4
+    3010, // 1x4
+    3001, // 2x4
+    3001, // 2x4
+    3009, // 1x6
+    3009, // 1x6
+    44237, // 2x6
+    44237, // 2x6
+    3007, // 2x8
+    3007, // 2x8
+};
+
+static_assert(std::size(k_bricks) == std::size(k_brick_design_ids),
+              "k_bricks and k_brick_design_ids must have the same length");
+
+__constant__ const std::size_t k_num_bricks = sizeof(k_bricks) / sizeof(k_bricks[0]);
 } // namespace lego_builder

@@ -16,14 +16,13 @@ namespace lego_builder
 struct ConverterParams {
     std::string model_path = "";
     int resolution = -1;
-    bool flip_x = false;
-    bool flip_y = false;
-    bool flip_z = false;
+    /// Permutation matrix to bring the model from its coordinate system to BrickFormer coordinate system:
+    /// left-handed, Y up (Unity-like).
+    glm::mat4 model_orientation;
     bool use_subslices = false;
     float alpha_test_threshold = 0.7f;
-    uint8_t proximity_threshold =
-        1; ///< If a floating placement's proximity value is below this value, then it's allowed
-
+    /// If a floating placement's proximity value is below this value, then it is allowed.
+    uint8_t proximity_threshold = 1;
     /// The value to which the proximity map is initialized where voxels are set (UINT8_MAX to make it automatically
     /// assigned).
     uint8_t proximity_max_value = UINT8_MAX;
@@ -133,6 +132,7 @@ public:
     uint32_t m_next_pid = 0;
 
     bool m_stop = false;
+    std::atomic<bool> m_done = false;
 
     /* Performance Stats */
     struct {
@@ -148,12 +148,16 @@ public:
 
     void add_listener(ConverterListener* listener) { m_listeners.emplace_back(listener); }
 
+    [[nodiscard]] bool is_done() const { return m_done; }
+
     void start();
 
     static uint8_t calc_proximity_threshold(int resolution);
 
     /// If unassigned, this function helps to calculate the proximity max value given the resolution.
     static uint8_t calc_proximity_max_value(int resolution);
+
+    static glm::mat4 model2brick_matrix(const Model& model, const glm::mat4& model_orientation, int resolution);
 
 private:
     /// Transforms the model vertices such that fits the user input grid (i.e. the Slicer space).

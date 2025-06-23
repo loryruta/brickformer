@@ -4,6 +4,8 @@ add_executable(arpenteur_ui
         App.h
         AuthScreen.cu
         AuthScreen.h
+        BrickColorsWindow.cu
+        BrickColorsWindow.h
         MainScreen.cu
         MainScreen.h
         Queue.h
@@ -13,11 +15,15 @@ add_executable(arpenteur_ui
         ConversionWindow.h
         ConverterVisualizationBridge.cu
         ConverterVisualizationBridge.h
+        InputWindow.cu
+        InputWindow.h
         main.cu
         Screen.h
+        UIStyle.cpp
+        UIStyle.h
         View3dWindow.cpp
         View3dWindow.h
-        ViewConversionWindow.cu
-        ViewConversionWindow.h
+        BrickModelWindow.cu
+        BrickModelWindow.h
 )
 target_link_libraries(arpenteur_ui PRIVATE arpenteur arpenteur_video nfd)

@@ -4,8 +4,9 @@
 #include <execution>
 
 #include "App.h"
-#include "brick_colors.hpp"
+#include "MainScreen.h"
 #include "bricks.hpp"
+#include "lego_dataset.h"
 #include "log.hpp"
 #include "util/StopWatch.hpp"
 
@@ -28,7 +29,8 @@ glm::vec<4, uint8_t> eval_placement_hashed_color(const Placement& placement)
 }
 } // namespace
 
-ConverterVisualizationBridge::ConverterVisualizationBridge(Converter& converter) : m_converter(converter)
+ConverterVisualizationBridge::ConverterVisualizationBridge(MainScreen& parent)
+    : m_parent(parent), m_converter(*parent.m_converter)
 {
     int resolution = m_converter.m_params.resolution;
 
@@ -44,8 +46,8 @@ ConverterVisualizationBridge::ConverterVisualizationBridge(Converter& converter)
 
     m_proximity_map_texture = std::make_unique<CUDAMappedGLTexture>(create_gl_texture(resolution, resolution));
 
-    m_brick_model = std::make_shared<BrickModelBuilder>();
-    m_baked_brick_model = std::make_shared<BrickRenderer_BakedModel>();
+    std::string model_name = std::filesystem::path(m_converter.m_params.model_path).stem();
+    m_brick_model = std::make_shared<BrickModelBuilder>(model_name);
 
     m_converter.add_listener(this);
 }
@@ -80,7 +82,7 @@ void ConverterVisualizationBridge::copy_placement_maps(cudaStream_t stream)
         assert(subslice_mask); // Shouldn't be zero
 
         glm::vec<4, uint8_t> hashed_color = eval_placement_hashed_color(placement);
-        glm::vec<4, uint8_t> color = k_brick_colors[placement.cid].color();
+        glm::vec<4, uint8_t> color_u8 = glm::vec4(k_brick_colors_rgb[placement.cid], 255.0f);
         auto& brick = k_bricks[placement.bid];
         for (int bz = 0; bz < BRICK_MAX_EXTENT_Z; bz++) {
             for (int bx = 0; bx < BRICK_MAX_EXTENT_X; bx++) {
@@ -89,15 +91,15 @@ void ConverterVisualizationBridge::copy_placement_maps(cudaStream_t stream)
                     int pz = placement.z + bz;
                     if (subslice_mask & 0x1) {
                         hashed_color_images.at(0).write_pixel(px, pz, hashed_color, g_stream);
-                        color_images.at(0).write_pixel(px, pz, color, g_stream);
+                        color_images.at(0).write_pixel(px, pz, color_u8, g_stream);
                     }
                     if (subslice_mask & 0x2) {
                         hashed_color_images.at(1).write_pixel(px, pz, hashed_color, g_stream);
-                        color_images.at(1).write_pixel(px, pz, color, g_stream);
+                        color_images.at(1).write_pixel(px, pz, color_u8, g_stream);
                     }
                     if (subslice_mask & 0x4) {
                         hashed_color_images.at(2).write_pixel(px, pz, hashed_color, g_stream);
-                        color_images.at(2).write_pixel(px, pz, color, g_stream);
+                        color_images.at(2).write_pixel(px, pz, color_u8, g_stream);
                     }
                 }
             }
@@ -150,9 +152,7 @@ void ConverterVisualizationBridge::add_placements_to_construction_model(cudaStre
     /* Baking */
     stopwatch.reset();
     ARP_DEBUG("Update Brick Model; Baking...");
-
-    const Model& brick_model = m_brick_model->model();
-    *m_baked_brick_model = std::move(BrickRenderer::bake_model(brick_model));
+    m_parent.set_brick_model(m_brick_model, false /* visualize */);
 
     dt_str = stopwatch.elapsed_time_str();
     ARP_DEBUG("Update Brick Model; Model baked in %s", dt_str);

@@ -106,8 +106,8 @@ const char* k_color_fshader_src = R"(#version 460 core
 BrickRenderer_BakedModel::BrickRenderer_BakedModel(BrickRenderer_BakedModel&& other) noexcept
     : vao(other.vao), vbo(other.vbo), num_vertices(other.num_vertices)
 {
-    vao = 0;
-    vbo = 0;
+    other.vao = 0;
+    other.vbo = 0;
 }
 
 BrickRenderer_BakedModel::~BrickRenderer_BakedModel()
@@ -257,6 +257,7 @@ void BrickRenderer::render(const BrickRenderer_RenderParams& params)
     glBindFramebuffer(GL_FRAMEBUFFER, m_gbuffer->framebuffer);
 
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
