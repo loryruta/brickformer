@@ -2,7 +2,7 @@
 #include <cstdio>
 
 #include "Converter.h"
-#include "exporters/GltfExporter.h"
+#include "io/BrickModelIO.h"
 
 using namespace lego_builder;
 

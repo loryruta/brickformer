@@ -9,9 +9,9 @@
 #include "BrickModelBuilder.h"
 #include "Queue.h"
 #include "Screen.h"
-#include "exporters/BuildInstructionsExporter.h"
 #include "util/BoundingBox3f.hpp"
 #include "util/StopWatch.hpp"
+#include "video/BrickPlaneRenderer.h"
 #include "video/BrickRenderer.h"
 #include "video/CustomFramebuffer.hpp"
 #include "video/GridRenderer.hpp"
@@ -33,6 +33,7 @@ private:
     std::unique_ptr<TextureRenderer> m_texture_renderer;
     std::unique_ptr<GridRenderer> m_grid_renderer;
     std::unique_ptr<BrickRenderer> m_brick_renderer;
+    std::unique_ptr<BrickPlaneRenderer> m_brick_plane_renderer;
 
     /// If the placement takes too long, this stopwatch is used to visualize intermediate result at fixed intervals.
     StopWatch m_placement_stopwatch;
@@ -53,9 +54,6 @@ private:
     mutable std::mutex m_job_queue_mutex;
     std::condition_variable m_job_queue_cond_var; ///< Used to wait for main thread jobs to complete before proceeding.
 
-    /* Exporters */
-    std::unique_ptr<BuildInstructionsExporter> m_build_instructions_exporter;
-
 public:
     explicit App(Window& window);
     ~App();
@@ -67,6 +65,7 @@ public:
     TextureRenderer& texture_renderer() const { return *m_texture_renderer; }
     GridRenderer& grid_renderer() const { return *m_grid_renderer; }
     BrickRenderer& brick_renderer() const { return *m_brick_renderer; }
+    BrickPlaneRenderer& brick_plane_renderer() const { return *m_brick_plane_renderer; }
 
     firebase::App* firebase_app() const { return m_firebase_app; }
     firebase::auth::Auth* firebase_auth() const { return m_firebase_auth; }

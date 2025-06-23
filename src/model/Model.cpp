@@ -2,10 +2,17 @@
 
 using namespace lego_builder;
 
+size_t Mesh::bytesize() const
+{
+    size_t bytesize = vertices.capacity() * sizeof(Vertex);
+    bytesize += indices.capacity() * sizeof(uint32_t);
+    bytesize += sizeof(Mesh);
+    return bytesize;
+}
+
 void Mesh::apply_transform(const glm::mat4& transform)
 {
-    for (Vertex& vertex : vertices)
-    {
+    for (Vertex& vertex : vertices) {
         vertex.position = transform * glm::vec4(vertex.position, 1.0f);
     }
 }
@@ -15,11 +22,18 @@ void Mesh::update_min_max()
     m_min = glm::vec3(INFINITY);
     m_max = glm::vec3(-INFINITY);
 
-    for (const Vertex& vertex : vertices)
-    {
+    for (const Vertex& vertex : vertices) {
         m_min = glm::min(m_min, vertex.position);
         m_max = glm::max(m_max, vertex.position);
     }
+}
+
+size_t Model::bytesize() const
+{
+    size_t bytesize = m_textures.capacity() * sizeof(Texture);
+    for (const Mesh& mesh : m_meshes) bytesize += mesh.bytesize();
+    bytesize += sizeof(Model);
+    return bytesize;
 }
 
 void Model::apply_transform(const glm::mat4& transform)
@@ -32,8 +46,7 @@ void Model::update_min_max(bool update_mesh_minmax)
     m_min = glm::vec3(INFINITY);
     m_max = glm::vec3(-INFINITY);
 
-    for (Mesh& mesh : m_meshes)
-    {
+    for (Mesh& mesh : m_meshes) {
         if (update_mesh_minmax) mesh.update_min_max();
 
         m_min = glm::min(m_min, mesh.m_min);

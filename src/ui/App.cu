@@ -9,7 +9,7 @@
 
 #include "AuthScreen.h"
 #include "MainScreen.h"
-#include "brick_colors.hpp"
+#include "UIStyle.h"
 #include "bricks.hpp"
 #include "log.hpp"
 #include "model/GltfLoader.hpp"
@@ -34,6 +34,9 @@ App::App(Window& window) : m_window(window)
     ImGui_ImplGlfw_InitForOpenGL(m_window.handle(), true);
     ImGui_ImplOpenGL3_Init("#version 460 core");
 
+    // Apply UI style
+    ui_apply_style();
+
     // Create visualization stream
     CHECK_CU(cudaStreamCreate(&g_stream));
 
@@ -41,6 +44,7 @@ App::App(Window& window) : m_window(window)
     m_model_renderer = std::make_unique<ModelRenderer>();
     m_grid_renderer = std::make_unique<GridRenderer>();
     m_brick_renderer = std::make_unique<BrickRenderer>();
+    m_brick_plane_renderer = std::make_unique<BrickPlaneRenderer>();
 
     // Init firebase
     setup_firebase();

@@ -18,6 +18,7 @@ private:
     GLuint m_pause_icon = 0;
     GLuint m_play_icon = 0;
     GLuint m_stop_icon = 0;
+    GLuint m_speed_play_icon = 0;
 
 public:
     explicit ConversionWindow(MainScreen& parent);
