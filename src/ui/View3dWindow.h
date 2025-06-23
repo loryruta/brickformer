@@ -14,9 +14,6 @@ namespace lego_builder::ui
 class View3dWindow
 {
 public:
-    static constexpr int k_framebuffer_width  = 1920;
-    static constexpr int k_framebuffer_height = 1080;
-
     using ViewUpdateFuncT = std::function<void(const glm::vec3& dposition, float dyaw, float dpitch)>;
     using RenderFuncT = std::function<void()>;
 
@@ -30,9 +27,9 @@ private:
     std::optional<glm::dvec2> m_last_cursor_pos;
 
 public:
-    explicit View3dWindow(Window& window, const RenderFuncT& render_func, const ViewUpdateFuncT& view_update_func);
+    explicit View3dWindow(Window& window, RenderFuncT render_func, ViewUpdateFuncT view_update_func);
     ~View3dWindow() = default;
 
-    void show();
+    void ui();
 };
-}
+} // namespace lego_builder::ui

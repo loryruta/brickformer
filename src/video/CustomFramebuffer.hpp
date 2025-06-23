@@ -22,8 +22,8 @@ public:
     CustomFramebuffer(CustomFramebuffer&&) = default;
     ~CustomFramebuffer();
 
-    [[nodiscard]] int get_width() const { return m_width; }
-    [[nodiscard]] int get_height() const { return m_height; }
+    [[nodiscard]] int width() const { return m_width; }
+    [[nodiscard]] int height() const { return m_height; }
     [[nodiscard]] float get_aspect_ratio() const { return m_aspect_ratio; }
 
     [[nodiscard]] GLuint get_framebuffer() const { return m_framebuffer; }

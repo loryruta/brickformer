@@ -29,8 +29,9 @@ struct Mesh {
     glm::vec3 m_min;
     glm::vec3 m_max;
 
-    void apply_transform(const glm::mat4& transform);
+    [[nodiscard]] size_t bytesize() const;
 
+    void apply_transform(const glm::mat4& transform);
     void update_min_max();
 };
 
@@ -42,17 +43,16 @@ struct Texture {
 
 struct Model {
     std::vector<Texture> m_textures;
-
     std::vector<Mesh> m_meshes;
 
     glm::vec3 m_min;
     glm::vec3 m_max;
 
     [[nodiscard]] inline glm::vec3 size() const { return m_max - m_min; }
+    [[nodiscard]] size_t bytesize() const;
 
     /// Applies the transform to all meshes' vertices.
     void apply_transform(const glm::mat4& transform);
-
     void update_min_max(bool update_mesh_minmax = true);
 
     /// Applies a transform that flips the specified axes of the input model while keeping the same bounding box (scale

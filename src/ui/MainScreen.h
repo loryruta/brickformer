@@ -6,13 +6,15 @@
 
 #include <glad/gl.h>
 
+#include "BrickColorsWindow.h"
 #include "ConversionWindow.h"
 #include "Converter.h"
 #include "ConverterVisualizationBridge.h"
+#include "InputWindow.h"
 #include "Screen.h"
 #include "View3dWindow.h"
 #include "model/Model.hpp"
-#include "ui/ViewConversionWindow.h"
+#include "ui/BrickModelWindow.h"
 #include "util/BoundingBox3f.hpp"
 #include "video/Camera.hpp"
 #include "video/ModelRenderer.hpp"
@@ -20,36 +22,18 @@
 
 namespace lego_builder
 {
+// Forward decl
+class MainScreen;
+
 namespace ui
 {
-/// The window where the user can select the model to convert and the resolution.
-struct InputWindow {
-    std::filesystem::path model_path = "";
-    int resolution = 50;
-    bool flip_x = false;
-    bool flip_y = false;
-    bool flip_z = false;
-    float alpha_test_threshold = 0.7f;
-
-    bool auto_proximity_settings = true;
-    int proximity_max_value = UINT8_MAX;
-    int proximity_threshold = 1;
-
-    int display_num_slices = -1;
-
-    /* Callbacks */
-    std::function<void()> on_input_change;
-    std::function<void()> on_submit;
-
-    void show();
-};
-
 /// A window used to edit options regarding the model/construction visualization.
 struct ViewSettingsWindow {
     bool show_model = true;
     bool perform_brick_height_adjustment = true;
     bool show_grid = true;
-    bool show_construction = true;
+    bool show_brick_model = true;
+    bool show_brick_plane = true;
     bool ssao = true;
 
     void show();
@@ -58,7 +42,7 @@ struct ViewSettingsWindow {
 /// A window used to visualize all the maps used during the conversion process (i.e. color map, placement map, proximity
 /// map).
 struct MapsWindow {
-    enum { MapType_ColorMap = 0, MapType_ProximityMap, MapType_PlacementMap } map_type;
+    enum { MapType_ColorMap = 0, MapType_ProximityMap, MapType_PlacementMap } map_type = MapType_ColorMap;
 
     GLuint color_map;
     GLuint proximity_map;
@@ -73,31 +57,27 @@ struct MapsWindow {
 
 class MainScreen : public Screen, public ConverterListener
 {
+    friend class BrickModelWindow;
+    friend class ConverterVisualizationBridge;
     friend class ConversionWindow;
-    friend class ViewConversionWindow;
+    friend class InputWindow;
 
 private:
     Camera m_camera;
-    float m_camera_speed = 40.0f;
-    bool m_freecam = true; // TODO default false
-    glm::mat4 m_undo_brick_height_adjustment_matrix{1.0f};
 
     struct {
-        ui::InputWindow input;
+        std::unique_ptr<InputWindow> input_window;
         ui::ViewSettingsWindow view_settings;
         std::unique_ptr<ConversionWindow> conversion_window;
         ui::MapsWindow maps;
         std::unique_ptr<ui::View3dWindow> view_3d_window;
-        std::unique_ptr<ViewConversionWindow> view_conversion_window;
+        std::unique_ptr<BrickModelWindow> brick_model_window;
+        std::unique_ptr<BrickColorsWindow> brick_colors_window;
     } m_ui;
 
     /* Model */
-    std::string m_view_model_path{}; // Used to detect when the UI model changes
     std::unique_ptr<Model> m_model;
     std::unique_ptr<BakedModel> m_baked_model;
-    glm::mat4 m_model_to_view_transform;      ///< Transform from original Model space to View space
-    BoundingBox3f m_model_bbox;               ///< Model bounding box in View space
-    glm::mat4 m_conversion_to_view_transform; ///< Transform from Conversion space to View space
 
     /* Converter */
     std::unique_ptr<Converter> m_converter;
@@ -112,11 +92,9 @@ private:
     /// The brick model to visualize (to aid construction).
     /// Can be either the live brick construction under conversion, or a pre-saved construction.
     std::shared_ptr<BrickModelBuilder> m_brick_model;
-    std::shared_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
+    std::unique_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
 
 public:
-    static constexpr float k_max_view_side = 100.f;
-
     explicit MainScreen();
     ~MainScreen() = default;
 
@@ -126,6 +104,7 @@ public:
     void update(float dt) override;
     void render() override;
 
+    /* UI */
     void ui_user_window();
     void ui() override;
 
@@ -135,11 +114,16 @@ public:
     void on_place(uint32_t slice_y, const Placement& placement, float reward) override {}
     void on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements) override;
 
+    void set_brick_model(std::shared_ptr<BrickModelBuilder> brick_model, bool visualize);
+    void clear_brick_model();
+
 private:
+    void load_and_display_model(const std::filesystem::path& model_filepath);
+
     void on_input_change();
 
     void start_conversion();
-    void stop_conversion();
+    void stop_conversion(bool discard);
 
     void render_3d_scene();
 };

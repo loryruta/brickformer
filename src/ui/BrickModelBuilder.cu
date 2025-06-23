@@ -3,16 +3,17 @@
 #include <algorithm>
 #include <cstring>
 #include <execution> // For std::execution::par
+#include <utility>
 
-#include "brick_colors.hpp"
+#include "lego_dataset.h"
 #include "bricks.hpp"
 #include "util/misc.hpp"
+#include "video/BrickRenderer.h"
 
 using namespace lego_builder;
 
 namespace
 {
-
 void set_outline_guide(uint32_t pid, uint8_t part, uint8_t subslice_mask, Vertex& out_vertex)
 {
     uint32_t p2_1 = (part << 8) | (subslice_mask & 0xFF);
@@ -113,22 +114,43 @@ void add_y_cylinder(const glm::vec3& p,
 
 BrickModelBuilder::BrickModelBuilder() { m_mesh = &m_model.m_meshes.emplace_back(); }
 
+BrickModelBuilder::BrickModelBuilder(std::string name) : BrickModelBuilder() { m_name = std::move(name); }
+
+BrickModelBuilder::BrickModelBuilder(BrickModelBuilder&& other) noexcept
+{
+    m_name = std::move(other.m_name);
+    m_model = std::move(other.m_model);
+    m_mesh = other.m_mesh;
+    m_subslice_ranges = std::move(other.m_subslice_ranges);
+    m_brick_quantities = std::move(other.m_brick_quantities);
+}
+
+size_t BrickModelBuilder::bytesize() const
+{
+    size_t bytesize = sizeof(BrickModelBuilder);
+    bytesize += m_name.capacity() * sizeof(char);
+    bytesize += m_model.bytesize();
+    bytesize += m_subslice_ranges.capacity() * sizeof(m_subslice_ranges[0]);
+    // Approximate unordered_map bytesize
+    bytesize += m_brick_quantities.size() * sizeof(decltype(m_brick_quantities)::key_type) +
+                sizeof(decltype(m_brick_quantities)::mapped_type);
+    return bytesize;
+}
+
 void BrickModelBuilder::add_placement(
     int slice_y, int subslice, uint32_t pid, const Placement& placement, std::vector<Vertex>& out_vertices)
 {
-    glm::vec4 color = k_brick_colors[placement.cid].color();
-    color /= 255.0f;
-
+    glm::vec3 color = k_brick_colors_rgb[placement.cid] / 255.0f;
     const auto& brick = k_bricks[placement.bid];
 
     Vertex template_{};
-    template_.color = color;
+    template_.color = glm::vec4(color, 1.0f);
 
     // Height of the stud in normalized coordinates (i.e. if the 1x1 brick is 1x1 units)
-    const float k_stud_h = 0.177083333f;
-    const float k_stud_r = 0.25f;
-    const int k_stud_subdivisions = 4;
-    const float k_brick_height = 1.23076923f;
+    const float k_stud_h = 0.2125f;
+    const float k_stud_r = 0.3f;
+    const int k_stud_subdivisions = 8;
+    const float k_brick_height = 1.2f;
     const float k_brick_slice_height = k_brick_height / 3.0f;
 
     float h = subslice == -1 ? k_brick_height : k_brick_slice_height;
@@ -273,4 +295,14 @@ void BrickModelBuilder::add_slice(int slice_y, const std::vector<Placement>& pla
         m_subslice_ranges.emplace_back(subslice2_start, subslice2_end);
     }
     m_mesh->update_min_max();
+
+    // Update brick quantities (to export cart)
+    // TODO subslices not supported
+    for (const Placement& placement : placements) {
+        CHECK_STATE(placement.subslice_mask == 0x7, "Subslices are not supported");
+        uint32_t key = ((placement.bid & 0xFFFF) << 16) | (placement.cid & 0xFFFF);
+        auto [iterator, inserted] = m_brick_quantities.emplace(key, 1);
+        if (!inserted) ++iterator->second;
+        ++m_total_brick_count;
+    }
 }

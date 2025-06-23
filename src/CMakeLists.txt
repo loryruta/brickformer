@@ -1,18 +1,22 @@
 
 
 add_library(arpenteur STATIC
+        AssignPlacementColor.cu
+        AssignPlacementColor.h
+        io/BrickModelIO.cu
+        io/BrickModelIO.h
+        BrickColors.cu
+        BrickColors.h
         Converter.cu
         Converter.h
         ConverterListener.h
-        exporters/BuildInstructionsExporter.cu
-        # exporters/GltfExporter.cu
         model/DeviceModel.cu
         model/GltfLoader.cpp
         model/Model.cpp
         PlacementSolver.cu
         Slicer.cu
         SpreadValue.cu
-        User.cpp
+        User.cu
         User.h
 )
 
@@ -24,7 +28,9 @@ target_link_libraries(arpenteur PUBLIC
         firebase_firestore
         firebase_auth
         firebase_app
+        pugixml
         secret-1
+        staticZipper
         tbb # To use e.g. std parallel foreach
 )
 

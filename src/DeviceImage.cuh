@@ -52,7 +52,7 @@ public:
     }
     ~DeviceImage()
     {
-#ifndef __CUDA_ARC__
+#ifndef __CUDA_ARCH__
         if (m_data && owned) {
             CHECK_CU(cudaFree(m_data));
             m_data = nullptr;

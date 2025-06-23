@@ -13,11 +13,15 @@
 
 namespace lego_builder
 {
+// Forward decl
+class MainScreen;
+
 /// A class that serves to bridge the conversion with the visualization:
 /// as an example, copies the proximity map to a GL-mapped texture which can be visualized.
 class ConverterVisualizationBridge : public ConverterListener
 {
 private:
+    MainScreen& m_parent;
     Converter& m_converter;
 
     std::unique_ptr<CUDAMappedGLTexture> m_color_map_texture;
@@ -26,10 +30,9 @@ private:
     std::unique_ptr<CUDAMappedGLTexture> m_proximity_map_texture;
 
     std::shared_ptr<BrickModelBuilder> m_brick_model;
-    std::shared_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
 
 public:
-    explicit ConverterVisualizationBridge(Converter& converter);
+    explicit ConverterVisualizationBridge(MainScreen& parent);
     ~ConverterVisualizationBridge() = default;
 
     [[nodiscard]] GLuint color_map_texture() const { return m_color_map_texture->texture(); }
@@ -46,7 +49,6 @@ public:
     [[nodiscard]] GLuint proximity_map_texture() const { return m_proximity_map_texture->texture(); }
 
     [[nodiscard]] const std::shared_ptr<BrickModelBuilder>& brick_model() const { return m_brick_model; }
-    [[nodiscard]] const std::shared_ptr<BrickRenderer_BakedModel>& baked_brick_model() const { return m_baked_brick_model; }
 
     void copy_color_map(cudaStream_t stream);
     void copy_placement_maps(cudaStream_t stream);
