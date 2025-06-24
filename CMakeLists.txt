@@ -22,13 +22,7 @@ endif ()
 
 set(CMAKE_CXX_STANDARD 20)
 
-project(arpenteur LANGUAGES C CXX CUDA)
-
-if (NOT LEGO_BUILDER_NO_VIDEO)
-    message(STATUS "Video support is enabled")
-else ()
-    message(STATUS "Video support is disabled (only headless target defined)")
-endif ()
+project(BrickFormer LANGUAGES C CXX CUDA)
 
 # ------------------------------------------------------------------------------------------------
 # External libraries
@@ -43,19 +37,17 @@ set(CCCL_ENABLE_EXAMPLES OFF)
 set(CCCL_ENABLE_BENCHMARKS OFF)
 add_subdirectory(external/cccl)
 
-if (NOT LEGO_BUILDER_NO_VIDEO)
-    # glad
-    add_library(glad STATIC external/glad/src/gl.c)
-    target_include_directories(glad PUBLIC external/glad/include/)
+# glad
+add_library(glad STATIC external/glad/src/gl.c)
+target_include_directories(glad PUBLIC external/glad/include/)
 
-    # glfw
-    set(BUILD_SHARED_LIBS OFF)
-    set(GLFW_BUILD_EXAMPLES OFF)
-    set(GLFW_BUILD_TESTS OFF)
-    set(GLFW_BUILD_DOCS OFF)
-    set(GLFW_INSTALL OFF)
-    add_subdirectory(external/glfw)
-endif ()
+# glfw
+set(BUILD_SHARED_LIBS OFF)
+set(GLFW_BUILD_EXAMPLES OFF)
+set(GLFW_BUILD_TESTS OFF)
+set(GLFW_BUILD_DOCS OFF)
+set(GLFW_INSTALL OFF)
+add_subdirectory(external/glfw)
 
 # Firebase SDK
 set(FIREBASE_CPP_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/firebase_cpp_sdk)
@@ -99,21 +91,17 @@ set(TINYGLTF_HEADER_ONLY OFF)
 set(TINYGLTF_INSTALL OFF)
 add_subdirectory(external/tinygltf)
 
-# zipper
+# Zipper
 add_subdirectory(external/zipper)
 
-if (NOT LEGO_BUILDER_NO_VIDEO)
-    # imgui backend OpenGL3+GLFW
-    add_library(imgui_backend_opengl3_glfw STATIC
-            external/imgui/backends/imgui_impl_opengl3.cpp
-            external/imgui/backends/imgui_impl_glfw.cpp
-    )
+# imgui backend OpenGL3+GLFW
+add_library(imgui_backend_opengl3_glfw STATIC
+        external/imgui/backends/imgui_impl_opengl3.cpp
+        external/imgui/backends/imgui_impl_glfw.cpp
+)
 
-    target_include_directories(imgui_backend_opengl3_glfw PUBLIC external/imgui/backends)
-
-    target_link_libraries(imgui_backend_opengl3_glfw PRIVATE glfw)
-    target_link_libraries(imgui_backend_opengl3_glfw PRIVATE imgui)
-endif ()
+target_include_directories(imgui_backend_opengl3_glfw PUBLIC external/imgui/backends)
+target_link_libraries(imgui_backend_opengl3_glfw PRIVATE glfw imgui)
 
 # ------------------------------------------------------------------------------------------------
 # Compile definitions

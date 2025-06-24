@@ -4,6 +4,7 @@
 #include <imgui.h>
 
 #include "App.h"
+#include "AuthScreen.h"
 #include "BrickColors.h"
 #include "Converter.h"
 #include "UIStyle.h"
@@ -84,6 +85,7 @@ MainScreen::MainScreen()
 
     /* UI */
     m_ui.input_window = std::make_unique<InputWindow>(*this);
+    m_ui.user_window = std::make_unique<UserWindow>();
     m_ui.view_3d_window = std::make_unique<ui::View3dWindow>(
         g_app->window(),
         [&]() { render_3d_scene(); },
@@ -97,21 +99,32 @@ MainScreen::MainScreen()
 
     m_ui.brick_model_window = std::make_unique<BrickModelWindow>(*this);
     m_ui.brick_colors_window = std::make_unique<BrickColorsWindow>();
+
+    // Start user sync daemon
+    User& user = User::get();
+    if (!user.is_anonymous()) {
+        m_user_sync_daemon = std::make_unique<UserSyncDaemon>(user);
+
+        auto redirect_to_auth_screen = [](std::string error) {
+            g_app->enqueue_job([error]() { g_app->set_screen(std::make_shared<AuthScreen>(error)); });
+        };
+        m_user_sync_daemon->user_auth_error = redirect_to_auth_screen;
+        m_user_sync_daemon->user_document_retrieve_error = redirect_to_auth_screen;
+
+        m_user_sync_daemon->start();
+    }
+}
+
+MainScreen::~MainScreen()
+{
+    // When destroyed, make sure to show up the cursor again
+    Window& window = g_app->window();
+    glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 }
 
 void MainScreen::update(float dt) {}
 
 void MainScreen::render() {}
-
-void MainScreen::ui_user_window()
-{
-    if (ui_window("User")) {
-        ImGui::Text("Email: %s", "ciaociao2@ciaociao2.com");
-        ImGui::Text("Plan:  Free");
-        // TODO when the license expires
-    }
-    ImGui::End();
-}
 
 void MainScreen::ui()
 {
@@ -134,7 +147,7 @@ void MainScreen::ui()
     }
     ImGui::End();
 
-    ui_user_window();
+    m_ui.user_window->ui();
     m_ui.view_settings.show();
     ImGui::SetNextWindowClass(&notabbar_class);
     m_ui.view_3d_window->ui();
@@ -261,26 +274,6 @@ void MainScreen::render_3d_scene()
     if (m_ui.view_settings.show_brick_plane) {
         g_app->brick_plane_renderer().render(0, m_camera, 0);
     }
-}
-
-void MainScreen::on_input_change()
-{
-    //    InputWindow& input_ui = *m_ui.input_window;
-    //    // Calculate transform from Model space to UI space (flip flags could have changed)
-    //
-    //    // Update num slices (UI)
-    //    input_ui.display_num_slices = calc_num_slices(*m_model, input_ui.resolution);
-    //
-    //    g_app->model_renderer().m_alpha_test_threshold = input_ui.alpha_test_threshold;
-    //
-    //    // Reset camera
-    //    if (model_changed) {
-    //        glm::vec3 p = m_model_bbox.get_center();
-    //        float camera_distance = glm::sqrt(p.x * p.x + p.z * p.z);
-    //        camera_distance *= 1.3f;
-    //        m_camera.m_position = p + glm::vec3(camera_distance, p.y / 2.0f, camera_distance);
-    //        m_camera.look_at(p);
-    //    }
 }
 
 void MainScreen::load_and_display_model(const std::filesystem::path& model_filepath)
