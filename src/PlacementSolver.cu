@@ -2,16 +2,16 @@
 
 #include <thrust/extrema.h>
 
-#include "bricks.hpp"
-#include "log.hpp"
-#include "types.cuh"
+#include "bricks.h"
+#include "log.h"
+#include "types.h"
 
 #define ARP_WARP_INDEX (threadIdx.x >> 5)
 #define ARP_IS_WARP_THREAD_0 ((threadIdx.x & 0x1F) == 0)
 
 #define ARP_LOG_CONTEXT "PlacementSolver"
 
-using namespace lego_builder;
+using namespace bf;
 
 /// The index of the placement. Only valid in a setup where every warp is dedicated to one placement.
 __device__ int get_placement_index() { return ((blockIdx.x << 5) + (threadIdx.x >> 5)); }

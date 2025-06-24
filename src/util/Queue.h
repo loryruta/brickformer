@@ -4,9 +4,9 @@
 #include <mutex>
 #include <queue>
 
-namespace lego_builder
+namespace bf
 {
-/// A thread-safe queue implementation.w
+/// \brief Thread-safe queue
 template <typename T>
 class Queue
 {
@@ -40,4 +40,4 @@ public:
         return m_queue.empty();
     }
 };
-} // namespace lego_builder
+} // namespace bf

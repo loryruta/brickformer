@@ -1,6 +1,6 @@
-#include "Model.hpp"
+#include "Model.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 size_t Mesh::bytesize() const
 {

@@ -2,9 +2,9 @@
 
 #include <random>
 
-#include "util/misc.hpp"
+#include "util/misc.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {

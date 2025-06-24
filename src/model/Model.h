@@ -7,7 +7,7 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
-namespace lego_builder
+namespace bf
 {
 
 struct Vertex {
@@ -66,4 +66,4 @@ inline int calc_num_slices(const Model& model, int resolution) // TODO find a be
     float max_side = glm::max(size.x, size.z);
     return (int) glm::ceil(float(resolution) / max_side * size.y);
 }
-} // namespace lego_builder
+} // namespace bf

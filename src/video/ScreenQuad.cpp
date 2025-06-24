@@ -2,7 +2,7 @@
 
 #include "gl_helpers.hpp"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "DeviceImage.cuh"
+#include "DeviceImage.h"
 
-namespace lego_builder
+namespace bf
 {
 /// Given an image with one channel, spreads pixel values to their 4-connected neighbors.
 class SpreadValue
@@ -15,4 +15,4 @@ public:
 
     void spread(DeviceImageT& image, int num_iterations, cudaStream_t stream);
 };
-} // namespace lego_builder
+} // namespace bf

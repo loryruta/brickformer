@@ -8,7 +8,7 @@
 
 #include "Screen.h"
 
-namespace lego_builder
+namespace bf
 {
 class AuthScreen : public Screen
 {
@@ -38,4 +38,4 @@ private:
     void ui_title_window();
     void ui_auth_form();
 };
-} // namespace lego_builder
+} // namespace bf

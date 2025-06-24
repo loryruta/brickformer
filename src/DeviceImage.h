@@ -4,9 +4,9 @@
 
 #include <glm/glm.hpp>
 
-#include "util/misc.cuh"
+#include "util/misc_cuda.h"
 
-namespace lego_builder
+namespace bf
 {
 
 template <uint32_t FORMAT, typename DATA_TYPE>
@@ -180,4 +180,4 @@ __global__ void transform_image_kernel(const DeviceImage<SRC_IMAGE_FORMAT, SRC_I
     }
 }
 
-} // namespace lego_builder
+} // namespace bf

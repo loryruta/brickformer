@@ -2,7 +2,7 @@
 
 #include <glad/gl.h>
 
-namespace lego_builder
+namespace bf
 {
 // Forward decl
 class MainScreen;
@@ -30,4 +30,4 @@ private:
     void export_bfc();
     void export_lxf();
 };
-} // namespace lego_builder
+} // namespace bf

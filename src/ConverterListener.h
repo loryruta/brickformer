@@ -1,9 +1,9 @@
 #pragma once
 
-#include "model/Model.hpp"
-#include "types.cuh"
+#include "model/Model.h"
+#include "types.h"
 
-namespace lego_builder
+namespace bf
 {
 class ConverterListener
 {
@@ -20,4 +20,4 @@ public:
     /// Function invoked when placement ends for \c slice_y (after all sub-slices and stacking).
     virtual void on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements) = 0;
 };
-} // namespace lego_builder
+} // namespace bf

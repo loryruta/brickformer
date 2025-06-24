@@ -5,11 +5,11 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-#include "gl_helpers.hpp"
 #include "ScreenQuad.hpp"
-#include "util/misc.hpp"
+#include "gl_helpers.hpp"
+#include "util/misc.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {

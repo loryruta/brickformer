@@ -7,7 +7,7 @@
 
 #include "PaidPlan.h"
 
-namespace lego_builder
+namespace bf
 {
 class User
 {
@@ -59,4 +59,4 @@ private:
     /// Sync the local user data with information retrieved from Firestore.
     void sync(const firebase::firestore::DocumentSnapshot& doc_snapshot);
 };
-} // namespace lego_builder
+} // namespace bf

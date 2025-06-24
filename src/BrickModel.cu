@@ -1,16 +1,16 @@
-#include "BrickModelBuilder.h"
+#include "BrickModel.h"
 
 #include <algorithm>
 #include <cstring>
 #include <execution> // For std::execution::par
 #include <utility>
 
+#include "bricks.h"
 #include "lego_dataset.h"
-#include "bricks.hpp"
-#include "util/misc.hpp"
+#include "util/misc.h"
 #include "video/BrickRenderer.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {
@@ -112,11 +112,11 @@ void add_y_cylinder(const glm::vec3& p,
 }
 } // namespace
 
-BrickModelBuilder::BrickModelBuilder() { m_mesh = &m_model.m_meshes.emplace_back(); }
+BrickModel::BrickModel() { m_mesh = &m_model.m_meshes.emplace_back(); }
 
-BrickModelBuilder::BrickModelBuilder(std::string name) : BrickModelBuilder() { m_name = std::move(name); }
+BrickModel::BrickModel(std::string name) : BrickModel() { m_name = std::move(name); }
 
-BrickModelBuilder::BrickModelBuilder(BrickModelBuilder&& other) noexcept
+BrickModel::BrickModel(BrickModel&& other) noexcept
 {
     m_name = std::move(other.m_name);
     m_model = std::move(other.m_model);
@@ -125,9 +125,9 @@ BrickModelBuilder::BrickModelBuilder(BrickModelBuilder&& other) noexcept
     m_brick_quantities = std::move(other.m_brick_quantities);
 }
 
-size_t BrickModelBuilder::bytesize() const
+size_t BrickModel::bytesize() const
 {
-    size_t bytesize = sizeof(BrickModelBuilder);
+    size_t bytesize = sizeof(BrickModel);
     bytesize += m_name.capacity() * sizeof(char);
     bytesize += m_model.bytesize();
     bytesize += m_subslice_ranges.capacity() * sizeof(m_subslice_ranges[0]);
@@ -137,7 +137,7 @@ size_t BrickModelBuilder::bytesize() const
     return bytesize;
 }
 
-void BrickModelBuilder::add_placement(
+void BrickModel::add_placement(
     int slice_y, int subslice, uint32_t pid, const Placement& placement, std::vector<Vertex>& out_vertices)
 {
     glm::vec3 color = k_brick_colors_rgb[placement.cid] / 255.0f;
@@ -235,7 +235,7 @@ void BrickModelBuilder::add_placement(
     }
 }
 
-void BrickModelBuilder::add_placement(int slice_y, const Placement& placement, std::vector<Vertex>& out_vertices)
+void BrickModel::add_placement(int slice_y, const Placement& placement, std::vector<Vertex>& out_vertices)
 {
     uint32_t pid = m_next_pid++;
 
@@ -253,7 +253,7 @@ void BrickModelBuilder::add_placement(int slice_y, const Placement& placement, s
     }
 }
 
-void BrickModelBuilder::add_slice(int slice_y, const std::vector<Placement>& placements)
+void BrickModel::add_slice(int slice_y, const std::vector<Placement>& placements)
 {
     std::vector<Vertex> subslice0_vertices; // Will also include complete placements
     std::vector<Vertex> subslice1_vertices;

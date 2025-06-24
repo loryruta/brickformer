@@ -5,10 +5,10 @@
 #include "glm/glm.hpp"
 #include <thrust/device_vector.h>
 
-#include "DeviceImage.cuh"
+#include "DeviceImage.h"
 #include "model/DeviceModel.h"
 
-namespace lego_builder
+namespace bf
 {
 struct TriRef
 {
@@ -39,4 +39,4 @@ public:
 private:
     void linearize_triangles(const Model& model, cudaStream_t stream);
 };
-} // namespace lego_builder
+} // namespace bf

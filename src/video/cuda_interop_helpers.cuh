@@ -5,10 +5,10 @@
 #include "glad/gl.h"
 #include <cuda_gl_interop.h>
 
-#include "DeviceImage.cuh"
-#include "util/misc.cuh"
+#include "DeviceImage.h"
+#include "util/misc_cuda.h"
 
-namespace lego_builder
+namespace bf
 {
 
 /// A RAII wrapper for cudaGraphicsResource that represents a GL texture.
@@ -29,4 +29,4 @@ public:
 
     void copy_from(DeviceImage<4, uint8_t>& image, cudaStream_t stream);
 };
-} // namespace lego_builder
+} // namespace bf

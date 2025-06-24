@@ -1,11 +1,11 @@
-#include "GltfLoader.hpp"
+#include "GltfLoader.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#include "util/misc.hpp"
+#include "util/misc.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 GltfLoader::GltfLoader() {}
 

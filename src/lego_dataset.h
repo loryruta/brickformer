@@ -7,7 +7,7 @@
 
 #include <glm/glm.hpp>
 
-namespace lego_builder
+namespace bf
 {
 struct BrickColor {
     uint32_t id;

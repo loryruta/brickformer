@@ -1,6 +1,6 @@
 #pragma once
 
-namespace lego_builder
+namespace bf
 {
 class UserWindow
 {

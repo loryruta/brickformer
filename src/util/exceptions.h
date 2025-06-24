@@ -8,11 +8,11 @@
 #include <tinyformat.h>
 
 #define CHECK_STATE(condition, ...)                                                                                    \
-    lego_builder::check_state(!!(condition), #condition, __FILE__, __LINE__, ##__VA_ARGS__)
+    bf::check_state(!!(condition), #condition, __FILE__, __LINE__, ##__VA_ARGS__)
 
-#define CHECK_ARG(condition, ...) lego_builder::check_arg(!!(condition), #condition, __FILE__, __LINE__, ##__VA_ARGS__)
+#define CHECK_ARG(condition, ...) bf::check_arg(!!(condition), #condition, __FILE__, __LINE__, ##__VA_ARGS__)
 
-namespace lego_builder
+namespace bf
 {
 ///
 class CustomException : public std::exception
@@ -90,4 +90,4 @@ inline void check_arg(bool condition, char const* condition_str, char const* fil
     check_arg(condition, condition_str, file, line, nullptr);
 }
 
-} // namespace lego_builder
+} // namespace bf

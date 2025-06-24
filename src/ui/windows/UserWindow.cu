@@ -1,9 +1,9 @@
 #include "UserWindow.h"
 
-#include "UIStyle.h"
 #include "User.h"
+#include "ui/UIStyle.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {

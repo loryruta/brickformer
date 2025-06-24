@@ -1,6 +1,6 @@
 #pragma once
 
-namespace lego_builder
+namespace bf
 {
 template<typename T, size_t MAX_LENGTH>
 class StaticVector

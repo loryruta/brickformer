@@ -6,11 +6,11 @@
 
 #include "ScreenQuad.hpp"
 #include "gl_helpers.hpp"
-#include "log.hpp"
+#include "log.h"
 
 #define ARP_LOG_CONTEXT "BrickPlaneRenderer"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {

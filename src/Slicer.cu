@@ -1,14 +1,14 @@
-#include "Slicer.cuh"
+#include "Slicer.h"
 
 #include <thrust/copy.h>
 
-#include "util/StaticVector.cuh"
-#include "util/intersections.cuh"
+#include "util/StaticVector.h"
+#include "util/intersections.h"
 
 #define MAX_POLYGON_SIZE 8 ///< The maximum number of vertices that are allowed (after e.g. triangle clipping)
 #define SET_VOXEL_SPREAD 0 ///< The radius of the area where the voxel is set (0 = only set position)
 
-using namespace lego_builder;
+using namespace bf;
 
 Slicer::Slicer(const Model& model, int resolution, float alpha_test_threshold, cudaStream_t stream)
     : m_resolution(resolution), m_alpha_test_threshold(alpha_test_threshold)

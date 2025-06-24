@@ -5,14 +5,14 @@
 
 #include "App.h"
 #include "MainScreen.h"
-#include "bricks.hpp"
+#include "bricks.h"
 #include "lego_dataset.h"
-#include "log.hpp"
-#include "util/StopWatch.hpp"
+#include "log.h"
+#include "util/StopWatch.h"
 
 #define ARP_LOG_CONTEXT "ConverterVisualizationBridge"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {
@@ -47,7 +47,7 @@ ConverterVisualizationBridge::ConverterVisualizationBridge(MainScreen& parent)
     m_proximity_map_texture = std::make_unique<CUDAMappedGLTexture>(create_gl_texture(resolution, resolution));
 
     std::string model_name = std::filesystem::path(m_converter.m_params.model_path).stem();
-    m_brick_model = std::make_shared<BrickModelBuilder>(model_name);
+    m_brick_model = std::make_shared<BrickModel>(model_name);
 
     m_converter.add_listener(this);
 }
