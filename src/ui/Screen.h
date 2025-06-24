@@ -2,7 +2,7 @@
 
 #include <glm/glm.hpp>
 
-namespace lego_builder
+namespace bf
 {
 class Screen
 {
@@ -17,4 +17,4 @@ public:
     virtual void render() = 0;
     virtual void ui() = 0;
 };
-} // namespace lego_builder
+} // namespace bf

@@ -4,9 +4,9 @@
 
 #include "glm/glm.hpp"
 
-#include "Model.hpp"
+#include "Model.h"
 
-namespace lego_builder
+namespace bf
 {
     struct DeviceMesh
     {

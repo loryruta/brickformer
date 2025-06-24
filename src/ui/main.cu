@@ -4,7 +4,7 @@
 
 #include "video/gl_helpers.hpp"
 
-using namespace lego_builder;
+using namespace bf;
 
 int main(int argc, char* argv[])
 {

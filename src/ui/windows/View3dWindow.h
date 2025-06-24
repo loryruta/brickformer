@@ -8,7 +8,7 @@
 #include "video/CustomFramebuffer.hpp"
 #include "video/Window.hpp"
 
-namespace lego_builder::ui
+namespace bf::ui
 {
 /// A window used to display and explore a 3d scene.
 class View3dWindow
@@ -32,4 +32,4 @@ public:
 
     void ui();
 };
-} // namespace lego_builder::ui
+} // namespace bf::ui

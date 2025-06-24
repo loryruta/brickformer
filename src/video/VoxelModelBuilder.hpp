@@ -1,8 +1,8 @@
 #pragma once
 
-#include "model/Model.hpp"
+#include "model/Model.h"
 
-namespace lego_builder
+namespace bf
 {
 
 class VoxelModelBuilder

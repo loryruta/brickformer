@@ -7,12 +7,12 @@
 #include "App.h"
 #include "UIStyle.h"
 #include "User.h"
-#include "log.hpp"
+#include "log.h"
 #include "ui/MainScreen.h"
 
 #define ARP_LOG_CONTEXT "AuthScreen"
 
-using namespace lego_builder;
+using namespace bf;
 
 AuthScreen::AuthScreen(std::string external_error) : m_external_error(std::move(external_error)) {}
 

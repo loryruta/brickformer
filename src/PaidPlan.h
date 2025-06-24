@@ -5,7 +5,7 @@
 
 #include "lego_dataset.h"
 
-namespace lego_builder
+namespace bf
 {
 class PaidPlan
 {
@@ -79,4 +79,4 @@ inline FreePlan    s_plan_free;
 inline PremiumPlan s_plan_premium;
 // clang-format on
 
-} // namespace lego_builder
+} // namespace bf

@@ -4,9 +4,9 @@
 
 #include <tiny_gltf.h>
 
-#include "Model.hpp"
+#include "Model.h"
 
-namespace lego_builder
+namespace bf
 {
     class GltfLoader
     {

@@ -2,9 +2,9 @@
 
 #include <glm/ext/scalar_constants.hpp>
 
-#include "primitives.cuh"
+#include "primitives.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 __global__ void spread_kernel(SpreadValue::DeviceImageT src_image, SpreadValue::DeviceImageT dst_image)
 {

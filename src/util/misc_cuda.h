@@ -4,13 +4,13 @@
 
 #include "glm/glm.hpp"
 
-#include "util/misc.hpp"
+#include "util/misc.h"
 
-#define CHECK_CU(error) lego_builder::check_cuda((error), __FILE__, __LINE__)
+#define CHECK_CU(error) bf::check_cuda((error), __FILE__, __LINE__)
 
 #define FULL_MASK UINT32_MAX
 
-namespace lego_builder
+namespace bf
 {
 inline void check_cuda(cudaError_t error, const char* file, int line)
 {
@@ -89,4 +89,4 @@ __host__ __device__ inline glm::vec4 to_fvec4(const uint4& v) { return {v.x, v.y
 __host__ __device__ inline glm::vec4 to_fvec4(const float4& v) { return {v.x, v.y, v.z, v.w}; }
 
 __host__ __device__ inline int pmod(int i, int n) { return (i % n + n) % n; }
-} // namespace lego_builder
+} // namespace bf

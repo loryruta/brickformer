@@ -5,36 +5,46 @@ add_executable(BrickFormer
         io/BrickModelIO.h
 
         model/DeviceModel.cu
+        model/DeviceModel.h
         model/GltfLoader.cpp
+        model/GltfLoader.h
         model/Model.cpp
+        model/Model.h
 
+        ui/windows/BrickColorsWindow.cu
+        ui/windows/BrickColorsWindow.h
+        ui/windows/BrickModelWindow.cu
+        ui/windows/BrickModelWindow.h
+        ui/windows/ConversionWindow.cu
+        ui/windows/ConversionWindow.h
+        ui/windows/InputWindow.cu
+        ui/windows/InputWindow.h
+        ui/windows/UserWindow.cu
+        ui/windows/UserWindow.h
+        ui/windows/View3dWindow.cpp
+        ui/windows/View3dWindow.h
         ui/App.cu
         ui/App.h
         ui/AuthScreen.cu
         ui/AuthScreen.h
-        ui/BrickColorsWindow.cu
-        ui/BrickColorsWindow.h
         ui/MainScreen.cu
         ui/MainScreen.h
-        ui/Queue.h
-        ui/BrickModelBuilder.cu
-        ui/BrickModelBuilder.h
-        ui/ConversionWindow.cu
-        ui/ConversionWindow.h
         ui/ConverterVisualizationBridge.cu
         ui/ConverterVisualizationBridge.h
-        ui/InputWindow.cu
-        ui/InputWindow.h
         ui/main.cu
         ui/Screen.h
         ui/UIStyle.cpp
         ui/UIStyle.h
-        ui/UserWindow.cu
-        ui/UserWindow.h
-        ui/View3dWindow.cpp
-        ui/View3dWindow.h
-        ui/BrickModelWindow.cu
-        ui/BrickModelWindow.h
+
+        util/exceptions.h
+        util/intersections.h
+        util/json.hpp
+        util/misc.h
+        util/misc_cuda.h
+        util/Queue.h
+        util/StaticVector.h
+        util/StopWatch.h
+        util/str_utils.h
 
         video/BoxFilter.cpp
         video/BoxFilter.hpp
@@ -60,14 +70,25 @@ add_executable(BrickFormer
         AssignPlacementColor.h
         BrickColors.cu
         BrickColors.h
+        BrickModel.cu
+        BrickModel.h
+        bricks.h
         Converter.cu
         Converter.h
         ConverterListener.h
+        DeviceImage.h
+        lego_dataset.h
+        log.h
+        PaidPlan.h
         PlacementSolver.cu
+        PlacementSolver.h
+        primitives.h
         Slicer.cu
+        Slicer.h
         SpreadValue.cu
+        SpreadValue.h
         User.cu
-        User.cu
+        User.h
         UserSyncDaemon.cu
         UserSyncDaemon.h
 )

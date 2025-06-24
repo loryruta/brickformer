@@ -6,23 +6,22 @@
 
 #include <glad/gl.h>
 
-#include "BrickColorsWindow.h"
-#include "ConversionWindow.h"
 #include "Converter.h"
 #include "ConverterVisualizationBridge.h"
-#include "InputWindow.h"
 #include "Screen.h"
 #include "UserSyncDaemon.h"
-#include "View3dWindow.h"
-#include "model/Model.hpp"
-#include "ui/BrickModelWindow.h"
-#include "ui/UserWindow.h"
-#include "util/BoundingBox3f.hpp"
+#include "model/Model.h"
 #include "video/Camera.hpp"
 #include "video/ModelRenderer.hpp"
 #include "video/cuda_interop_helpers.cuh"
+#include "windows/BrickColorsWindow.h"
+#include "windows/BrickModelWindow.h"
+#include "windows/ConversionWindow.h"
+#include "windows/InputWindow.h"
+#include "windows/UserWindow.h"
+#include "windows/View3dWindow.h"
 
-namespace lego_builder
+namespace bf
 {
 // Forward decl
 class MainScreen;
@@ -94,7 +93,7 @@ private:
     /* View Conversion */
     /// The brick model to visualize (to aid construction).
     /// Can be either the live brick construction under conversion, or a pre-saved construction.
-    std::shared_ptr<BrickModelBuilder> m_brick_model;
+    std::shared_ptr<BrickModel> m_brick_model;
     std::unique_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
 
     std::unique_ptr<UserSyncDaemon> m_user_sync_daemon;
@@ -119,7 +118,7 @@ public:
     void on_place(uint32_t slice_y, const Placement& placement, float reward) override {}
     void on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements) override;
 
-    void set_brick_model(std::shared_ptr<BrickModelBuilder> brick_model, bool visualize);
+    void set_brick_model(std::shared_ptr<BrickModel> brick_model, bool visualize);
     void clear_brick_model();
 
 private:
@@ -132,4 +131,4 @@ private:
 
     void render_3d_scene();
 };
-} // namespace lego_builder
+} // namespace bf

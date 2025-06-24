@@ -8,10 +8,10 @@
 #include "BoxFilter.hpp"
 #include "Camera.hpp"
 #include "GBuffer.hpp"
-#include "model/Model.hpp"
 #include "SSAOPass.hpp"
+#include "model/Model.h"
 
-namespace lego_builder
+namespace bf
 {
     struct BakedMesh
     {

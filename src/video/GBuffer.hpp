@@ -2,7 +2,7 @@
 
 #include <glad/gl.h>
 
-namespace lego_builder
+namespace bf
 {
 class GBuffer
 {
@@ -35,4 +35,4 @@ public:
 
     void clear();
 };
-} // namespace lego_builder
+} // namespace bf

@@ -6,7 +6,7 @@
 
 #include "glad/gl.h"
 
-namespace lego_builder
+namespace bf
 {
 GLuint create_shader(GLenum type, const std::string& src);
 
@@ -27,4 +27,4 @@ GLuint create_gl_texture(uint32_t width, uint32_t height);
 
 GLuint load_gl_texture(const std::filesystem::path& filepath);
 
-} // namespace lego_builder
+} // namespace bf

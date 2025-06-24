@@ -6,11 +6,10 @@
 #include <firebase/app.h>
 #include <firebase/auth.h>
 
-#include "BrickModelBuilder.h"
-#include "Queue.h"
+#include "BrickModel.h"
 #include "Screen.h"
-#include "util/BoundingBox3f.hpp"
-#include "util/StopWatch.hpp"
+#include "util/Queue.h"
+#include "util/StopWatch.h"
 #include "video/BrickPlaneRenderer.h"
 #include "video/BrickRenderer.h"
 #include "video/CustomFramebuffer.hpp"
@@ -21,7 +20,7 @@
 #include "video/Window.hpp"
 #include "video/cuda_interop_helpers.cuh"
 
-namespace lego_builder
+namespace bf
 {
 class App
 {
@@ -108,4 +107,4 @@ private:
 inline App* g_app = nullptr;
 /// CUDA stream used by the main thread, generally for visualization purposes.
 inline cudaStream_t g_stream = nullptr;
-} // namespace lego_builder
+} // namespace bf

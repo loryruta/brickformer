@@ -2,14 +2,14 @@
 
 #include <imgui.h>
 
-#include "App.h"
-#include "BrickColors.h"
-#include "UIStyle.h"
-#include "User.h"
 #include "AssignPlacementColor.h"
+#include "BrickColors.h"
+#include "User.h"
 #include "lego_dataset.h"
+#include "ui/App.h"
+#include "ui/UIStyle.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 BrickColorsWindow::BrickColorsWindow() {}
 
@@ -87,7 +87,8 @@ void BrickColorsWindow::ui_color_similarity_test()
         color_edit_flags |= ImGuiColorEditFlags_NoInputs;
         bool changed = ImGui::ColorPicker3("Query Color##BrickColors", &query_color.r, color_edit_flags);
         if (changed || closest_cid < 0) {
-            closest_cid = AssignPlacementColor::search_nearest_cid(query_color * 255.0f, colors.color_mask_all_bricks());
+            closest_cid =
+                AssignPlacementColor::search_nearest_cid(query_color * 255.0f, colors.color_mask_all_bricks());
             if (closest_cid < 0) {
                 CHECK_STATE(closest_cid >= 0, "Nearest Brick Color weirdly failed: %d (CID >= 0)", closest_cid);
             }

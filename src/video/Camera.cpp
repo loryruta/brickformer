@@ -2,7 +2,7 @@
 
 #include "glm/gtx/transform.hpp"
 
-using namespace lego_builder;
+using namespace bf;
 
 glm::mat4 Camera::orientation() const
 {

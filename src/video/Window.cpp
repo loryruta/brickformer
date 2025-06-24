@@ -2,9 +2,9 @@
 
 #include <cassert>
 
-#include "util/misc.hpp"
+#include "util/misc.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 Window::Window(GLFWwindow* window) : m_glfw_window(window)
 {

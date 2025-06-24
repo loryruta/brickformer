@@ -5,7 +5,7 @@
 #include <iomanip>
 #include <sstream>
 
-namespace lego_builder
+namespace bf
 {
 class StopWatch
 {
@@ -54,4 +54,4 @@ public:
         }
     }
 };
-} // namespace lego_builder
+} // namespace bf

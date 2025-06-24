@@ -2,7 +2,7 @@
 
 #include "glm/glm.hpp"
 
-namespace lego_builder
+namespace bf
 {
     struct Camera
     {

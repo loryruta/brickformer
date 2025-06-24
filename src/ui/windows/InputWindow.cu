@@ -5,18 +5,18 @@
 #include <imgui.h>
 #include <nfd.h>
 
-#include "App.h"
 #include "Converter.h"
-#include "MainScreen.h"
-#include "UIStyle.h"
 #include "User.h"
 #include "io/BrickModelIO.h"
-#include "log.hpp"
+#include "log.h"
+#include "ui/App.h"
+#include "ui/MainScreen.h"
+#include "ui/UIStyle.h"
 #include "util/exceptions.h"
 
 #define ARP_LOG_CONTEXT "InputWindow"
 
-using namespace lego_builder;
+using namespace bf;
 
 void InputWindow::browse_model()
 {
@@ -63,7 +63,7 @@ void InputWindow::import_brickformer_construction()
             throw IllegalArgumentException("Invalid file extension (expected .bfc): %s", bfc_filepath.string());
         }
         g_app->enqueue_job([this, bfc_filepath]() {
-            std::shared_ptr<BrickModelBuilder> brick_model = BrickModelIO::bfc_import(bfc_filepath);
+            std::shared_ptr<BrickModel> brick_model = BrickModelIO::bfc_import(bfc_filepath);
             m_parent.set_brick_model(brick_model, true /* visualize */);
             ARP_INFO("Imported and baked brick model \"%s\" from: %s\n", brick_model->name(), bfc_filepath.string());
         });

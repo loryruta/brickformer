@@ -1,15 +1,15 @@
 #include "BrickColors.h"
 
 #include "User.h"
-#include "bricks.hpp"
+#include "bricks.h"
 #include "lego_dataset.h"
-#include "log.hpp"
+#include "log.h"
 #include "util/exceptions.h"
-#include "util/misc.cuh"
+#include "util/misc_cuda.h"
 
 #define ARP_LOG_CONTEXT "BrickColors"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {

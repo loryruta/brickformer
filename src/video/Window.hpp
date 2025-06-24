@@ -9,7 +9,7 @@
 #include <glm/glm.hpp>
 // clang-format on
 
-namespace lego_builder
+namespace bf
 {
 class Window
 {
@@ -43,4 +43,4 @@ private:
     explicit Window(GLFWwindow* window);
 };
 
-} // namespace lego_builder
+} // namespace bf

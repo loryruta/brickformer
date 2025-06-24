@@ -1,10 +1,10 @@
 #include "DeviceModel.h"
 
-#include "util/misc.cuh"
+#include "util/misc_cuda.h"
 
-using namespace lego_builder;
+using namespace bf;
 
-const DeviceModel* lego_builder::upload_model(const Model& model, cudaStream_t stream)
+const DeviceModel* bf::upload_model(const Model& model, cudaStream_t stream)
 {
     std::vector<cudaTextureObject_t> d_textures;
     std::vector<DeviceMesh> d_meshes;

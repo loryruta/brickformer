@@ -3,16 +3,13 @@
 #include <atomic>
 #include <memory>
 
-#include "model/Model.hpp"
-#include "types.cuh"
+#include "model/Model.h"
+#include "types.h"
 
-namespace lego_builder
+namespace bf
 {
-// Forward decl
-class BrickRenderer_BakedModel;
-
 /// Given several placements, procedurally generate a brick model.
-class BrickModelBuilder
+class BrickModel
 {
     friend class BrickModelIO;
 
@@ -34,9 +31,9 @@ private:
     size_t m_total_brick_count = 0;
 
 public:
-    explicit BrickModelBuilder(std::string name);
-    BrickModelBuilder(BrickModelBuilder&&) noexcept;
-    ~BrickModelBuilder() = default;
+    explicit BrickModel(std::string name);
+    BrickModel(BrickModel&&) noexcept;
+    ~BrickModel() = default;
 
     [[nodiscard]] const std::string& name() const { return m_name; }
     [[nodiscard]] const Model& model() const { return m_model; }
@@ -53,7 +50,7 @@ public:
     void add_slice(int slice_y, const std::vector<Placement>& placements);
 
 private:
-    explicit BrickModelBuilder();
+    explicit BrickModel();
 
     /// Procedurally generate vertices for the given placement's subslice.
     void add_placement(
@@ -61,4 +58,4 @@ private:
     /// Procedurally generate vertices for the given placement.
     void add_placement(int slice_y, const Placement& placement, std::vector<Vertex>& out_vertices);
 };
-} // namespace lego_builder
+} // namespace bf

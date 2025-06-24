@@ -18,7 +18,7 @@
 #define MAIN_COLOR_DARK  MAKE_IMVEC4(0xCCA300)
 // clang-format on
 
-namespace lego_builder
+namespace bf
 {
 inline ImFont* g_font;
 inline ImFont* g_title_font;
@@ -112,4 +112,4 @@ inline bool ui_slider_float(
 }
 
 void ui_apply_style();
-} // namespace lego_builder
+} // namespace bf

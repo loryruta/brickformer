@@ -5,7 +5,7 @@
 #include "Camera.hpp"
 #include "GBuffer.hpp"
 
-namespace lego_builder
+namespace bf
 {
 struct SSAOTarget
 {

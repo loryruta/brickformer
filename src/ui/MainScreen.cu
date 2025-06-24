@@ -10,12 +10,12 @@
 #include "UIStyle.h"
 #include "imgui_internal.h"
 #include "io/BrickModelIO.h"
-#include "log.hpp"
-#include "model/GltfLoader.hpp"
+#include "log.h"
+#include "model/GltfLoader.h"
 
 #define ARP_LOG_CONTEXT "MainScreen"
 
-using namespace lego_builder;
+using namespace bf;
 
 void ui::ViewSettingsWindow::show()
 {
@@ -184,7 +184,7 @@ void MainScreen::on_placement_end(uint32_t slice_y, const std::vector<Placement>
     }
 }
 
-void MainScreen::set_brick_model(std::shared_ptr<BrickModelBuilder> brick_model, bool visualize)
+void MainScreen::set_brick_model(std::shared_ptr<BrickModel> brick_model, bool visualize)
 {
     m_brick_model = std::move(brick_model);
     const Model& model = m_brick_model->model();

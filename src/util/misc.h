@@ -4,15 +4,8 @@
 
 #include "exceptions.h"
 
-#define CHECK_STATE_MSG(condition, message)                                                                            \
-    lego_builder::check_state(condition, #condition, __FILE__, __LINE__, message)
-
-
-namespace lego_builder
+namespace bf
 {
-
-
-
 template <typename T>
 std::string to_string(const T& element)
 {
@@ -28,4 +21,4 @@ std::string join(ITERABLE iterable, std::string separator = ", ")
     }
     return result;
 }
-} // namespace lego_builder
+} // namespace bf

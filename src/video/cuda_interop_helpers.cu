@@ -1,6 +1,6 @@
 #include "cuda_interop_helpers.cuh"
 
-using namespace lego_builder;
+using namespace bf;
 
 CUDAMappedGLTexture::CUDAMappedGLTexture(GLuint texture)
 {

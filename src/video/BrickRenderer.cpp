@@ -4,12 +4,12 @@
 
 #include "ScreenQuad.hpp"
 #include "gl_helpers.hpp"
-#include "log.hpp"
-#include "util/misc.hpp"
+#include "log.h"
+#include "util/misc.h"
 
 #define ARP_LOG_CONTEXT "BrickRenderer"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {

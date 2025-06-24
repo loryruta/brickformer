@@ -4,7 +4,7 @@
 #include <sstream>
 #include <string>
 
-namespace lego_builder
+namespace bf
 {
 inline std::string num_bytes_to_string(std::size_t bytes)
 {
@@ -21,4 +21,4 @@ inline std::string num_bytes_to_string(std::size_t bytes)
     oss << std::fixed << std::setprecision(2) << size << " " << suffixes[order];
     return oss.str();
 }
-} // namespace lego_builder
+} // namespace bf

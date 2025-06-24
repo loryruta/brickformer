@@ -1,8 +1,8 @@
 #include "UIStyle.h"
 
-using namespace lego_builder;
+using namespace bf;
 
-void lego_builder::ui_apply_style()
+void bf::ui_apply_style()
 {
     ImGuiIO& io = ImGui::GetIO();
     ImFontConfig config{};

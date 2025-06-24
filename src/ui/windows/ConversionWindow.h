@@ -4,7 +4,7 @@
 
 #include <glad/gl.h>
 
-namespace lego_builder
+namespace bf
 {
 // Forward decl
 class MainScreen;
@@ -29,4 +29,4 @@ public:
 private:
     void resume_conversion();
 };
-} // namespace lego_builder
+} // namespace bf

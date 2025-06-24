@@ -4,11 +4,11 @@
 
 #include <glm/glm.hpp>
 
-#include "bricks.hpp"
+#include "bricks.h"
 #include "lego_dataset.h"
-#include "util/misc.hpp"
+#include "util/misc.h"
 
-namespace lego_builder
+namespace bf
 {
 /// \brief Front-end class for accessing bricks color
 class BrickColors
@@ -53,4 +53,4 @@ public:
 
     static BrickColors& get();
 };
-} // namespace lego_builder
+} // namespace bf

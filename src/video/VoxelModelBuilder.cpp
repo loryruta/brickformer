@@ -1,7 +1,7 @@
 #include "VoxelModelBuilder.hpp"
 #include <numeric>
 
-using namespace lego_builder;
+using namespace bf;
 
 VoxelModelBuilder::VoxelModelBuilder() { m_mesh = &m_model.m_meshes.emplace_back(); }
 
