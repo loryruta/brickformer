@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 
 #include "gl_helpers.hpp"
-#include "util/misc.hpp"
+#include "util/exceptions.h"
 
 using namespace lego_builder;
 

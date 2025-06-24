@@ -2,7 +2,11 @@
 
 #include <imgui.h>
 
+#include <utility>
+
 #include "App.h"
+#include "UIStyle.h"
+#include "User.h"
 #include "log.hpp"
 #include "ui/MainScreen.h"
 
@@ -10,21 +14,7 @@
 
 using namespace lego_builder;
 
-AuthScreen::AuthScreen()
-{
-    ImGuiIO& io = ImGui::GetIO();
-    ImFontConfig config{};
-
-    config.SizePixels = 13;
-    config.OversampleH = config.OversampleV = 1;
-    config.PixelSnapH = true;
-    m_font = io.Fonts->AddFontDefault(&config);
-
-    config.SizePixels = 50;
-    config.OversampleH = config.OversampleV = 1;
-    config.PixelSnapH = true;
-    m_title_font = io.Fonts->AddFontDefault(&config);
-}
+AuthScreen::AuthScreen(std::string external_error) : m_external_error(std::move(external_error)) {}
 
 void AuthScreen::update(float dt)
 {
@@ -55,10 +45,19 @@ void AuthScreen::update(float dt)
 
 void AuthScreen::on_sign_in()
 {
-    const firebase::auth::AuthResult* auth_result = m_auth_result_future->result();
-    // Nothing to do here, the current user is obtained through current_user() (in App)
+    if (m_auth_result_future) {
+        const firebase::auth::AuthResult* auth_result = m_auth_result_future->result();
 
-    g_app->set_screen(std::make_shared<MainScreen>());
+        std::string uid = auth_result->user.uid();
+        std::string email = auth_result->user.email();
+
+        User::set(uid, email);
+    } else {
+        // Signed in as an anonymous user
+        User::set_anonymous();
+    }
+
+    g_app->enqueue_job([&/* &g_app */]() { g_app->set_screen(std::make_shared<MainScreen>()); });
 }
 
 void AuthScreen::render()
@@ -78,8 +77,10 @@ void AuthScreen::ui_title_window()
     flags |= ImGuiWindowFlags_NoTitleBar;
     flags |= ImGuiWindowFlags_NoBackground;
     if (ImGui::Begin("###title_window", nullptr, flags)) {
-        ImGui::PushFont(m_title_font);
+        ImGui::PushFont(g_title_font);
+        ImGui::PushStyleColor(ImGuiCol_Text, MAIN_COLOR);
         ImGui::Text("BrickFormer");
+        ImGui::PopStyleColor();
         ImGui::PopFont();
     }
     ImGui::End();
@@ -88,7 +89,7 @@ void AuthScreen::ui_title_window()
 void AuthScreen::ui_auth_form()
 {
     ImGuiIO& io = ImGui::GetIO();
-    ImGui::PushFont(m_font);
+    ImGui::PushFont(g_font);
     ImGui::SetNextWindowPos(
         ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(0, 0)); // Fit content
@@ -97,18 +98,26 @@ void AuthScreen::ui_auth_form()
     flags |= ImGuiWindowFlags_NoTitleBar;
 
     if (ImGui::Begin("Sign In###login_form", nullptr, flags)) {
-        ImVec2 window_size = ImGui::GetContentRegionAvail();
-        ImGui::PushItemWidth(window_size.x);
+        ImVec2 content_region = ImGui::GetContentRegionAvail();
+        ImGui::PushItemWidth(content_region.x);
 
         ImGui::Text("Email");
         ImGui::InputText("###email", m_email, sizeof(m_email));
         ImGui::Text("Password");
         ImGui::InputText("###password", m_password, sizeof(m_password), ImGuiInputTextFlags_Password);
+
         ImGui::Spacing();
-        if (ImGui::Button("Sign In")) {
+
+        if (ui_primary_button("Sign In", ImVec2(content_region.x, 40.0f))) {
             ARP_DEBUG("Signing; Email: %s, Password: %s", m_email, m_password);
             m_auth_result_future = g_app->firebase_auth()->SignInWithEmailAndPassword(m_email, m_password);
         }
+
+        if (ui_button("Sign In Anonymously", ImVec2(content_region.x, 25.0f))) {
+            m_auth_result_future = std::nullopt;
+            g_app->enqueue_job([this]() { on_sign_in(); });
+        }
+
         // Sign in error
         if (!m_auth_error.empty()) {
             ImGui::TextColored(ImVec4(1, 0, 0, 1), "ERROR: %s", m_auth_error.c_str());
@@ -131,4 +140,33 @@ void AuthScreen::ui()
 {
     ui_title_window();
     ui_auth_form();
+
+    // TODO this should be more general and not be restricted to the AuthScreen.
+    //   Maybe put this logic in App?
+    if (!m_external_error.empty()) {
+        ImGui::OpenPopup(":(##AuthScreen_ExternalErrorModal");
+
+        ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(
+            ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(0, 0)); // Fit content
+
+        bool opened = true;
+        if (ui_popup_modal(":(##AuthScreen_ExternalErrorModal", &opened)) {
+            ImVec2 content_window = ImGui::GetContentRegionAvail();
+
+            ui_text_danger("%s", m_external_error.c_str());
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            if (ui_button("Dismiss", ImVec2(content_window.x, 0))) opened = false;
+
+            ImGui::EndPopup();
+        }
+        if (!opened) {
+            m_external_error.clear();
+        }
+    }
 }

@@ -5,15 +5,11 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-#include <nfd.h>
 
 #include "AuthScreen.h"
-#include "MainScreen.h"
 #include "UIStyle.h"
-#include "bricks.hpp"
 #include "log.hpp"
-#include "model/GltfLoader.hpp"
-#include "util/StopWatch.hpp"
+#include "util/exceptions.h"
 #include "video/gl_helpers.hpp"
 
 #define ARP_LOG_CONTEXT "App"
@@ -50,7 +46,7 @@ App::App(Window& window) : m_window(window)
     setup_firebase();
 
     // Set initial screen: authentication
-    m_screen = std::make_unique<MainScreen>();
+    m_screen = std::make_unique<AuthScreen>();
 }
 
 App::~App()
@@ -68,17 +64,6 @@ void App::setup_firebase()
     CHECK_STATE(m_firebase_app, "Failed to initialize Firebase app");
     m_firebase_auth = firebase::auth::Auth::GetAuth(m_firebase_app);
     CHECK_STATE(m_firebase_auth, "Failed to initialize Firebase auth");
-}
-
-std::optional<firebase::auth::User> App::auth_user() const
-{
-    firebase::auth::User user = m_firebase_auth->current_user();
-    if (!user.is_valid()) return std::nullopt; // Not authenticated
-    firebase::Future<std::string> auth_token = user.GetToken(true /* renew */);
-    while (auth_token.status() == firebase::kFutureStatusPending)
-        ;
-    if (auth_token.status() != firebase::kFutureStatusComplete) return std::nullopt;
-    return user;
 }
 
 void App::start()

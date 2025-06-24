@@ -103,8 +103,6 @@ public:
 
 private:
     void setup_firebase();
-    /// Get the currently authenticated user if any, renew the token ID if expired (duration 1 hour).
-    [[nodiscard]] std::optional<firebase::auth::User> auth_user() const;
 };
 
 inline App* g_app = nullptr;

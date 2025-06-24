@@ -36,11 +36,12 @@ BrickColors::~BrickColors()
 
 void BrickColors::upload_colors()
 {
-    PaidPlan& plan = User::get().plan();
+    const PaidPlan* plan = User::get().copy().plan();
+
     for (int cid = 0; cid < k_num_brick_colors; ++cid) {
         bool enabled = true;
         enabled &= m_enabled_colors.at(cid);
-        enabled &= plan.is_brick_color_allowed(cid); // Allowed by the paid plan
+        enabled &= plan->is_brick_color_allowed(cid); // Allowed by the paid plan
         m_color_mask_all_bricks[cid] = enabled;
         for (int bid = 0; bid < k_num_bricks; ++bid) {
             // Check if the combination Design ID + color ID exists
