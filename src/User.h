@@ -3,30 +3,60 @@
 #include <memory>
 #include <string>
 
+#include <firebase/firestore.h>
+
 #include "PaidPlan.h"
 
 namespace lego_builder
 {
 class User
 {
+    friend class UserSyncDaemon;
+
 private:
     std::string m_uid{};
     std::string m_email{};
-    std::unique_ptr<PaidPlan> m_paid_plan; // Lazy initialized
+    uint64_t m_premium_plan_begin_cyphered = 0;
+    uint64_t m_premium_plan_end_cyphered = 0;
+    /// Secret used not to store the plan time ranges in plain (simple XOR cyphering).
+    uint64_t m_secret = 0;
+    PaidPlan* m_plan = nullptr;
+
+    int64_t m_last_synchronization_at = INT64_MAX;
+
+    std::mutex m_mutex;
 
 public:
-    /// Create an anonymous user (empty UID).
-    explicit User() = default;
     /// Create a signed-in user with UID and email.
-    explicit User(std::string uid, std::string email) : m_uid(std::move(uid)), m_email(std::move(email)) {}
+    explicit User(std::string uid, std::string email);
+    User(User&&) noexcept = default;
 
-    [[nodiscard]] const std::string& uid() const { return m_uid; }
-    [[nodiscard]] const std::string& email() const { return m_email; }
-    [[nodiscard]] bool is_anonymous() const { return m_uid.empty(); }
+    [[nodiscard]] std::string uid() const { return m_uid; }
+    [[nodiscard]] std::string email() const { return m_email; }
 
-    [[nodiscard]] PaidPlan& plan() const { return *m_paid_plan; };
-    void set_plan(std::unique_ptr<PaidPlan>&& plan) { m_paid_plan = std::move(plan); }
+    [[nodiscard]] bool is_anonymous() const { return m_uid.empty() || m_email.empty(); }
+
+    [[nodiscard]] uint64_t premium_plan_begin() const { return m_premium_plan_begin_cyphered ^ m_secret; }
+    [[nodiscard]] uint64_t premium_plan_end() const { return m_premium_plan_end_cyphered ^ m_secret; }
+
+    [[nodiscard]] const PaidPlan* plan() const { return m_plan ? m_plan : &s_plan_free; }
+
+    [[nodiscard]] int64_t last_synchronization_at() const { return m_last_synchronization_at; }
+
+    /// Thread-safe copy of the user-data. Shall be used before accessing any user data for thread-safety.
+    [[nodiscard]] User copy();
 
     static User& get();
+
+    static void set(std::string uid, std::string email);
+    static void set_anonymous();
+
+private:
+    /// Create an anonymous user (empty UID).
+    explicit User();
+    User(const User&); // Copy constructor is private; call copy() instead
+
+    /// Sync the local user data with information retrieved from Firestore.
+    void sync(const firebase::firestore::DocumentSnapshot& doc_snapshot);
 };
 } // namespace lego_builder

@@ -9,6 +9,7 @@
 #include "Converter.h"
 #include "MainScreen.h"
 #include "UIStyle.h"
+#include "User.h"
 #include "io/BrickModelIO.h"
 #include "log.hpp"
 #include "util/exceptions.h"
@@ -71,8 +72,12 @@ void InputWindow::import_brickformer_construction()
 
 void InputWindow::ui()
 {
+    const PaidPlan* plan = User::get().copy().plan();
+
     if (ui_window("Input")) {
         ImVec2 content_region = ImGui::GetContentRegionAvail();
+
+        bool can_convert = true;
 
         ImGui::Text("Model: %s", model_path.empty() ? "-" : model_path.filename().c_str());
 
@@ -80,11 +85,15 @@ void InputWindow::ui()
             ImGui::BeginTooltip();
             ImGui::Text("%s", model_path.c_str());
             ImGui::EndTooltip();
+        } else if (model_path.empty()) {
+            can_convert = false;
         }
 
         if (ui_button("Browse a model...", ImVec2(content_region.x, 0))) {
             g_app->enqueue_job([this]() { browse_model(); });
         }
+
+        /* XZ Resolution */
         ImGui::Text("XZ Resolution");
         if (ImGui::BeginItemTooltip()) {
             ImGui::Text("The bricks length along the largest axis between X and Z.\n"
@@ -92,8 +101,13 @@ void InputWindow::ui()
             ImGui::EndTooltip();
         }
         ImGui::SetNextItemWidth(content_region.x);
-        ui_slider_int("##Input_Resolution", &resolution, 1, 256);
-        ImGui::Text("Y slices: %d", 3); // TODO
+        ui_slider_int("##Input_Resolution", &resolution, 1, 150);
+        if (plan->is_resolution_allowed(resolution)) {
+            ImGui::Text("");
+        } else {
+            ui_text_wrapped_danger("Resolution not available with your plan");
+            can_convert = false;
+        }
 
         ImGui::Text("Model orientation");
         ImGui::BeginTable("##Input_ModelOrientation", 2);
@@ -132,11 +146,11 @@ void InputWindow::ui()
         ui_slider_int_with_text("Threshold", &proximity_threshold, 1, 32);
         if (auto_proximity) ImGui::EndDisabled();
 
-        if (model_path.empty()) ImGui::BeginDisabled();
+        ImGui::BeginDisabled(!can_convert);
         if (ui_primary_button("Convert", ImVec2(content_region.x, 50.0f))) {
             g_app->enqueue_job([&]() { m_parent.start_conversion(); });
         }
-        if (model_path.empty()) ImGui::EndDisabled();
+        ImGui::EndDisabled();
 
         ImGui::Spacing();
         ImGui::Spacing();

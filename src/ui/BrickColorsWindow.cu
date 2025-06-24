@@ -16,7 +16,7 @@ BrickColorsWindow::BrickColorsWindow() {}
 void BrickColorsWindow::ui_color_list()
 {
     BrickColors& colors = BrickColors::get();
-    PaidPlan& plan = User::get().plan();
+    const PaidPlan* plan = User::get().copy().plan();
 
     bool reupload_colors = false;
 
@@ -26,10 +26,12 @@ void BrickColorsWindow::ui_color_list()
         ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 50.0f);
         ImGui::TableSetupColumn("Color");
         ImGui::TableSetupColumn("Online ID", ImGuiTableColumnFlags_WidthFixed, 75.0f);
-        ImGui::TableSetupColumn("Enabled", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+        ImGui::TableSetupColumn("Enabled", ImGuiTableColumnFlags_WidthFixed, 220.0f);
         ImGui::TableHeadersRow();
         // Data
         for (int cid = 0; cid < k_num_brick_colors; ++cid) {
+            bool available = plan->is_brick_color_allowed(cid);
+            ImGui::BeginDisabled(!available);
             const BrickColor& color = k_brick_colors[cid];
             ImGui::TableNextColumn(), ImGui::Text("%d", cid);
             // Color
@@ -50,14 +52,15 @@ void BrickColorsWindow::ui_color_list()
             // Enabled
             bool enabled = colors.is_enabled(cid);
             ImGui::TableNextColumn();
-            if (plan.is_brick_color_allowed(cid)) {
+            if (available) {
                 if (ImGui::Checkbox(checkbox_id_str.c_str(), &enabled)) {
                     colors.set_enabled(cid, enabled);
                     reupload_colors = true;
                 }
             } else {
-                ImGui::TextWrapped("Unavailable");
+                ImGui::TextWrapped("Unavailable with your plan");
             }
+            ImGui::EndDisabled();
         }
         ImGui::EndTable();
     }
@@ -86,7 +89,7 @@ void BrickColorsWindow::ui_color_similarity_test()
         if (changed || closest_cid < 0) {
             closest_cid = AssignPlacementColor::search_nearest_cid(query_color * 255.0f, colors.color_mask_all_bricks());
             if (closest_cid < 0) {
-                CHECK_STATE(closest_cid >= 0, "Nearest Brick Color weirdly failed: %d (CID >= 0)", cid);
+                CHECK_STATE(closest_cid >= 0, "Nearest Brick Color weirdly failed: %d (CID >= 0)", closest_cid);
             }
         }
         if (closest_cid >= 0) {

@@ -35,11 +35,14 @@ int main(int argc, char* argv[])
     printf("[DEBUG]   cudaLimitPrintfFifoSize: %zu KB\n", printf_buffer_size >> 10);
 
     // Start the app
-    std::unique_ptr<App> app = std::make_unique<App>(window);
-    app->start();
-
-    //
-    app.reset();
+    try {
+        std::unique_ptr<App> app = std::make_unique<App>(window);
+        app->start();
+        app.reset();
+    } catch (std::exception& exception) {
+        fprintf(stderr, "BrickFormer thrown an exception:\n%s", exception.what());
+        exit(100);
+    }
 
     glfwTerminate();
 

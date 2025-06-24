@@ -20,9 +20,7 @@ public:
     [[nodiscard]] virtual bool is_resolution_allowed(int resolution) const = 0;
 };
 
-///
 /// \brief Free plan
-///
 class FreePlan : public PaidPlan
 {
 public:
@@ -58,12 +56,10 @@ public:
         return k_allowed_lego_color_ids.contains(k_brick_colors[cid].lego_id);
     }
 
-    [[nodiscard]] bool is_resolution_allowed(int resolution) const override { return resolution < 50; }
+    [[nodiscard]] bool is_resolution_allowed(int resolution) const override { return resolution <= 40; }
 };
 
-///
 /// \brief Premium plan
-///
 class PremiumPlan : public PaidPlan
 {
 public:
@@ -73,4 +69,14 @@ public:
 
     [[nodiscard]] bool is_resolution_allowed(int resolution) const override { return true; }
 };
+
+/*
+ * Singletons
+ */
+
+// clang-format off
+inline FreePlan    s_plan_free;
+inline PremiumPlan s_plan_premium;
+// clang-format on
+
 } // namespace lego_builder

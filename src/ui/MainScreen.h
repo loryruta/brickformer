@@ -12,9 +12,11 @@
 #include "ConverterVisualizationBridge.h"
 #include "InputWindow.h"
 #include "Screen.h"
+#include "UserSyncDaemon.h"
 #include "View3dWindow.h"
 #include "model/Model.hpp"
 #include "ui/BrickModelWindow.h"
+#include "ui/UserWindow.h"
 #include "util/BoundingBox3f.hpp"
 #include "video/Camera.hpp"
 #include "video/ModelRenderer.hpp"
@@ -68,6 +70,7 @@ private:
     struct {
         std::unique_ptr<InputWindow> input_window;
         ui::ViewSettingsWindow view_settings;
+        std::unique_ptr<UserWindow> user_window;
         std::unique_ptr<ConversionWindow> conversion_window;
         ui::MapsWindow maps;
         std::unique_ptr<ui::View3dWindow> view_3d_window;
@@ -94,9 +97,11 @@ private:
     std::shared_ptr<BrickModelBuilder> m_brick_model;
     std::unique_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
 
+    std::unique_ptr<UserSyncDaemon> m_user_sync_daemon;
+
 public:
     explicit MainScreen();
-    ~MainScreen() = default;
+    ~MainScreen();
 
     [[nodiscard]] const char* name() const override { return "MainScreen"; }
 
