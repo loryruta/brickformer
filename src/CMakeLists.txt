@@ -115,3 +115,17 @@ target_link_libraries(BrickFormer PUBLIC
         tinyformat
         tinygltf
 )
+
+# ----------------------------------------------------------------
+# Copy assets
+# ----------------------------------------------------------------
+
+set(BF_ASSETS_DIR ${CMAKE_SOURCE_DIR}/assets)
+add_custom_command(
+        TARGET BrickFormer
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${BF_ASSETS_DIR} $<TARGET_FILE_DIR:BrickFormer>/assets
+        COMMENT "Copying assets folder"
+)
+add_custom_target(BrickFormer_copy_assets ALL DEPENDS ${ASSETS_DST_DIR})
+add_dependencies(BrickFormer BrickFormer_copy_assets)

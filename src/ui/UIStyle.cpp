@@ -7,15 +7,17 @@ void bf::ui_apply_style()
     ImGuiIO& io = ImGui::GetIO();
     ImFontConfig config{};
 
+    io.IniFilename = "assets/imgui.ini";
+
     config.SizePixels = 17;
     config.OversampleH = config.OversampleV = 1;
     config.PixelSnapH = true;
-    g_font = io.Fonts->AddFontFromFileTTF("fonts/RobotoMono-Regular.ttf", 17.0f, &config);
+    g_font = io.Fonts->AddFontFromFileTTF("assets/fonts/RobotoMono-Regular.ttf", 17.0f, &config);
 
     config.SizePixels = 150;
     config.OversampleH = config.OversampleV = 1;
     config.PixelSnapH = true;
-    g_title_font = io.Fonts->AddFontFromFileTTF("fonts/RobotoMono-Bold.ttf", 150.0f, &config);
+    g_title_font = io.Fonts->AddFontFromFileTTF("assets/fonts/RobotoMono-Bold.ttf", 150.0f, &config);
 
     ImGuiStyle& style = ImGui::GetStyle();
 
