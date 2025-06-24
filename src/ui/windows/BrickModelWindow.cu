@@ -21,8 +21,8 @@ BrickModelWindow::BrickModelWindow(MainScreen& parent) : m_parent(parent)
 {
     current_subslice = 0;
 
-    m_arrow_left_icon = load_gl_texture("arrow_left.png");
-    m_arrow_right_icon = load_gl_texture("arrow_right.png");
+    m_arrow_left_icon = load_gl_texture("assets/icons/arrow_left.png");
+    m_arrow_right_icon = load_gl_texture("assets/icons/arrow_right.png");
 }
 
 BrickModelWindow::~BrickModelWindow()
