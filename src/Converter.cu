@@ -5,15 +5,15 @@
 
 #include "AssignPlacementColor.h"
 #include "BrickColors.h"
-#include "bricks.hpp"
-#include "log.hpp"
-#include "model/GltfLoader.hpp"
-#include "types.cuh"
-#include "util/StopWatch.hpp"
+#include "bricks.h"
+#include "log.h"
+#include "model/GltfLoader.h"
+#include "types.h"
+#include "util/StopWatch.h"
 
 #define ARP_LOG_CONTEXT "Converter"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {

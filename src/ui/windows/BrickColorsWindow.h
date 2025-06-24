@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 #include <imgui.h>
 
-namespace lego_builder
+namespace bf
 {
 class BrickColorsWindow
 {
@@ -21,4 +21,4 @@ public:
     void ui_color_similarity_test();
     void ui();
 };
-} // namespace lego_builder
+} // namespace bf

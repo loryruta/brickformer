@@ -2,9 +2,9 @@
 
 #include <cstdint>
 
-#include "util/misc.cuh"
+#include "util/misc_cuda.h"
 
-namespace lego_builder
+namespace bf
 {
     template<typename T>
     struct Max

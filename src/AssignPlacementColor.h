@@ -1,8 +1,8 @@
 #pragma once
 
-#include "types.cuh"
+#include "types.h"
 
-namespace lego_builder
+namespace bf
 {
 class AssignPlacementColor
 {
@@ -17,4 +17,4 @@ private:
     ~AssignPlacementColor() = default;
 };
 
-} // namespace lego_builder
+} // namespace bf

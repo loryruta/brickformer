@@ -8,9 +8,9 @@
 #include <tiny_gltf.h>
 #include <zipper/zipper.h>
 
-#include "bricks.hpp"
+#include "bricks.h"
 #include "lego_dataset.h"
-#include "log.hpp"
+#include "log.h"
 #include "util/exceptions.h"
 
 #define BFC_CHECK_FORMAT(cond_)                                                                                        \
@@ -20,7 +20,7 @@
 
 #define ARP_LOG_CONTEXT "BrickModelIO"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {
@@ -34,7 +34,7 @@ std::string current_datetime_str()
 }
 } // namespace
 
-tinygltf::Value BrickModelIO::bfc_serialize_metadata(const BrickModelBuilder& brick_model)
+tinygltf::Value BrickModelIO::bfc_serialize_metadata(const BrickModel& brick_model)
 {
     using tinygltf::Value;
 
@@ -80,7 +80,7 @@ tinygltf::Value BrickModelIO::bfc_serialize_metadata(const BrickModelBuilder& br
     return Value(json_);
 }
 
-void BrickModelIO::bfc_deserialize_metadata(const tinygltf::Value& json, BrickModelBuilder& out_brick_model)
+void BrickModelIO::bfc_deserialize_metadata(const tinygltf::Value& json, BrickModel& out_brick_model)
 {
     using tinygltf::Value;
 
@@ -144,7 +144,7 @@ void BrickModelIO::bfc_deserialize_metadata(const tinygltf::Value& json, BrickMo
     }
 }
 
-void BrickModelIO::bfc_export(const BrickModelBuilder& brick_model, const std::filesystem::path& output_filepath)
+void BrickModelIO::bfc_export(const BrickModel& brick_model, const std::filesystem::path& output_filepath)
 {
     // .bfc extension (BrickFormer Conversion) is a .glb file with custom content
     CHECK_ARG(output_filepath.extension() == ".bfc", "Output file extension must be .bfc");
@@ -279,7 +279,7 @@ void BrickModelIO::bfc_export(const BrickModelBuilder& brick_model, const std::f
     CHECK_STATE(result, "Failed to write .bfc file: %s", output_filepath.string());
 }
 
-std::unique_ptr<BrickModelBuilder> BrickModelIO::bfc_import(const std::filesystem::path& input_filepath)
+std::unique_ptr<BrickModel> BrickModelIO::bfc_import(const std::filesystem::path& input_filepath)
 {
     CHECK_ARG(input_filepath.extension() == ".bfc", "Input file extension must be .bfc");
 
@@ -319,7 +319,7 @@ std::unique_ptr<BrickModelBuilder> BrickModelIO::bfc_import(const std::filesyste
     min_ = {position_accessor.minValues[0], position_accessor.minValues[1], position_accessor.minValues[2]};
     max_ = {position_accessor.maxValues[0], position_accessor.maxValues[1], position_accessor.maxValues[2]};
 
-    BrickModelBuilder brick_model;
+    BrickModel brick_model;
     bfc_deserialize_metadata(model.extras, brick_model);
     brick_model.m_model.m_min = min_;
     brick_model.m_model.m_max = max_;
@@ -329,7 +329,7 @@ std::unique_ptr<BrickModelBuilder> BrickModelIO::bfc_import(const std::filesyste
     mesh.indices = {}; // No indices for Brick Model
     mesh.m_min = min_;
     mesh.m_max = max_;
-    return std::make_unique<BrickModelBuilder>(std::move(brick_model));
+    return std::make_unique<BrickModel>(std::move(brick_model));
 }
 
 /*
@@ -372,7 +372,7 @@ std::unique_ptr<BrickModelBuilder> BrickModelIO::bfc_import(const std::filesyste
     </LXFML>
  */
 
-void BrickModelIO::lxfml_export(const BrickModelBuilder& brick_model, const std::filesystem::path& output_filepath)
+void BrickModelIO::lxfml_export(const BrickModel& brick_model, const std::filesystem::path& output_filepath)
 {
     CHECK_ARG(output_filepath.extension() == ".lxfml", "Output file extension must be .lxfml");
 
@@ -430,7 +430,7 @@ void BrickModelIO::lxfml_export(const BrickModelBuilder& brick_model, const std:
     CHECK_ARG(result, "Failed to export .lxfml file to: %s", output_filepath.string());
 }
 
-void BrickModelIO::lxf_export(const BrickModelBuilder& brick_model, const std::filesystem::path& output_filepath)
+void BrickModelIO::lxf_export(const BrickModel& brick_model, const std::filesystem::path& output_filepath)
 {
     using namespace zipper;
 

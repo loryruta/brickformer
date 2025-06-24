@@ -3,19 +3,19 @@
 #include <imgui.h>
 #include <nfd.h>
 
-#include "App.h"
-#include "MainScreen.h"
-#include "UIStyle.h"
 #include "io/BrickModelIO.h"
-#include "log.hpp"
+#include "log.h"
+#include "ui/App.h"
+#include "ui/MainScreen.h"
+#include "ui/UIStyle.h"
 #include "util/exceptions.h"
-#include "util/misc.hpp"
+#include "util/misc.h"
 #include "util/str_utils.h"
 #include "video/gl_helpers.hpp"
 
 #define ARP_LOG_CONTEXT "BrickModelWindow"
 
-using namespace lego_builder;
+using namespace bf;
 
 BrickModelWindow::BrickModelWindow(MainScreen& parent) : m_parent(parent)
 {
@@ -33,7 +33,7 @@ BrickModelWindow::~BrickModelWindow()
 
 void BrickModelWindow::export_bfc()
 {
-    std::shared_ptr<BrickModelBuilder> brick_model = m_parent.m_brick_model;
+    std::shared_ptr<BrickModel> brick_model = m_parent.m_brick_model;
     CHECK_STATE(brick_model);
 
     nfdu8char_t* out_path;
@@ -59,7 +59,7 @@ void BrickModelWindow::export_bfc()
 
 void BrickModelWindow::export_lxf()
 {
-    std::shared_ptr<BrickModelBuilder> brick_model = m_parent.m_brick_model;
+    std::shared_ptr<BrickModel> brick_model = m_parent.m_brick_model;
     CHECK_STATE(brick_model);
 
     nfdu8char_t* out_path;
@@ -85,7 +85,7 @@ void BrickModelWindow::export_lxf()
 
 void BrickModelWindow::ui()
 {
-    std::shared_ptr<BrickModelBuilder> brick_model = m_parent.m_brick_model;
+    std::shared_ptr<BrickModel> brick_model = m_parent.m_brick_model;
     CHECK_STATE(brick_model, "Brick model not present");
     size_t num_subslices = brick_model->subslice_ranges().size();
 

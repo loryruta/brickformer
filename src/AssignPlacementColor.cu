@@ -1,9 +1,9 @@
 #include "AssignPlacementColor.h"
 
-#include "bricks.hpp"
+#include "bricks.h"
 #include "lego_dataset.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {

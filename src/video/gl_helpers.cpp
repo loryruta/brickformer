@@ -2,9 +2,9 @@
 
 #include <stb_image.h>
 
-#include "util/misc.hpp"
+#include "util/misc.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 namespace
 {
@@ -32,7 +32,7 @@ namespace
     }
 }  // namespace
 
-GLuint lego_builder::create_shader(GLenum type, const std::string& src)
+GLuint bf::create_shader(GLenum type, const std::string& src)
 {
     GLuint shader = glCreateShader(type);
     const char* src_ptr = src.c_str();
@@ -59,7 +59,7 @@ GLuint lego_builder::create_shader(GLenum type, const std::string& src)
     return shader;
 }
 
-void lego_builder::link_program(GLuint program)
+void bf::link_program(GLuint program)
 {
     glLinkProgram(program);
 
@@ -81,7 +81,7 @@ void lego_builder::link_program(GLuint program)
     }
 }
 
-GLint lego_builder::get_attrib_location(GLuint program, const char* name, bool require)
+GLint bf::get_attrib_location(GLuint program, const char* name, bool require)
 {
     GLint loc = glGetAttribLocation(program, name);
 
@@ -93,7 +93,7 @@ GLint lego_builder::get_attrib_location(GLuint program, const char* name, bool r
     return loc;
 }
 
-GLint lego_builder::get_uniform_location(GLuint program, const char* name, bool require)
+GLint bf::get_uniform_location(GLuint program, const char* name, bool require)
 {
     GLint loc = glGetUniformLocation(program, name);
     if (require && loc < 0)
@@ -104,14 +104,14 @@ GLint lego_builder::get_uniform_location(GLuint program, const char* name, bool 
     return loc;
 }
 
-void lego_builder::enable_gl_debug_output()
+void bf::enable_gl_debug_output()
 {
     glEnable(GL_DEBUG_OUTPUT);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);  // To ensure errors are thrown in the scope of the function
     glDebugMessageCallback(debug_message_callback, nullptr);
 }
 
-GLuint lego_builder::create_gl_texture(uint32_t width, uint32_t height)
+GLuint bf::create_gl_texture(uint32_t width, uint32_t height)
 {
     GLuint gl_texture;
     glGenTextures(1, &gl_texture);
@@ -129,7 +129,7 @@ GLuint lego_builder::create_gl_texture(uint32_t width, uint32_t height)
     return gl_texture;
 }
 
-GLuint lego_builder::load_gl_texture(const std::filesystem::path& filepath)
+GLuint bf::load_gl_texture(const std::filesystem::path& filepath)
 {
     int width, height, channels;
     const stbi_uc* image_data = stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);

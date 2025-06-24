@@ -2,11 +2,11 @@
 
 #include <cstdint>
 
-#include "DeviceImage.cuh"
+#include "DeviceImage.h"
 
 #define ARP_NO_PLACEMENT_VALUE uint16_t(UINT16_MAX)
 
-namespace lego_builder
+namespace bf
 {
 
 /// A struct representing a placement within a slice.
@@ -50,4 +50,4 @@ using ProximityMapT = DeviceImage<1, uint8_t>;
 /// meaningless and only useful to identify the occupied region.
 using PlacementMapT = DeviceImage<1, uint16_t>;
 
-} // namespace lego_builder
+} // namespace bf

@@ -5,7 +5,7 @@
 
 #include <glm/glm.hpp>
 
-namespace lego_builder
+namespace bf
 {
 // Forward decl
 class MainScreen;
@@ -37,4 +37,4 @@ public:
     void browse_model();
     void import_brickformer_construction();
 };
-} // namespace lego_builder
+} // namespace bf

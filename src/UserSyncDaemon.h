@@ -5,7 +5,7 @@
 
 #include "User.h"
 
-namespace lego_builder
+namespace bf
 {
 /// A class wrapping a thread that periodically query user data from Firestore.
 /// If this class fails in any manner (e.g. no internet), the user must be brought to login screen.
@@ -29,4 +29,4 @@ public:
 private:
     void thread_start();
 };
-} // namespace lego_builder
+} // namespace bf

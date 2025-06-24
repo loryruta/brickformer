@@ -5,12 +5,12 @@
 #include <firebase/firestore.h>
 #include <iostream>
 
-#include "log.hpp"
+#include "log.h"
 #include "ui/App.h"
 
 #define ARP_LOG_CONTEXT "UserSyncDaemon"
 
-using namespace lego_builder;
+using namespace bf;
 using namespace firebase;
 
 UserSyncDaemon::UserSyncDaemon(User& user) : m_user(user) {}

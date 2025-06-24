@@ -5,7 +5,7 @@
 #include "gl_helpers.hpp"
 #include "util/exceptions.h"
 
-using namespace lego_builder;
+using namespace bf;
 
 GBuffer::GBuffer(int width, int height) :
     m_width(width),

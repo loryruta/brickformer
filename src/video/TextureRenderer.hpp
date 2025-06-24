@@ -2,7 +2,7 @@
 
 #include "glad/gl.h"
 
-namespace lego_builder
+namespace bf
 {
 class TextureRenderer
 {

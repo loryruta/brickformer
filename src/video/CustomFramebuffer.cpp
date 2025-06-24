@@ -2,7 +2,7 @@
 
 #include <cassert>
 
-using namespace lego_builder;
+using namespace bf;
 
 CustomFramebuffer::CustomFramebuffer(int width, int height)
     : m_width(width), m_height(height), m_aspect_ratio(float(width) / float(height))

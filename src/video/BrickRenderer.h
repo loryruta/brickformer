@@ -6,9 +6,9 @@
 
 #include "Camera.hpp"
 #include "GBuffer.hpp"
-#include "model/Model.hpp"
+#include "model/Model.h"
 
-namespace lego_builder
+namespace bf
 {
 struct BrickRenderer_BakedModel {
     GLuint vao = 0;
@@ -67,4 +67,4 @@ public:
 
     static BrickRenderer_BakedModel bake_model(const Model& model);
 };
-} // namespace lego_builder
+} // namespace bf

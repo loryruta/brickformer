@@ -3,7 +3,7 @@
 #include <memory>
 #include <vector>
 
-#include "BrickModelBuilder.h"
+#include "BrickModel.h"
 #include "Converter.h"
 #include "ConverterListener.h"
 #include "video/BrickRenderer.h"
@@ -11,7 +11,7 @@
 #include "video/VoxelModelBuilder.hpp"
 #include "video/cuda_interop_helpers.cuh"
 
-namespace lego_builder
+namespace bf
 {
 // Forward decl
 class MainScreen;
@@ -29,7 +29,7 @@ private:
     std::vector<CUDAMappedGLTexture> m_placement_map_color_textures;
     std::unique_ptr<CUDAMappedGLTexture> m_proximity_map_texture;
 
-    std::shared_ptr<BrickModelBuilder> m_brick_model;
+    std::shared_ptr<BrickModel> m_brick_model;
 
 public:
     explicit ConverterVisualizationBridge(MainScreen& parent);
@@ -48,7 +48,7 @@ public:
     }
     [[nodiscard]] GLuint proximity_map_texture() const { return m_proximity_map_texture->texture(); }
 
-    [[nodiscard]] const std::shared_ptr<BrickModelBuilder>& brick_model() const { return m_brick_model; }
+    [[nodiscard]] const std::shared_ptr<BrickModel>& brick_model() const { return m_brick_model; }
 
     void copy_color_map(cudaStream_t stream);
     void copy_placement_maps(cudaStream_t stream);
@@ -62,4 +62,4 @@ public:
     void on_place(uint32_t slice_y, const Placement& placement, float reward) override {}
     void on_placement_end(uint32_t slice_y, const std::vector<Placement>& placements) override;
 };
-} // namespace lego_builder
+} // namespace bf

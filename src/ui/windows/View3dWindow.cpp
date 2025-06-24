@@ -1,11 +1,11 @@
 #include "View3dWindow.h"
 
-#include <imgui.h>
 #include "imgui_internal.h"
+#include <imgui.h>
 
-#include "UIStyle.h"
+#include "ui/UIStyle.h"
 
-using namespace lego_builder::ui;
+using namespace bf::ui;
 
 View3dWindow::View3dWindow(Window& window, RenderFuncT render_func, ViewUpdateFuncT view_update_func)
     : m_window(window), m_render_func(std::move(render_func)), m_view_update_func(std::move(view_update_func))

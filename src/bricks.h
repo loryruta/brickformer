@@ -10,7 +10,7 @@
 #define __constant__
 #endif
 
-namespace lego_builder
+namespace bf
 {
 using BlockLayoutT = uint8_t[BRICK_MAX_EXTENT_Z][BRICK_MAX_EXTENT_X];
 
@@ -152,4 +152,4 @@ static_assert(std::size(k_bricks) == std::size(k_brick_design_ids),
               "k_bricks and k_brick_design_ids must have the same length");
 
 __constant__ const std::size_t k_num_bricks = sizeof(k_bricks) / sizeof(k_bricks[0]);
-} // namespace lego_builder
+} // namespace bf

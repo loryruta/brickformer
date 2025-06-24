@@ -1,9 +1,9 @@
 #pragma once
 
-#include "bricks.hpp"
-#include "types.cuh"
+#include "bricks.h"
+#include "types.h"
 
-namespace lego_builder
+namespace bf
 {
 /// Iterates the brick grid within the warp and callbacks every occurrence.
 /// Important: don't perform warp operations within the callback.
@@ -102,4 +102,4 @@ namespace internal
 __global__ void
 eval_reward_kernel(const PlacementSolver* self, const PlacementSolver::Input* params, float* out_rewards);
 }
-} // namespace lego_builder
+} // namespace bf

@@ -6,7 +6,7 @@
 
 #include "Camera.hpp"
 
-namespace lego_builder
+namespace bf
 {
 class BrickPlaneRenderer
 {
@@ -23,4 +23,4 @@ public:
 private:
     void create_brick_texture();
 };
-} // namespace lego_builder
+} // namespace bf

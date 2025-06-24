@@ -3,12 +3,12 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
-#include "App.h"
-#include "MainScreen.h"
-#include "UIStyle.h"
+#include "ui/App.h"
+#include "ui/MainScreen.h"
+#include "ui/UIStyle.h"
 #include "video/gl_helpers.hpp"
 
-using namespace lego_builder;
+using namespace bf;
 
 ConversionWindow::ConversionWindow(MainScreen& parent) : m_parent(parent)
 {

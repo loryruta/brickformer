@@ -4,7 +4,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-using namespace lego_builder;
+using namespace bf;
 
 // TODO: Vertices not good with backface culling!
 

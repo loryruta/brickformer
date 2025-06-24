@@ -7,11 +7,11 @@
 
 #include "ConverterListener.h"
 #include "PlacementSolver.h"
-#include "Slicer.cuh"
+#include "Slicer.h"
 #include "SpreadValue.h"
-#include "types.cuh"
+#include "types.h"
 
-namespace lego_builder
+namespace bf
 {
 struct ConverterParams {
     std::string model_path = "";
@@ -174,4 +174,4 @@ private:
     void color_placements();
 };
 
-} // namespace lego_builder
+} // namespace bf

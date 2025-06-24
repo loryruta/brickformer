@@ -8,13 +8,13 @@
 
 #include "AuthScreen.h"
 #include "UIStyle.h"
-#include "log.hpp"
+#include "log.h"
 #include "util/exceptions.h"
 #include "video/gl_helpers.hpp"
 
 #define ARP_LOG_CONTEXT "App"
 
-using namespace lego_builder;
+using namespace bf;
 
 App::App(Window& window) : m_window(window)
 {
