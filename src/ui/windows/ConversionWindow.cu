@@ -12,10 +12,10 @@ using namespace bf;
 
 ConversionWindow::ConversionWindow(MainScreen& parent) : m_parent(parent)
 {
-    m_pause_icon = load_gl_texture("pause.png");
-    m_play_icon = load_gl_texture("play.png");
-    m_stop_icon = load_gl_texture("stop.png");
-    m_speed_play_icon = load_gl_texture("speed_play.png");
+    m_pause_icon = load_gl_texture("assets/icons/pause.png");
+    m_play_icon = load_gl_texture("assets/icons/play.png");
+    m_stop_icon = load_gl_texture("assets/icons/stop.png");
+    m_speed_play_icon = load_gl_texture("assets/icons/speed_play.png");
 }
 
 ConversionWindow::~ConversionWindow()
