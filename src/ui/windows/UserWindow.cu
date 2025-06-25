@@ -36,14 +36,6 @@ void UserWindow::ui()
             ImGui::Text("Start: %s", plan_begin.c_str());
             ImGui::Text("End:   %s", plan_end.c_str());
         }
-
-        ImGui::Separator();
-
-        int64_t last_sync_t = user.last_synchronization_at();
-        ui_text_wrapped_muted("Last synchronization%s", last_sync_t < INT64_MAX ? "" : ": -");
-        if (last_sync_t < INT64_MAX) {
-            ui_text_wrapped_muted("%s", unix_timestamp_to_readable_str(last_sync_t).c_str());
-        }
     }
     ImGui::End();
 }
