@@ -1,33 +1,9 @@
-[submodule "external/glm"]
-	path = external/glm
-	url = https://github.com/g-truc/glm
 [submodule "external/cccl"]
 	path = external/cccl
 	url = https://github.com/NVIDIA/cccl
-[submodule "external/glfw"]
-	path = external/glfw
-	url = https://github.com/glfw/glfw
-[submodule "external/raylib"]
-	path = external/raylib
-	url = https://github.com/raysan5/raylib
-[submodule "external/bvh"]
-	path = external/bvh
-	url = https://github.com/madmann91/bvh
-[submodule "external/tinygltf"]
-	path = external/tinygltf
-	url = https://github.com/syoyo/tinygltf
-[submodule "external/imgui"]
-	path = external/imgui
-	url = https://github.com/ocornut/imgui
-[submodule "external/nativefiledialog-extended"]
-	path = external/nativefiledialog-extended
-	url = https://github.com/btzy/nativefiledialog-extended
 [submodule "external/tinyformat"]
 	path = external/tinyformat
 	url = https://github.com/c42f/tinyformat
-[submodule "external/pugixml"]
-	path = external/pugixml
-	url = https://github.com/zeux/pugixml
 [submodule "external/zipper"]
 	path = external/zipper
 	url = https://github.com/sebastiandev/zipper

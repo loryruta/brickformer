@@ -42,7 +42,9 @@ void Slicer::linearize_triangles(const Model& model, cudaStream_t stream)
     printf("[Slicer] Model triangles linearized to %zu triangles\n", triangles.size());
 
     m_triangles_d.resize(triangles.size());
-    thrust::copy(thrust::cuda::par.on(stream), triangles.begin(), triangles.end(), m_triangles_d.begin());
+    TriRef* triangles_d = thrust::raw_pointer_cast(m_triangles_d.data());
+    CHECK_CU(cudaMemcpyAsync(
+        triangles_d, triangles.data(), triangles.size() * sizeof(TriRef), cudaMemcpyHostToDevice, stream));
 }
 
 __device__ void set_voxel(int x, int z, const glm::vec4& color, SliceT* out_slice)

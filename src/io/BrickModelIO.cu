@@ -275,7 +275,7 @@ void BrickModelIO::bfc_export(const BrickModel& brick_model, const std::filesyst
 
     tinygltf::TinyGLTF writer{};
     writer.SetStoreOriginalJSONForExtrasAndExtensions(true);
-    bool result = writer.WriteGltfSceneToFile(&model, output_filepath, true, true, false, true /* writeBinary */);
+    bool result = writer.WriteGltfSceneToFile(&model, output_filepath.string(), true, true, false, true /* writeBinary */);
     CHECK_STATE(result, "Failed to write .bfc file: %s", output_filepath.string());
 }
 
@@ -443,7 +443,7 @@ void BrickModelIO::lxf_export(const BrickModel& brick_model, const std::filesyst
     std::filesystem::path thumbnail_filepath = std::filesystem::temp_directory_path() / "IMAGE100.png";
     // Dummy thumbnail, it's required to make Bricklink import work!
     std::vector<uint8_t> image_data(128 * 128 * 4, 0xFF);
-    CHECK_STATE(stbi_write_png(thumbnail_filepath.c_str(), 128 /* w */, 128 /* h */, 4, image_data.data(), 0));
+    CHECK_STATE(stbi_write_png(thumbnail_filepath.string().c_str(), 128 /* w */, 128 /* h */, 4, image_data.data(), 0));
     ARP_DEBUG("Created dummy thumbnail at: %s", thumbnail_filepath.string());
 
     // Reference:
@@ -451,7 +451,7 @@ void BrickModelIO::lxf_export(const BrickModel& brick_model, const std::filesyst
 
     // Using Zipper;
     // Tried https://github.com/kuba--/zip/ but creates a .zip file not supported by Bricklink (no CRC?)
-    Zipper zipper(output_filepath);
+    Zipper zipper(output_filepath.string());
     {
         std::ifstream lxfml_file(lxfml_filepath, std::ios::binary);
         zipper.add(lxfml_file, "IMAGE100.lxfml");

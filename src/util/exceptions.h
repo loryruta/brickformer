@@ -53,7 +53,7 @@ void check_state(bool condition,
                  const char* additional_message_fmt,
                  ARGS&&... args)
 {
-    if (__builtin_expect(!condition, 0) /* UNLIKELY */) {
+    if (!condition) [[unlikely]] {
         std::string fmt = "Illegal state \"%s\"";
 #ifndef NDEBUG
         fmt += std::string(" (%s:%d)");
@@ -77,7 +77,7 @@ void check_arg(bool condition,
                const char* additional_message_fmt,
                ARGS&&... args)
 {
-    if (__builtin_expect(!condition, 0) /* UNLIKELY */) {
+    if (!condition) [[unlikely]] {
         std::string fmt = "Illegal argument \"%s\"";
 #ifndef NDEBUG
         fmt += std::string(" (%s:%d)");

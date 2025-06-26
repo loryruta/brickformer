@@ -7,8 +7,8 @@ namespace bf
 {
 /// Iterates the brick grid within the warp and callbacks every occurrence.
 /// Important: don't perform warp operations within the callback.
-template <typename CALLBACK>
-__device__ void iterate_brick_grid(CALLBACK callback)
+template <typename Callback> // MSVC: "CALLBACK" is already defined by windows.h!
+__device__ void iterate_brick_grid(Callback callback)
 {
     int lane_i = threadIdx.x & 0x1f;
     int lane_x = lane_i % 5;

@@ -7,29 +7,29 @@ using namespace bf;
 
 namespace
 {
-__host__ __device__ glm::vec3 rgb_to_xyz(const glm::vec3& rgb)
+__host__ __device__ float3 rgb_to_xyz(const float3& rgb)
 {
     // Code from:
     // http://www.easyrgb.com/en/math.php
     // sR, sG and sB (Standard RGB) input range = 0 - 255
     // X, Y and Z output refer to a D65/2° standard illuminant.
-    float var_R = rgb.r / 255.0f;
-    float var_G = rgb.g / 255.0f;
-    float var_B = rgb.b / 255.0f;
+    float var_R = rgb.x / 255.0f;
+    float var_G = rgb.y / 255.0f;
+    float var_B = rgb.z / 255.0f;
     var_R = var_R > 0.04045 ? powf((var_R + 0.055f) / 1.055f, 2.4f) : var_R / 12.92;
     var_G = var_G > 0.04045 ? powf((var_G + 0.055) / 1.055, 2.4f) : var_G / 12.92;
     var_B = var_B > 0.04045 ? powf((var_B + 0.055) / 1.055, 2.4) : var_B / 12.92;
     var_R = var_R * 100;
     var_G = var_G * 100;
     var_B = var_B * 100;
-    glm::vec3 out_xyz;
+    float3 out_xyz;
     out_xyz.x = var_R * 0.4124 + var_G * 0.3576 + var_B * 0.1805;
     out_xyz.y = var_R * 0.2126 + var_G * 0.7152 + var_B * 0.0722;
     out_xyz.z = var_R * 0.0193 + var_G * 0.1192 + var_B * 0.9505;
     return out_xyz;
 }
 
-__host__ __device__ glm::vec3 xyz_to_lab(const glm::vec3& xyz)
+__host__ __device__ float3 xyz_to_lab(const float3& xyz)
 {
     // Code from:
     // http://www.easyrgb.com/en/math.php
@@ -43,10 +43,10 @@ __host__ __device__ glm::vec3 xyz_to_lab(const glm::vec3& xyz)
     var_X = var_X > 0.008856f ? powf(var_X, 0.333333333f) : (7.787 * var_X) + 0.13793103f;
     var_Y = var_Y > 0.008856f ? powf(var_Y, 0.333333333f) : (7.787 * var_Y) + 0.13793103f;
     var_Z = var_Z > 0.008856f ? powf(var_Z, 0.333333333f) : (7.787 * var_Z) + 0.13793103f;
-    glm::vec3 out_cielab;
-    out_cielab[0] = (116 * var_Y) - 16;
-    out_cielab[1] = 500 * (var_X - var_Y);
-    out_cielab[2] = 200 * (var_Y - var_Z);
+    float3 out_cielab;
+    out_cielab.x = (116 * var_Y) - 16;
+    out_cielab.y = 500 * (var_X - var_Y);
+    out_cielab.z = 200 * (var_Y - var_Z);
     return out_cielab;
 }
 
@@ -94,19 +94,25 @@ __global__ void assign_placements_cid_kernel(ColorMapT color_map,
 /// \param color_mask  A color mask to use to unavailable colors (length is color cardinality)
 __host__ __device__ int AssignPlacementColor::search_nearest_cid(const glm::vec3& query_color, const bool* color_mask)
 {
+    // Awful conversion to float3 for compatibility with lego_dataset.h
+    float3 q = make_float3(query_color.r, query_color.g, query_color.b);
+
     // Computing color difference:
     // https://stackoverflow.com/a/67294772/7358682
     int min_cid = -1;
     float min_dist_sq = INFINITY;
     for (uint32_t cid = 0; cid < k_num_brick_colors; ++cid) {
         if (!color_mask || color_mask[cid]) {
-            glm::vec3 b = k_brick_colors_rgb_d[cid];
+            float3 b = k_brick_colors_rgb_d[cid];
             // Compute color difference in CIELAB color space (closer to human perception)
             // TODO cache CIELAB color conversions!
-            glm::vec3 q_lab = xyz_to_lab(rgb_to_xyz(query_color));
-            glm::vec3 b_lab = xyz_to_lab(rgb_to_xyz(b));
-            glm::vec3 diff = q_lab - b_lab;
-            float dist_sq = glm::dot(diff, diff);
+            float3 q_lab = xyz_to_lab(rgb_to_xyz(q));
+            float3 b_lab = xyz_to_lab(rgb_to_xyz(b));
+            float3 diff;
+            diff.x = q_lab.x - b_lab.x;
+            diff.y = q_lab.y - b_lab.y;
+            diff.z = q_lab.z - b_lab.z;
+            float dist_sq = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
             if (dist_sq < min_dist_sq) {
                 min_cid = cid;
                 min_dist_sq = dist_sq;

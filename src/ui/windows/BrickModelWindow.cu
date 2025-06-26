@@ -38,7 +38,7 @@ void BrickModelWindow::export_bfc()
 
     nfdu8char_t* out_path;
     nfdu8filteritem_t filters[]{{"BrickFormer Construction", "bfc"}};
-    nfdsavedialognargs_t args{};
+    nfdsavedialogu8args_t args{};
     args.filterList = filters;
     args.filterCount = 1;
 
@@ -64,7 +64,7 @@ void BrickModelWindow::export_lxf()
 
     nfdu8char_t* out_path;
     nfdu8filteritem_t filters[]{{"LXF", "lxf"}};
-    nfdsavedialognargs_t args{};
+    nfdsavedialogu8args_t args{};
     args.filterList = filters;
     args.filterCount = 1;
 

@@ -132,7 +132,7 @@ GLuint bf::create_gl_texture(uint32_t width, uint32_t height)
 GLuint bf::load_gl_texture(const std::filesystem::path& filepath)
 {
     int width, height, channels;
-    const stbi_uc* image_data = stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    const stbi_uc* image_data = stbi_load(filepath.string().c_str(), &width, &height, &channels, STBI_rgb_alpha);
     CHECK_STATE(image_data, "Failed to load texture: %s", filepath.string());
 
     GLuint texture;
