@@ -42,10 +42,10 @@ tinygltf::Value BrickModelIO::bfc_serialize_metadata(const BrickModel& brick_mod
 
     json_["name"] = Value(brick_model.name());
     json_["description"] = Value("BrickFormer Conversion");
-    json_["version"] = Value(BFC_GIT_VERSION);
-    json_["version_full"] = Value(BFC_GIT_VERSION_FULL);
-    json_["commit_hash"] = Value(BFC_GIT_COMMIT_HASH);
-    json_["commit_timestamp"] = Value(BFC_GIT_COMMIT_TIMESTAMP);
+    json_["version"] = Value(BF_GIT_VERSION);
+    json_["version_full"] = Value(BF_GIT_VERSION_FULL);
+    json_["commit_hash"] = Value(BF_GIT_COMMIT_HASH);
+    json_["commit_timestamp"] = Value(BF_GIT_COMMIT_TIMESTAMP);
     json_["created_at"] = Value(current_datetime_str());
 
     // Serialize subslice ranges
@@ -386,7 +386,7 @@ void BrickModelIO::lxfml_export(const BrickModel& brick_model, const std::filesy
     pugi::xml_node meta = lxfml.append_child("Meta");
     pugi::xml_node application = meta.append_child("Application");
     application.append_attribute("name") = "BrickFormer";
-    application.append_attribute("version") = BFC_GIT_VERSION_FULL;
+    application.append_attribute("version") = BF_GIT_VERSION_FULL;
     // Bricks
     pugi::xml_node bricks = lxfml.append_child("Bricks");
     uint32_t ref_id = 0;
