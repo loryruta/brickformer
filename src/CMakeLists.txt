@@ -37,6 +37,7 @@ add_executable(BrickFormer
         ui/UIStyle.h
 
         util/exceptions.h
+        util/external_libs.cpp
         util/intersections.h
         util/json.hpp
         util/misc.h
@@ -91,30 +92,39 @@ add_executable(BrickFormer
         User.h
         UserSyncDaemon.cu
         UserSyncDaemon.h
+        util/external_libs.cpp
 )
 
-target_include_directories(BrickFormer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
-# It's important for the Firebase dependencies to be in this order!
+target_include_directories(BrickFormer PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${Stb_INCLUDE_DIR}
+        ${TINYGLTF_INCLUDE_DIRS}
+)
 target_link_libraries(BrickFormer PUBLIC
-        CCCL::CCCL
+        # It's important for the Firebase dependencies to be in this order!
         firebase_firestore
         firebase_auth
         firebase_app
         glad
         glfw
-        glm
-        imgui
-        imgui_backend_opengl3_glfw
-        nfd
-        pugixml
-        secret-1
+        glm::glm
+        ZLIB::ZLIB
+        imgui::imgui
+        nfd::nfd
+        pugixml::pugixml
         staticZipper
-        stb
-        tbb # To use e.g. std parallel foreach
         tinyformat
-        tinygltf
 )
+
+if (UNIX)
+    # Firebase dependencies in Linux
+    target_link_libraries(BrickFormer PRIVATE secret-1)
+    # To use e.g. std parallel foreach
+    target_link_libraries(BrickFormer PRIVATE tbb)
+elseif (MSVC)
+    # Firebase dependencies in Windows
+    target_link_libraries(BrickFormer PRIVATE advapi32 ws2_32 crypt32 iphlpapi psapi userenv dbghelp bcrypt)
+endif ()
 
 # ----------------------------------------------------------------
 # Copy assets

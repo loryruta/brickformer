@@ -144,7 +144,7 @@ def generate_header_file():
 
 #include <glm/glm.hpp>
 
-namespace lego_builder
+namespace bf
 {
 struct BrickColor {
     uint32_t id;
@@ -164,20 +164,22 @@ const BrickColor k_brick_colors[] = {\n"""
     content += f"constexpr std::size_t k_num_brick_colors = {len(colors)};\n\n"
 
     # Write k_brick_colors_data
-    def write_brick_colors(var_name: str, out_content: str):
-        out_content += f"const glm::vec3 {var_name}[] = {{\n"
+    def write_brick_colors(var_name: str, var_type: str, out_content: str):
+        out_content += f"const {var_type} {var_name}[] = {{\n"
         for _, color in colors.items():
             rgb = color["rgb"]
             r_float = float((rgb >> 16) & 0xFF)
             g_float = float((rgb >> 8) & 0xFF)
             b_float = float(rgb & 0xFF)
-            out_content += f"   glm::vec3({r_float}f, {g_float}f, {b_float}f),\n"
+            out_content += f"   {{{r_float}f, {g_float}f, {b_float}f}},\n"
         out_content += "};\n\n"
         return out_content
 
+    # For GPU
     content += "__constant__\n"
-    content = write_brick_colors("k_brick_colors_rgb_d", content)
-    content = write_brick_colors("k_brick_colors_rgb", content)
+    content = write_brick_colors("k_brick_colors_rgb_d", "float3", content)
+    # For host
+    content = write_brick_colors("k_brick_colors_rgb", "glm::vec3", content)
 
     design_ids_set = set(DESIGN_IDS)
     design_id_color_ids = {}

@@ -321,7 +321,7 @@ void MainScreen::start_conversion()
 
     // Init the converter
     ConverterParams params{};
-    params.model_path = m_ui.input_window->model_path;
+    params.model_path = m_ui.input_window->model_path.string();
     params.resolution = resolution;
     params.model_orientation = m_ui.input_window->model_orientation();
     params.use_subslices = false;
