@@ -24,14 +24,14 @@ void bf::ui_apply_style()
     style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
     style.Colors[ImGuiCol_WindowBg] = DARK_COLOR;
     style.Colors[ImGuiCol_PopupBg] = DARK_COLOR;
-    style.Colors[ImGuiCol_Border] = ImVec4(0.70f, 0.70f, 0.70f, 0.65f);
+    style.Colors[ImGuiCol_Border] = DARK_COLOR_LIGHT;
     style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
     style.Colors[ImGuiCol_FrameBg] = DARK_COLOR_LIGHT;
     style.Colors[ImGuiCol_FrameBgHovered] = DARK_COLOR_LIGHT2;
     style.Colors[ImGuiCol_FrameBgActive] = DARK_COLOR_LIGHT2;
-    style.Colors[ImGuiCol_TitleBg] = MAIN_COLOR;
-    style.Colors[ImGuiCol_TitleBgCollapsed] = MAIN_COLOR;
-    style.Colors[ImGuiCol_TitleBgActive] = MAIN_COLOR;
+    style.Colors[ImGuiCol_TitleBg] = DARK_COLOR;
+    style.Colors[ImGuiCol_TitleBgCollapsed] = DARK_COLOR_LIGHT;
+    style.Colors[ImGuiCol_TitleBgActive] = DARK_COLOR_LIGHT;
     style.Colors[ImGuiCol_Tab] = MAIN_COLOR;
     style.Colors[ImGuiCol_TabHovered] = MAIN_COLOR_LIGHT;
     style.Colors[ImGuiCol_TabSelected] = MAIN_COLOR_LIGHT;
@@ -49,7 +49,7 @@ void bf::ui_apply_style()
     style.Colors[ImGuiCol_Button] = MAIN_COLOR;
     style.Colors[ImGuiCol_ButtonHovered] = MAIN_COLOR_LIGHT;
     style.Colors[ImGuiCol_ButtonActive] = MAIN_COLOR_LIGHT;
-    style.Colors[ImGuiCol_Header] = MAIN_COLOR;
+    style.Colors[ImGuiCol_Header] = ImVec4(0.44f, 0.61f, 0.86f, 1.00f);
     style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.44f, 0.61f, 0.86f, 1.00f);
     style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.38f, 0.62f, 0.83f, 1.00f);
     style.Colors[ImGuiCol_ResizeGrip] = ImVec4(1.00f, 1.00f, 1.00f, 0.85f);

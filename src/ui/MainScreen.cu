@@ -26,6 +26,8 @@ void ui::ViewSettingsWindow::show()
         ImGui::Checkbox("Show brick model", &show_brick_model);
         ImGui::Checkbox("Show brick plane", &show_brick_plane);
         ImGui::Checkbox("SSAO", &ssao);
+        ImGui::Checkbox("Orbit camera", &orbit_camera);
+        ui_slider_float("Orbit speed", &orbit_speed, 0.1f, 8.0f);
     }
     ImGui::End();
 }
@@ -122,7 +124,32 @@ MainScreen::~MainScreen()
     glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 }
 
-void MainScreen::update(float dt) {}
+void MainScreen::update(float dt)
+{
+    if (m_ui.view_settings.orbit_camera) {
+        if (m_model) {
+            int resolution = m_ui.input_window->resolution;
+            glm::mat4 model_orientation = m_ui.input_window->model_orientation();
+            glm::mat4 transform = Converter::model2brick_matrix(*m_model, model_orientation, resolution);
+            glm::vec3 a = transform * glm::vec4(m_model->m_min, 1.0f);
+            glm::vec3 max_ = transform * glm::vec4(m_model->m_max, 1.0f);
+            glm::vec3 min_ = glm::min(a, max_); // Should be zero
+            max_ = glm::max(a, max_);
+            glm::vec3 middle = (max_ + min_) * 0.5f;
+            glm::vec3 size = max_ - min_;
+            float h = size.y;
+            float diag = glm::sqrt(size.x * size.x + size.z * size.z) * 0.5f;
+            float r = diag * 3.1f;
+            m_camera.m_position = middle + diag;
+            double t = glfwGetTime();
+            float speed = m_ui.view_settings.orbit_speed;
+            m_camera.m_position.x = middle.x + r * glm::sin(t * speed);
+            m_camera.m_position.z = middle.z + r * glm::cos(t * speed);
+            m_camera.m_position.y = middle.y + h * 1.4f;
+            m_camera.look_at(middle);
+        }
+    }
+}
 
 void MainScreen::render() {}
 

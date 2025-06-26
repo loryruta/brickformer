@@ -92,6 +92,7 @@ void InputWindow::ui()
         if (ui_button("Browse a model...", ImVec2(content_region.x, 0))) {
             g_app->enqueue_job([this]() { browse_model(); });
         }
+        ui_text_wrapped_muted("Supported formats: .glb, .gltf");
 
         /* XZ Resolution */
         ImGui::Text("XZ Resolution");
