@@ -16,13 +16,12 @@ class User
 private:
     std::string m_uid{};
     std::string m_email{};
-    uint64_t m_premium_plan_begin_cyphered = 0;
-    uint64_t m_premium_plan_end_cyphered = 0;
+    uint64_t m_premium_license_expiration = 0;
     /// Secret used not to store the plan time ranges in plain (simple XOR cyphering).
     uint64_t m_secret = 0;
     PaidPlan* m_plan = nullptr;
 
-    int64_t m_last_synchronization_at = INT64_MAX;
+    int64_t m_last_synchronization_at = 0;
 
     std::mutex m_mutex;
 
@@ -36,8 +35,7 @@ public:
 
     [[nodiscard]] bool is_anonymous() const { return m_uid.empty() || m_email.empty(); }
 
-    [[nodiscard]] uint64_t premium_plan_begin() const { return m_premium_plan_begin_cyphered ^ m_secret; }
-    [[nodiscard]] uint64_t premium_plan_end() const { return m_premium_plan_end_cyphered ^ m_secret; }
+    [[nodiscard]] uint64_t premium_license_expiration() const { return m_premium_license_expiration ^ m_secret; }
 
     [[nodiscard]] const PaidPlan* plan() const { return m_plan ? m_plan : &s_plan_free; }
 
@@ -58,5 +56,7 @@ private:
 
     /// Sync the local user data with information retrieved from Firestore.
     void sync(const firebase::firestore::DocumentSnapshot& doc_snapshot);
+    /// Update the synchronized at timestamp without doing anything else.
+    void touch_sync();
 };
 } // namespace bf

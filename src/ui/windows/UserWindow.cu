@@ -28,14 +28,12 @@ void UserWindow::ui()
         }
         ImGui::Text("Plan:  %s", user.plan()->name().c_str());
 
-        uint64_t premium_plan_begin = user.premium_plan_begin();
-        if (premium_plan_begin != UINT64_MAX) {
-            ImGui::SeparatorText("Last purchase:");
-            std::string plan_begin = unix_timestamp_to_readable_str(premium_plan_begin);
-            std::string plan_end = unix_timestamp_to_readable_str(user.premium_plan_end());
-            ImGui::Text("Start: %s", plan_begin.c_str());
-            ImGui::Text("End:   %s", plan_end.c_str());
-        }
+        int64_t premium_license_expiration = user.premium_license_expiration();
+        ImGui::Text("Premium Plan Expiration:\n%s", premium_license_expiration > 0 ?
+                        unix_timestamp_to_readable_str(premium_license_expiration).c_str() : "-");
+        int64_t synchronized_at = user.last_synchronization_at();
+        ImGui::Text("Synchronized at:\n%s", synchronized_at > 0 ?
+                    unix_timestamp_to_readable_str(synchronized_at).c_str() : "-");
     }
     ImGui::End();
 }

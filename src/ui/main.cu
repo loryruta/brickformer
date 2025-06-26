@@ -16,8 +16,7 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
-    std::string title = "BrickFormer " + std::string(BFC_GIT_VERSION);
-    Window window = Window::create_fullscreen(title);
+    Window window = Window::create_fullscreen("BrickFormer");
 
     // Initialize GL
     int version = gladLoadGL(glfwGetProcAddress);

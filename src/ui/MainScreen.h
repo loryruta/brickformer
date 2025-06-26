@@ -36,6 +36,8 @@ struct ViewSettingsWindow {
     bool show_brick_model = true;
     bool show_brick_plane = true;
     bool ssao = true;
+    bool orbit_camera = false;
+    float orbit_speed = 1.1f;
 
     void show();
 };

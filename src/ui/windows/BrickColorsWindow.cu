@@ -119,7 +119,11 @@ void BrickColorsWindow::ui()
     if (is_opened) {
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking;
         flags |= ImGuiWindowFlags_NoCollapse;
+        ImGui::PushStyleColor(ImGuiCol_TitleBg, MAIN_COLOR);
+        ImGui::PushStyleColor(ImGuiCol_TitleBgActive, MAIN_COLOR);
+        ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, MAIN_COLOR);
         if (ui_window("Brick Colors##BrickColors", &is_opened, flags)) {
+            ImGui::PopStyleColor(3);
             ImGuiID dockspace_id = ImGui::GetID("DockSpace##BrickColors");
             ImGui::DockSpace(dockspace_id);
         }

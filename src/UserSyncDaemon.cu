@@ -112,8 +112,11 @@ void UserSyncDaemon::thread_start()
                 doc_snapshot_future.reset();
             } else if (doc_snapshot_future->status() == kFutureStatusComplete) {
                 const firestore::DocumentSnapshot* doc_snapshot = doc_snapshot_future->result();
-                m_user.sync(*doc_snapshot);
-                ARP_INFO("User data synchronized");
+                if (doc_snapshot->exists()) {
+                    m_user.sync(*doc_snapshot);
+                } else {
+                    m_user.touch_sync();
+                }
                 doc_snapshot_future.reset();
             } else if (doc_snapshot_future->status() == kFutureStatusPending) {
                 // Pending...
