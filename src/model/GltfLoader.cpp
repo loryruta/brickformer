@@ -345,14 +345,14 @@ Model&& GltfLoader::load_file(const std::filesystem::path& model_path)
     std::string error;
     std::string warning;
 
-    ARP_INFO("Loading GLTF model \"%s\"...", model_path.c_str());
+    ARP_INFO("Loading GLTF model \"%s\"...", model_path.string());
 
     m_gltf_model = {};
     bool loaded;
     if (model_path.extension() == ".gltf") {
-        loaded = gltf_loader.LoadASCIIFromFile(&m_gltf_model, &error, &warning, model_path);
+        loaded = gltf_loader.LoadASCIIFromFile(&m_gltf_model, &error, &warning, model_path.string());
     } else if (model_path.extension() == ".glb") {
-        loaded = gltf_loader.LoadBinaryFromFile(&m_gltf_model, &error, &warning, model_path);
+        loaded = gltf_loader.LoadBinaryFromFile(&m_gltf_model, &error, &warning, model_path.string());
     } else {
         throw IllegalArgumentException("Invalid model format \"%s\": %s (expected .gltf or .glb)",
                                        model_path.string(),

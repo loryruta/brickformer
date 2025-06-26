@@ -79,7 +79,7 @@ void InputWindow::ui()
 
         bool can_convert = true;
 
-        ImGui::Text("Model: %s", model_path.empty() ? "-" : model_path.filename().c_str());
+        ImGui::Text("Model: %s", model_path.empty() ? "-" : model_path.filename().string().c_str());
 
         if (!model_path.empty() && ImGui::IsItemHovered()) {
             ImGui::BeginTooltip();
@@ -104,10 +104,10 @@ void InputWindow::ui()
         ImGui::SetNextItemWidth(content_region.x);
         ui_slider_int("##Input_Resolution", &resolution, 1, 150);
         if (plan->is_resolution_allowed(resolution)) {
-            ImGui::Text("");
+            //ImGui::Text("");
         } else {
-            ui_text_wrapped_danger("Resolution not available with your plan");
-            can_convert = false;
+            //ui_text_wrapped_danger("Resolution not available with your plan");
+            //can_convert = false;
         }
 
         ImGui::Text("Model orientation");

@@ -1,0 +1,22 @@
+{
+  "name": "brickformer",
+  "version": "1.0.0a",
+  "dependencies": [
+    "glfw3",
+    "glm",
+    {
+      "name": "imgui",
+      "features": [
+        "glfw-binding",
+        "freetype",
+        "opengl3-binding",
+        "docking-experimental"
+      ]
+    },
+    "nativefiledialog-extended",
+    "pugixml",
+    "stb",
+    "tinygltf",
+    "zlib"
+  ]
+}

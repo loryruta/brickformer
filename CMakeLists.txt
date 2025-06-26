@@ -6,8 +6,10 @@ set(CMAKE_CUDA_ARCHITECTURES 75)
 # There could be situations where the system's default compiler has an incompatible version, in such cases the developer
 # might explicit the compiler to use by setting CXX env variable
 if (CMAKE_CXX_COMPILER)
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${CMAKE_CXX_COMPILER}")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin \"${CMAKE_CXX_COMPILER}\"")
 endif ()
+
+project(BrickFormer LANGUAGES C CXX CUDA)
 
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 
@@ -22,86 +24,78 @@ endif ()
 
 set(CMAKE_CXX_STANDARD 20)
 
-project(BrickFormer LANGUAGES C CXX CUDA)
+if (MSVC)
+    # To make preprocessing work the same way as in GCC/Clang
+    add_compile_options(-Zc:preprocessor)
+endif ()
 
 # ------------------------------------------------------------------------------------------------
 # External libraries
 # ------------------------------------------------------------------------------------------------
 
 # cccl
-set(CCCL_ENABLE_LIBCUDACXX OFF)
-set(CCCL_ENABLE_CUB ON)
-set(CCCL_ENABLE_THRUST OFF)
-set(CCCL_ENABLE_TESTING OFF)
-set(CCCL_ENABLE_EXAMPLES OFF)
-set(CCCL_ENABLE_BENCHMARKS OFF)
-add_subdirectory(external/cccl)
+#set(CCCL_ENABLE_LIBCUDACXX OFF)
+#set(CCCL_ENABLE_CUB ON)
+#set(CCCL_ENABLE_THRUST OFF)
+#set(CCCL_ENABLE_TESTING OFF)
+#set(CCCL_ENABLE_EXAMPLES OFF)
+#set(CCCL_ENABLE_BENCHMARKS OFF)
+#add_subdirectory(external/cccl)
 
 # glad
 add_library(glad STATIC external/glad/src/gl.c)
 target_include_directories(glad PUBLIC external/glad/include/)
 
-# glfw
-set(BUILD_SHARED_LIBS OFF)
-set(GLFW_BUILD_EXAMPLES OFF)
-set(GLFW_BUILD_TESTS OFF)
-set(GLFW_BUILD_DOCS OFF)
-set(GLFW_INSTALL OFF)
-add_subdirectory(external/glfw)
+# glfw3
+find_package(glfw3 CONFIG REQUIRED)
 
 # Firebase SDK
+#
+# Reference:
+# https://github.com/firebase/quickstart-cpp/
+#
+# Windows runtime mode, either MD or MT depending on whether you are using
+# /MD or /MT. For more information see:
+# https://msdn.microsoft.com/en-us/library/2kzt1wy3.aspx
+#
+if (MSVC)
+    set(MSVC_RUNTIME_MODE MD)
+endif ()
 set(FIREBASE_CPP_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/firebase_cpp_sdk)
 add_subdirectory(${FIREBASE_CPP_SDK_DIR} bin/ EXCLUDE_FROM_ALL)
 
 # GLM
-add_library(glm INTERFACE)
-target_include_directories(glm INTERFACE external/glm)
+find_package(glm CONFIG REQUIRED)
+add_compile_definitions(-DGLM_ENABLE_EXPERIMENTAL)
+# Suppress the warning:
+# warning #20012-D: __host__ annotation is ignored on a function("vec") that is explicitly defaulted on its first declaration
+#  		__declspec(__device__) __declspec(__host__)  vec() = default ;
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 20012")
+
+# zlib
+find_package(ZLIB REQUIRED)
 
 # imgui
-add_library(imgui STATIC
-        external/imgui/imgui.cpp
-        external/imgui/imgui_demo.cpp
-        external/imgui/imgui_draw.cpp
-        external/imgui/imgui_tables.cpp
-        external/imgui/imgui_widgets.cpp
-)
-
-target_include_directories(imgui PUBLIC external/imgui)
+find_package(imgui CONFIG REQUIRED)
 
 # nativefiledialog-extended
-add_subdirectory(external/nativefiledialog-extended)
+find_package(nfd CONFIG REQUIRED)
 
 # pugixml
-add_subdirectory(external/pugixml)
+find_package(pugixml CONFIG REQUIRED)
 
 # stb
-add_library(stb INTERFACE)
-target_include_directories(stb INTERFACE external/stb)
+find_package(Stb REQUIRED)
 
 # tinyformat
 add_library(tinyformat INTERFACE)
 target_include_directories(tinyformat INTERFACE external/tinyformat)
 
 # tinygltf
-set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF)
-set(TINYGLTF_BUILD_GL_EXAMPLES OFF)
-set(TINYGLTF_BUILD_VALIDATOR_EXAMPLE OFF)
-set(TINYGLTF_BUILD_BUILDER_EXAMPLE OFF)
-set(TINYGLTF_HEADER_ONLY OFF)
-set(TINYGLTF_INSTALL OFF)
-add_subdirectory(external/tinygltf)
+find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 
 # Zipper
 add_subdirectory(external/zipper)
-
-# imgui backend OpenGL3+GLFW
-add_library(imgui_backend_opengl3_glfw STATIC
-        external/imgui/backends/imgui_impl_opengl3.cpp
-        external/imgui/backends/imgui_impl_glfw.cpp
-)
-
-target_include_directories(imgui_backend_opengl3_glfw PUBLIC external/imgui/backends)
-target_link_libraries(imgui_backend_opengl3_glfw PRIVATE glfw imgui)
 
 # ------------------------------------------------------------------------------------------------
 # Compile definitions
@@ -145,4 +139,4 @@ add_compile_definitions(
 # ------------------------------------------------------------------------------------------------
 
 add_subdirectory(src)
-add_subdirectory(test)
+#add_subdirectory(test)

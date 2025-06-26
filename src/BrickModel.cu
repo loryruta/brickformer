@@ -5,6 +5,8 @@
 #include <execution> // For std::execution::par
 #include <utility>
 
+#include <tiny_gltf.h>
+
 #include "bricks.h"
 #include "lego_dataset.h"
 #include "util/misc.h"
