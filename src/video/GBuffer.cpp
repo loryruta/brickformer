@@ -3,13 +3,14 @@
 #include <glm/glm.hpp>
 
 #include "gl_helpers.hpp"
+#include "log.h"
 #include "util/exceptions.h"
+
+#define ARP_LOG_CONTEXT "GBuffer"
 
 using namespace bf;
 
-GBuffer::GBuffer(int width, int height) :
-    m_width(width),
-    m_height(height)
+GBuffer::GBuffer(int width, int height) : m_width(width), m_height(height)
 {
     glGenFramebuffers(1, &m_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
@@ -42,7 +43,7 @@ GBuffer::GBuffer(int width, int height) :
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_albedo_texture, 0);
 
-    unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    unsigned int attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
     glDrawBuffers(3, attachments);
 
     // Renderbuffer
@@ -54,13 +55,12 @@ GBuffer::GBuffer(int width, int height) :
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_depth_buffer, 0);
 
     GLenum framebuffer_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (framebuffer_status != GL_FRAMEBUFFER_COMPLETE)
-    {
-        printf("[ERROR] [GBuffer] Framebuffer not complete: %d\n", framebuffer_status);
-        CHECK_STATE(!(framebuffer_status != GL_FRAMEBUFFER_COMPLETE));
+    if (framebuffer_status != GL_FRAMEBUFFER_COMPLETE) {
+        CHECK_STATE(
+            !(framebuffer_status != GL_FRAMEBUFFER_COMPLETE), "Frame buffer not complete: %d", framebuffer_status);
     }
 
-    printf("[DEBUG] [GBuffer] Framebuffer ready\n");
+    ARP_DEBUG("Framebuffer ready\n");
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
