@@ -2,7 +2,10 @@
 
 #include <nfd.h>
 
+#include "log.h"
 #include "video/gl_helpers.hpp"
+
+#define ARP_LOG_CONTEXT "main"
 
 using namespace bf;
 
@@ -28,10 +31,10 @@ int main(int argc, char* argv[])
     enable_gl_debug_output();
     // Increase printf buffer size for debugging purposes (CUDA)
     CHECK_CU(cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size_t(1) << 30 /* 1GB */));
-    printf("[DEBUG] Device capabilities:\n");
+    ARP_DEBUG("Device capabilities:");
     size_t printf_buffer_size{};
     CHECK_CU(cudaDeviceGetLimit(&printf_buffer_size, cudaLimitPrintfFifoSize));
-    printf("[DEBUG]   cudaLimitPrintfFifoSize: %zu KB\n", printf_buffer_size >> 10);
+    ARP_DEBUG("  cudaLimitPrintfFifoSize: %zu KB", printf_buffer_size >> 10);
 
     // Start the app
     try {

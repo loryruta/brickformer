@@ -374,7 +374,7 @@ Model&& GltfLoader::load_file(const std::filesystem::path& model_path)
 
     m_model.update_min_max(false /* update_mesh_minmax */);
 
-    ARP_INFO("Loaded model \"%s\"\n", model_path.string());
+    ARP_INFO("Loaded model \"%s\"", model_path.string());
 
     m_gltf_model = {};
 

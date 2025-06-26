@@ -1,6 +1,12 @@
 #include <tinyformat.h>
 
-#define ARP_LOG_LEVEL 3
+#ifndef ARP_LOG_LEVEL // Not defined externally
+#   ifdef NDEBUG
+#       define ARP_LOG_LEVEL 2 // INFO
+#   else
+#       define ARP_LOG_LEVEL 3 // DEBUG
+#   endif
+#endif
 
 #define ARP_LOG(level, format, ...) \
     tfm::printf("[" level "] [" ARP_LOG_CONTEXT "] " format "\n", ##__VA_ARGS__)

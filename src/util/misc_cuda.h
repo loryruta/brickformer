@@ -16,12 +16,12 @@ inline void check_cuda(cudaError_t error, const char* file, int line)
 {
     if (error != cudaSuccess) // TODO Mark as unlikely path
     {
-        fprintf(stderr,
-                "CUDA error: %s (%s) (file: %s, line: %d)\n",
-                cudaGetErrorName(error),
-                cudaGetErrorString(error),
-                file,
-                line);
+        fprintf(stderr, "CUDA error: %s (%s)", cudaGetErrorName(error), cudaGetErrorString(error));
+#ifndef NDEBUG
+        fprintf(stderr, "(file: %s, line: %d)", file, line);
+#endif
+        fprintf(stderr, "\n");
+
         exit(error);
     }
 }
