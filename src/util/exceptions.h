@@ -7,8 +7,7 @@
 
 #include <tinyformat.h>
 
-#define CHECK_STATE(condition, ...)                                                                                    \
-    bf::check_state(!!(condition), #condition, __FILE__, __LINE__, ##__VA_ARGS__)
+#define CHECK_STATE(condition, ...) bf::check_state(!!(condition), #condition, __FILE__, __LINE__, ##__VA_ARGS__)
 
 #define CHECK_ARG(condition, ...) bf::check_arg(!!(condition), #condition, __FILE__, __LINE__, ##__VA_ARGS__)
 
@@ -55,11 +54,18 @@ void check_state(bool condition,
                  ARGS&&... args)
 {
     if (__builtin_expect(!condition, 0) /* UNLIKELY */) {
-        std::string fmt = "Illegal state \"%s\" (%s:%d)";
+        std::string fmt = "Illegal state \"%s\"";
+#ifndef NDEBUG
+        fmt += std::string(" (%s:%d)");
+#endif
         if (additional_message_fmt) {
             fmt += std::string(":\n") + additional_message_fmt;
         }
+#ifndef NDEBUG
         throw IllegalStateException(fmt.c_str(), condition_str, file, line, std::forward<ARGS>(args)...);
+#else
+        throw IllegalStateException(fmt.c_str(), condition_str, std::forward<ARGS>(args)...);
+#endif
     }
 }
 
@@ -72,11 +78,18 @@ void check_arg(bool condition,
                ARGS&&... args)
 {
     if (__builtin_expect(!condition, 0) /* UNLIKELY */) {
-        std::string fmt = "Illegal argument \"%s\" (%s:%d)";
+        std::string fmt = "Illegal argument \"%s\"";
+#ifndef NDEBUG
+        fmt += std::string(" (%s:%d)");
+#endif
         if (additional_message_fmt) {
             fmt += std::string(":\n") + additional_message_fmt;
         }
+#ifndef NDEBUG
         throw IllegalArgumentException(fmt.c_str(), condition_str, file, line, std::forward<ARGS>(args)...);
+#else
+        throw IllegalArgumentException(fmt.c_str(), condition_str, std::forward<ARGS>(args)...);
+#endif
     }
 }
 
