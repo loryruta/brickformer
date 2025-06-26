@@ -107,45 +107,40 @@ target_link_libraries(imgui_backend_opengl3_glfw PRIVATE glfw imgui)
 # Compile definitions
 # ------------------------------------------------------------------------------------------------
 
-# BFC_GIT_VERSION
+# BF_GIT_VERSION
 execute_process(
         COMMAND git describe --tags --abbrev=0
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE BFC_GIT_VERSION
+        OUTPUT_VARIABLE BF_GIT_VERSION
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-# BFC_GIT_VERSION_FULL
+# BF_GIT_VERSION_FULL
 execute_process(
         COMMAND git describe --tags
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE BFC_GIT_VERSION_FULL
+        OUTPUT_VARIABLE BF_GIT_VERSION_FULL
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-# BFC_GIT_COMMIT_HASH
+# BF_GIT_COMMIT_HASH
 execute_process(
         COMMAND git rev-parse HEAD
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE BFC_GIT_COMMIT_HASH
+        OUTPUT_VARIABLE BF_GIT_COMMIT_HASH
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-# BFC_GIT_COMMIT_TIMESTAMP
+# BF_GIT_COMMIT_TIMESTAMP
 execute_process(
         COMMAND git show -s --format=%at
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE BFC_GIT_COMMIT_TIMESTAMP
+        OUTPUT_VARIABLE BF_GIT_COMMIT_TIMESTAMP
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-message(STATUS "BFC_GIT_VERSION: ${BFC_GIT_VERSION}")
-message(STATUS "BFC_GIT_VERSION_FULL: ${BFC_GIT_VERSION_FULL}")
-message(STATUS "BFC_GIT_COMMIT_HASH: ${BFC_GIT_COMMIT_HASH}")
-message(STATUS "BFC_GIT_COMMIT_TIMESTAMP: ${BFC_GIT_COMMIT_TIMESTAMP}")
-
 add_compile_definitions(
-        -DBFC_GIT_VERSION="${BFC_GIT_VERSION}"
-        -DBFC_GIT_VERSION_FULL="${BFC_GIT_VERSION_FULL}"
-        -DBFC_GIT_COMMIT_HASH="${BFC_GIT_COMMIT_HASH}"
-        -DBFC_GIT_COMMIT_TIMESTAMP="${BFC_GIT_COMMIT_TIMESTAMP}")
+        -DBF_GIT_VERSION="${BF_GIT_VERSION}"
+        -DBF_GIT_VERSION_FULL="${BF_GIT_VERSION_FULL}"
+        -DBF_GIT_COMMIT_HASH="${BF_GIT_COMMIT_HASH}"
+        -DBF_GIT_COMMIT_TIMESTAMP="${BF_GIT_COMMIT_TIMESTAMP}")
 
 # ------------------------------------------------------------------------------------------------
 

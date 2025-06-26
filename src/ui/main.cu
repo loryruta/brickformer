@@ -11,6 +11,12 @@ using namespace bf;
 
 int main(int argc, char* argv[])
 {
+    ARP_INFO("BrickFormer build information:");
+    ARP_INFO("  Git version:          %s", BF_GIT_VERSION);
+    ARP_INFO("  Git version full:     %s", BF_GIT_VERSION_FULL);
+    ARP_INFO("  Git commit hash:      %s", BF_GIT_COMMIT_HASH);
+    ARP_INFO("  Git commit timestamp: %s", BF_GIT_COMMIT_TIMESTAMP);
+
     NFD_Init();
 
     // Initialize GLFW
