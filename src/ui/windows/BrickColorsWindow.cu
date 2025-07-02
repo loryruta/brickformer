@@ -16,7 +16,7 @@ BrickColorsWindow::BrickColorsWindow() {}
 void BrickColorsWindow::ui_color_list()
 {
     BrickColors& colors = BrickColors::get();
-    const PaidPlan* plan = User::get().copy().plan();
+    const PaidPlan* plan = User::get()->copy().plan();
 
     bool reupload_colors = false;
 

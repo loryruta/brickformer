@@ -9,7 +9,7 @@
 #include "Converter.h"
 #include "ConverterVisualizationBridge.h"
 #include "Screen.h"
-#include "UserSyncDaemon.h"
+#include "SyncDaemon.h"
 #include "model/Model.h"
 #include "video/Camera.hpp"
 #include "video/ModelRenderer.hpp"
@@ -97,8 +97,6 @@ private:
     /// Can be either the live brick construction under conversion, or a pre-saved construction.
     std::shared_ptr<BrickModel> m_brick_model;
     std::unique_ptr<BrickRenderer_BakedModel> m_baked_brick_model;
-
-    std::unique_ptr<UserSyncDaemon> m_user_sync_daemon;
 
 public:
     explicit MainScreen();

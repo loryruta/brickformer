@@ -14,7 +14,12 @@
 
 using namespace bf;
 
-AuthScreen::AuthScreen(std::string external_error) : m_external_error(std::move(external_error)) {}
+AuthScreen::AuthScreen() {}
+
+AuthScreen::AuthScreen(std::string external_error, bool severe_error)
+    : m_external_error(std::move(external_error)), m_severe_error(severe_error)
+{
+}
 
 void AuthScreen::update(float dt)
 {
@@ -52,12 +57,9 @@ void AuthScreen::on_sign_in()
         std::string email = auth_result->user.email();
 
         User::set(uid, email);
-    } else {
-        // Signed in as an anonymous user
-        User::set_anonymous();
-    }
 
-    g_app->enqueue_job([&/* &g_app */]() { g_app->set_screen(std::make_shared<MainScreen>()); });
+        g_app->enqueue_job([&/* &g_app */]() { g_app->set_screen(std::make_shared<MainScreen>()); });
+    }
 }
 
 void AuthScreen::render()
@@ -113,10 +115,11 @@ void AuthScreen::ui_auth_form()
             m_auth_result_future = g_app->firebase_auth()->SignInWithEmailAndPassword(m_email, m_password);
         }
 
+        /*
         if (ui_button("Sign In Anonymously", ImVec2(content_region.x, 25.0f))) {
             m_auth_result_future = std::nullopt;
             g_app->enqueue_job([this]() { on_sign_in(); });
-        }
+        }*/
 
         // Sign in error
         if (!m_auth_error.empty()) {
@@ -161,12 +164,13 @@ void AuthScreen::ui()
             ImGui::Spacing();
             ImGui::Spacing();
 
-            if (ui_button("Dismiss", ImVec2(content_window.x, 0))) opened = false;
+            if (ui_button("Close", ImVec2(content_window.x, 0))) opened = false;
 
             ImGui::EndPopup();
         }
         if (!opened) {
             m_external_error.clear();
+            if (m_severe_error) g_app->set_should_close();
         }
     }
 }

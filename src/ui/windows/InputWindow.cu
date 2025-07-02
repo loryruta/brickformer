@@ -72,7 +72,7 @@ void InputWindow::import_brickformer_construction()
 
 void InputWindow::ui()
 {
-    const PaidPlan* plan = User::get().copy().plan();
+    const PaidPlan* plan = User::get()->copy().plan();
 
     if (ui_window("Input")) {
         ImVec2 content_region = ImGui::GetContentRegionAvail();
