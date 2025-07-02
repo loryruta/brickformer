@@ -11,6 +11,17 @@
 
 #define CHECK_ARG(condition, ...) bf::check_arg(!!(condition), #condition, __FILE__, __LINE__, ##__VA_ARGS__)
 
+#define DEFINE_EXCEPTION(ClassName_)                                                                                   \
+    class ClassName_ : public CustomException                                                                          \
+    {                                                                                                                  \
+    public:                                                                                                            \
+        template <typename... ARGS>                                                                                    \
+        explicit ClassName_(const char* fmt, ARGS&&... args)                                                           \
+            : CustomException(tfm::format(fmt, std::forward<ARGS>(args)...))                                           \
+        {                                                                                                              \
+        }                                                                                                              \
+    };
+
 namespace bf
 {
 ///
@@ -25,25 +36,8 @@ public:
     [[nodiscard]] const char* what() const noexcept override { return m_error.c_str(); }
 };
 
-class IllegalStateException : public CustomException
-{
-public:
-    template <typename... ARGS>
-    explicit IllegalStateException(const char* fmt, ARGS&&... args)
-        : CustomException(tfm::format(fmt, std::forward<ARGS>(args)...))
-    {
-    }
-};
-
-class IllegalArgumentException : public CustomException
-{
-public:
-    template <typename... ARGS>
-    explicit IllegalArgumentException(const char* fmt, ARGS&&... args)
-        : CustomException(tfm::format(fmt, std::forward<ARGS>(args)...))
-    {
-    }
-};
+DEFINE_EXCEPTION(IllegalArgumentException);
+DEFINE_EXCEPTION(IllegalStateException);
 
 template <typename... ARGS>
 void check_state(bool condition,

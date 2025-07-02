@@ -102,19 +102,7 @@ MainScreen::MainScreen()
     m_ui.brick_model_window = std::make_unique<BrickModelWindow>(*this);
     m_ui.brick_colors_window = std::make_unique<BrickColorsWindow>();
 
-    // Start user sync daemon
-    User& user = User::get();
-    if (!user.is_anonymous()) {
-        m_user_sync_daemon = std::make_unique<UserSyncDaemon>(user);
-
-        auto redirect_to_auth_screen = [](std::string error) {
-            g_app->enqueue_job([error]() { g_app->set_screen(std::make_shared<AuthScreen>(error)); });
-        };
-        m_user_sync_daemon->user_auth_error = redirect_to_auth_screen;
-        m_user_sync_daemon->user_document_retrieve_error = redirect_to_auth_screen;
-
-        m_user_sync_daemon->start();
-    }
+    g_app->sync_daemon().force_plan_check = true;
 }
 
 MainScreen::~MainScreen()

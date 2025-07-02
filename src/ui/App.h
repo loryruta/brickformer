@@ -8,6 +8,7 @@
 
 #include "BrickModel.h"
 #include "Screen.h"
+#include "SyncDaemon.h"
 #include "util/Queue.h"
 #include "util/StopWatch.h"
 #include "video/BrickPlaneRenderer.h"
@@ -53,6 +54,8 @@ private:
     mutable std::mutex m_job_queue_mutex;
     std::condition_variable m_job_queue_cond_var; ///< Used to wait for main thread jobs to complete before proceeding.
 
+    std::unique_ptr<SyncDaemon> m_sync_daemon;
+
 public:
     explicit App(Window& window);
     ~App();
@@ -90,6 +93,7 @@ public:
     }
 
     void start();
+    void set_should_close();
 
     /* Jobs */
     void enqueue_job(const std::function<void()>& job) { m_job_queue.push(job); }
@@ -99,6 +103,8 @@ public:
         m_job_queue_cond_var.wait(lock, [this]() { return m_job_queue.empty(); });
     }
     void clear_jobs_queue();
+
+    SyncDaemon& sync_daemon() const { return *m_sync_daemon; }
 
 private:
     void setup_firebase();

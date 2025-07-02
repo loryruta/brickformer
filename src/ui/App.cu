@@ -47,10 +47,16 @@ App::App(Window& window) : m_window(window)
 
     // Set initial screen: authentication
     m_screen = std::make_unique<AuthScreen>();
+
+    // Start sync daemon
+    m_sync_daemon = std::make_unique<SyncDaemon>();
+    m_sync_daemon->start();
 }
 
 App::~App()
 {
+    m_sync_daemon.reset();
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
 
@@ -116,6 +122,8 @@ void App::start()
         m_job_queue_cond_var.notify_all(); // Notify arpenteur thread that the job queue is now empty
     }
 }
+
+void App::set_should_close() { m_window.set_should_close(true); }
 
 void App::clear_jobs_queue()
 {

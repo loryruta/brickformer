@@ -33,9 +33,7 @@ inline bool ui_window(const char* name, bool* p_open = nullptr, ImGuiWindowFlags
 
 inline bool ui_popup_modal(const char* name, bool* p_open = nullptr, ImGuiWindowFlags flags = 0)
 {
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 0, 1));
     bool opened = ImGui::BeginPopupModal(name, p_open, flags);
-    ImGui::PopStyleColor();
     return opened;
 }
 
