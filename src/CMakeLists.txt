@@ -71,6 +71,8 @@ add_executable(BrickFormer
         AssignPlacementColor.h
         BrickColors.cu
         BrickColors.h
+        BrickFormerAPI.cu
+        BrickFormerAPI.h
         BrickModel.cu
         BrickModel.h
         bricks.h
@@ -90,8 +92,8 @@ add_executable(BrickFormer
         SpreadValue.h
         User.cu
         User.h
-        UserSyncDaemon.cu
-        UserSyncDaemon.h
+        SyncDaemon.cu
+        SyncDaemon.h
         util/external_libs.cpp
 )
 
@@ -102,7 +104,7 @@ target_include_directories(BrickFormer PUBLIC
 )
 target_link_libraries(BrickFormer PUBLIC
         # It's important for the Firebase dependencies to be in this order!
-        firebase_firestore
+        CURL::libcurl
         firebase_auth
         firebase_app
         glad

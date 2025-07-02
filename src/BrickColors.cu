@@ -36,7 +36,7 @@ BrickColors::~BrickColors()
 
 void BrickColors::upload_colors()
 {
-    const PaidPlan* plan = User::get().copy().plan();
+    const PaidPlan* plan = User::get()->copy().plan();
 
     for (int cid = 0; cid < k_num_brick_colors; ++cid) {
         bool enabled = true;

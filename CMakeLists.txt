@@ -42,6 +42,9 @@ endif ()
 #set(CCCL_ENABLE_BENCHMARKS OFF)
 #add_subdirectory(external/cccl)
 
+# curl
+find_package(CURL REQUIRED)
+
 # glad
 add_library(glad STATIC external/glad/src/gl.c)
 target_include_directories(glad PUBLIC external/glad/include/)
