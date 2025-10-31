@@ -26,12 +26,12 @@ void AuthScreen::update(float dt)
     if (m_auth_result_future) {
         if (m_auth_result_future->status() == firebase::kFutureStatusComplete) {
             int error = m_auth_result_future->error();
-            const char* error_message = m_auth_result_future->error_message();
             if (error == firebase::auth::kAuthErrorNone) {
                 m_auth_error.clear();
                 ARP_INFO("Signed in");
                 on_sign_in();
             } else {
+                const char* error_message = m_auth_result_future->error_message();
                 ARP_INFO("Sign in attempt failed (%d): %s", error, error_message);
                 if (error == firebase::auth::kAuthErrorFailure) {
                     m_auth_error = "Invalid username or password";

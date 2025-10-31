@@ -15,9 +15,9 @@
 
 /* Configuration */
 // clang-format off
-#define VERIFY_AUTH_INTERVAL   double(2 * 60)
-#define UPDATE_PLAN_INTERVAL   double(1 * 60)
-#define CHECK_SOFTWARE_VERSION double(5 * 60)
+#define VERIFY_AUTH_INTERVAL   double(2 * 60) // 2 min
+#define UPDATE_PLAN_INTERVAL   double(1 * 60) // 1 min
+#define CHECK_SOFTWARE_VERSION double(5 * 60) // 5 min
 // clang-format on
 
 using namespace bf;
@@ -25,55 +25,29 @@ using namespace firebase;
 
 namespace
 {
-/// Class to verify the authentication of the user and possibly renew the authentication token.
+/// Class to verify that the firebase user is present within the firebase SDK cache.
 struct SyncDaemon_AuthVerifier {
     DEFINE_EXCEPTION(AuthException);
 
     StopWatch stopwatch;
-    std::optional<firebase::Future<std::string>> auth_token_future;
 
     void update(bool force)
     {
-        if (!auth_token_future && (force || stopwatch.elapsed_seconds() > VERIFY_AUTH_INTERVAL)) {
-            send_request();
-            stopwatch.reset();
-        }
-        read_request();
-    }
+        if (force || stopwatch.elapsed_seconds() > VERIFY_AUTH_INTERVAL) {
+            firebase::auth::User firebase_user = g_app->firebase_auth()->current_user();
 
-private:
-    void send_request()
-    {
-        firebase::auth::Auth* firebase_auth = g_app->firebase_auth();
-        firebase::auth::User firebase_user = firebase_auth->current_user();
-        bool is_valid = !firebase_user.is_valid();
-        if (!is_valid) {
-            if (User::get()) {
-                throw AuthException("User not signed in");
-            } else {
-                return; // Didn't login yet
+            // The user is not cached within the firebase SDK.
+            // This doesn't tell whether the authentication token is valid or not
+            if (!firebase_user.is_valid()) {
+                // The user is authenticated in the application, but no more on firebase.
+                // Thus, throw an exception and kick the user back to the AuthScreen
+                if (User::get()) {
+                    throw AuthException("User not signed in");
+                } else {
+                    // It's fine, the user didn't authenticated yet within the app
+                    return;
+                }
             }
-        }
-        // Renew the token ID if expired (duration 1h)
-        ARP_DEBUG("Requesting renewal of the auth token...");
-        auth_token_future = firebase_user.GetToken(true /* renew */);
-    }
-
-    void read_request()
-    {
-        if (!auth_token_future) return;
-        if (auth_token_future->error() != firebase::auth::kAuthErrorNone ||
-            auth_token_future->status() == kFutureStatusInvalid) {
-            // Can't renew authentication token
-            throw AuthException("Cannot renew auth token: %s", auth_token_future->error());
-        } else if (auth_token_future->status() == firebase::kFutureStatusComplete) {
-            // Auth token renewed
-            ARP_DEBUG("Auth token renewed: %s", auth_token_future->result());
-            auth_token_future.reset();
-        } else if (auth_token_future->status() == firebase::kFutureStatusPending) {
-            // Pending...
-        } else {
-            throw IllegalStateException("Unhandled firebase future state");
         }
     }
 };
@@ -141,9 +115,7 @@ SyncDaemon::SyncDaemon() {}
 SyncDaemon::~SyncDaemon()
 {
     m_should_stop = true;
-    if (m_thread && m_thread->joinable()) {
-        m_thread->join();
-    }
+    if (m_thread && m_thread->joinable()) m_thread->join();
 }
 
 void SyncDaemon::start()
