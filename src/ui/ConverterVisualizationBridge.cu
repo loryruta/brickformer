@@ -47,7 +47,7 @@ ConverterVisualizationBridge::ConverterVisualizationBridge(MainScreen& parent)
     m_proximity_map_texture = std::make_unique<CUDAMappedGLTexture>(create_gl_texture(resolution, resolution));
 
     std::string model_name = std::filesystem::path(m_converter.m_params.model_path).stem().string();
-    m_brick_model = std::make_shared<BrickModel>(model_name);
+    m_brick_model = std::make_shared<BrickModel>(model_name, m_converter.m_params.resolution);
 
     m_converter.add_listener(this);
 }

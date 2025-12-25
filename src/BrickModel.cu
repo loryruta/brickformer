@@ -116,15 +116,17 @@ void add_y_cylinder(const glm::vec3& p,
 
 BrickModel::BrickModel() { m_mesh = &m_model.m_meshes.emplace_back(); }
 
-BrickModel::BrickModel(std::string name) : BrickModel() { m_name = std::move(name); }
+BrickModel::BrickModel(std::string name, int resolution) : BrickModel()
+{
+    m_name = std::move(name);
+    m_resolution = resolution;
+}
 
 BrickModel::BrickModel(BrickModel&& other) noexcept
+    : m_name(std::move(other.m_name)), m_resolution(other.m_resolution), m_model(std::move(other.m_model)),
+      m_mesh(other.m_mesh), m_subslice_ranges(std::move(other.m_subslice_ranges)),
+      m_brick_quantities(std::move(other.m_brick_quantities))
 {
-    m_name = std::move(other.m_name);
-    m_model = std::move(other.m_model);
-    m_mesh = other.m_mesh;
-    m_subslice_ranges = std::move(other.m_subslice_ranges);
-    m_brick_quantities = std::move(other.m_brick_quantities);
 }
 
 size_t BrickModel::bytesize() const
@@ -257,6 +259,11 @@ void BrickModel::add_placement(int slice_y, const Placement& placement, std::vec
 
 void BrickModel::add_slice(int slice_y, const std::vector<Placement>& placements)
 {
+    // Register current slice placements
+    CHECK_STATE(m_placements.size() == slice_y); // This method should be called once per slice
+    auto& this_slice_placements = m_placements.emplace_back();
+    this_slice_placements.insert(this_slice_placements.end(), placements.begin(), placements.end());
+
     std::vector<Vertex> subslice0_vertices; // Will also include complete placements
     std::vector<Vertex> subslice1_vertices;
     std::vector<Vertex> subslice2_vertices;

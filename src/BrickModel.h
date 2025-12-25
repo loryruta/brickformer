@@ -6,6 +6,11 @@
 #include "model/Model.h"
 #include "types.h"
 
+#define BBFC_VERSION_MAJ 1
+#define BBFC_VERSION_MIN 0
+#define BBFC_VERSION_FIX 0
+#define BBFC_VERSION ((BBFC_VERSION_MAJ << 16) | (BBFC_VERSION_MIN << 8) | BBFC_VERSION_FIX)
+
 namespace bf
 {
 /// Given several placements, procedurally generate a brick model.
@@ -15,7 +20,10 @@ class BrickModel
 
 private:
     /// A representative name for the brick model.
-    std::string m_name;
+    std::string m_name{};
+    /// The resolution for the brick model.
+    int m_resolution = -1;
+
     /// The model/mesh under construction.
     Model m_model;
     /// A pointer to the first and only mesh of the model.
@@ -30,8 +38,11 @@ private:
     std::unordered_map<uint32_t, uint32_t> m_brick_quantities;
     size_t m_total_brick_count = 0;
 
+    /// A complete list of placements for every slice used to export instructions.
+    std::vector<std::vector<Placement>> m_placements; // TODO subslice not supported
+
 public:
-    explicit BrickModel(std::string name);
+    explicit BrickModel(std::string name, int resolution);
     BrickModel(BrickModel&&) noexcept;
     ~BrickModel() = default;
 
