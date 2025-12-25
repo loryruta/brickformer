@@ -48,7 +48,7 @@ tinygltf::Value BrickModelIO::bfc_serialize_metadata(const BrickModel& brick_mod
     json_["commit_timestamp"] = Value(BF_GIT_COMMIT_TIMESTAMP);
     json_["created_at"] = Value(current_datetime_str());
 
-    // Serialize subslice ranges
+    // Serialize subslice ranges for per-slice visualization
     {
         const auto& subslice_ranges = brick_model.subslice_ranges();
         Value::Array subslice_ranges_json = Value::Array();
@@ -60,7 +60,22 @@ tinygltf::Value BrickModelIO::bfc_serialize_metadata(const BrickModel& brick_mod
         json_["subslice_ranges"] = Value(subslice_ranges_json);
     }
 
-    // Serialize brick quantities
+    // Serialize placements to generate instructions
+    {
+        std::vector<uint32_t> placements_buf{};
+        for (auto& slice_placements : brick_model.m_placements) {
+            placements_buf.reserve(placements_buf.size() + 1 + slice_placements.size());
+            int num_placements = slice_placements.size();
+            placements_buf.emplace_back(num_placements);
+            for (auto& placement : slice_placements) {
+                uint32_t& entry = placements_buf.emplace_back();
+                entry = (placement.bid << 24) | (placement.x << 16) | (placement.z << 8) | placement.cid;
+            }
+        }
+        json_["placements"] = Value(reinterpret_cast<const uint8_t*>(placements_buf.data()), placements_buf.size());
+    }
+
+    // Serialize brick quantities for brick cart
     {
         const auto& brick_quantities = brick_model.brick_quantities();
         Value::Array brick_quantities_json = Value::Array();
@@ -78,6 +93,37 @@ tinygltf::Value BrickModelIO::bfc_serialize_metadata(const BrickModel& brick_mod
     }
 
     return Value(json_);
+}
+
+void BrickModelIO::bbfc_export(const BrickModel& brick_model, const std::filesystem::path& out_filepath)
+{
+    CHECK_ARG(out_filepath.extension() == ".bbfc", "Output file extension must be .bbfc");
+
+    std::ofstream os(out_filepath, std::ios::binary);
+    // Magic
+    constexpr static char k_magic[]{"BBFC"};
+    os.write(k_magic, 4 * sizeof(char));
+    // BBFC format version
+    uint32_t version = BBFC_VERSION;
+    os.write((char*) &version, sizeof(uint32_t));
+    // BrickFormer commit hash
+    os.write(BF_GIT_COMMIT_HASH, std::strlen(BF_GIT_COMMIT_HASH) + 1);
+    // Model name
+    os.write(brick_model.m_name.c_str(), brick_model.m_name.size() + 1);
+    // Model resolution
+    os.write((char*) &brick_model.m_resolution, sizeof(int));
+    // Placements
+    std::vector<uint32_t> placements_buf{};
+    for (auto& slice_placements : brick_model.m_placements) {
+        placements_buf.reserve(placements_buf.size() + 1 + slice_placements.size());
+        int num_placements = slice_placements.size();
+        placements_buf.emplace_back(num_placements);
+        for (auto& placement : slice_placements) {
+            uint32_t& entry = placements_buf.emplace_back();
+            entry = (placement.bid << 24) | (placement.x << 16) | (placement.z << 8) | placement.cid;
+        }
+    }
+    os.write((char*) placements_buf.data(), placements_buf.size() * sizeof(uint32_t));
 }
 
 void BrickModelIO::bfc_deserialize_metadata(const tinygltf::Value& json, BrickModel& out_brick_model)
@@ -148,6 +194,11 @@ void BrickModelIO::bfc_export(const BrickModel& brick_model, const std::filesyst
 {
     // .bfc extension (BrickFormer Conversion) is a .glb file with custom content
     CHECK_ARG(output_filepath.extension() == ".bfc", "Output file extension must be .bfc");
+
+    // Export the .bbfc filepath
+    std::filesystem::path bbfc_filepath = output_filepath;
+    bbfc_filepath.replace_extension(".bbfc");
+    bbfc_export(brick_model, bbfc_filepath);
 
     const Mesh& mesh = brick_model.model().m_meshes.at(0);
 
@@ -270,12 +321,12 @@ void BrickModelIO::bfc_export(const BrickModel& brick_model, const std::filesyst
     /* Scene */
     tinygltf::Scene& scene = model.scenes.emplace_back();
     scene.nodes.push_back(0);
-
     model.extras = bfc_serialize_metadata(brick_model);
 
     tinygltf::TinyGLTF writer{};
     writer.SetStoreOriginalJSONForExtrasAndExtensions(true);
-    bool result = writer.WriteGltfSceneToFile(&model, output_filepath.string(), true, true, false, true /* writeBinary */);
+    bool result =
+        writer.WriteGltfSceneToFile(&model, output_filepath.string(), true, true, false, true /* writeBinary */);
     CHECK_STATE(result, "Failed to write .bfc file: %s", output_filepath.string());
 }
 

@@ -33,9 +33,9 @@ void test_color_map_coverage_kernel()
     ColorMapCoverageResult color_map_coverage{};
 
     /* Test 1 */
-    placement.m_bid = 1;
-    placement.m_x = 0;
-    placement.m_y = 0;
+    placement.bid = 1;
+    placement.x = 0;
+    placement.z = 0;
     CHECK_CU(cudaMemcpy(placement_d, &placement, sizeof(Placement), cudaMemcpyHostToDevice));
     internal::eval_color_map_coverage_kernel<<<1, 32>>>(placement_d, 1, color_map_d, color_map_coverage_d);
     CHECK_CU(cudaDeviceSynchronize());
@@ -44,9 +44,9 @@ void test_color_map_coverage_kernel()
     CHECK_STATE(color_map_coverage.color_distance == 155);
 
     /* Test 2 */
-    placement.m_bid = 1;
-    placement.m_x = 1;
-    placement.m_y = 0;
+    placement.bid = 1;
+    placement.x = 1;
+    placement.z = 0;
     CHECK_CU(cudaMemcpy(placement_d, &placement, sizeof(Placement), cudaMemcpyHostToDevice));
     internal::eval_color_map_coverage_kernel<<<1, 32>>>(placement_d, 1, color_map_d, color_map_coverage_d);
     CHECK_CU(cudaDeviceSynchronize());
@@ -55,9 +55,9 @@ void test_color_map_coverage_kernel()
     CHECK_STATE(color_map_coverage.color_distance == 0);
 
     /* Test 3 */
-    placement.m_bid = 16;
-    placement.m_x = 6;
-    placement.m_y = 6;
+    placement.bid = 16;
+    placement.x = 6;
+    placement.z = 6;
     CHECK_CU(cudaMemcpy(placement_d, &placement, sizeof(Placement), cudaMemcpyHostToDevice));
     internal::eval_color_map_coverage_kernel<<<1, 32>>>(placement_d, 1, color_map_d, color_map_coverage_d);
     CHECK_CU(cudaDeviceSynchronize());
