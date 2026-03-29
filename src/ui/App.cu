@@ -65,11 +65,18 @@ App::~App()
 
 void App::setup_firebase()
 {
+#ifndef BF_OPENSOURCE
     firebase::AppOptions app_options;
+    app_options.set_api_key(BF_FIREBASE_API_KEY);
+    app_options.set_project_id(BF_FIREBASE_PROJECT_ID);
+    app_options.set_storage_bucket(BF_FIREBASE_STORAGE_BUCKET);
+    app_options.set_messaging_sender_id(BF_FIREBASE_MESSAGING_SENDER_ID);
+    app_options.set_app_id(BF_FIREBASE_APP_ID);
     m_firebase_app = firebase::App::Create(app_options);
     CHECK_STATE(m_firebase_app, "Failed to initialize Firebase app");
     m_firebase_auth = firebase::auth::Auth::GetAuth(m_firebase_app);
     CHECK_STATE(m_firebase_auth, "Failed to initialize Firebase auth");
+#endif
 }
 
 void App::start()
