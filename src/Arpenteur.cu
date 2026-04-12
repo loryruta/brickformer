@@ -1,15 +1,18 @@
 #include "Arpenteur.cuh"
 
-#include <tinyformat.h>
-#include <thrust/extrema.h>
 #include <cuda_profiler_api.h>
+#include <thrust/extrema.h>
+#include <tinyformat.h>
 
+#include "assign_placements_color.cuh"
 #include "bricks.hpp"
-#include "colorize_placements.cuh"
+#include "log.hpp"
 #include "model/GltfLoader.hpp"
 #include "reward_func.cuh"
 #include "types.cuh"
 #include "util/StopWatch.hpp"
+
+#define ARP_LOG_CONTEXT "Arpenteur"
 
 using namespace lego_builder;
 
@@ -19,28 +22,30 @@ Arpenteur::Arpenteur(const ArpenteurInput& input) :
     int resolution = input.resolution;
     tfm::printf("[INFO ] [Arpenteur] Resolution: %d\n", resolution);
 
-    if (m_proximity_threshold == UINT8_MAX) {
+    if (m_proximity_threshold == UINT8_MAX)
+    {
         m_proximity_threshold = calc_proximity_threshold(resolution);
         tfm::printf("[INFO ] [Arpenteur] Proximity threshold (derived): %d\n", m_proximity_threshold);
-    } else {
+    }
+    else
+    {
         m_proximity_threshold = input.proximity_threshold;
         tfm::printf("[INFO ] [Arpenteur] Proximity threshold: %d\n", m_proximity_threshold);
     }
 
-    if (input.proximity_max_value == UINT8_MAX) {
+    if (input.proximity_max_value == UINT8_MAX)
+    {
         m_proximity_max_value = calc_proximity_max_value(resolution);
         tfm::printf("[INFO ] [Arpenteur] Proximity max value (derived): %d\n", m_proximity_max_value);
-    } else {
+    }
+    else
+    {
         m_proximity_max_value = input.proximity_max_value;
         tfm::printf("[INFO ] [Arpenteur] Proximity max value: %d\n", m_proximity_max_value);
     }
 
     m_num_placements = resolution * resolution * k_num_bricks;
-
-    CHECK_CU(cudaMalloc(&m_placements_d, m_num_placements * sizeof(Placement)));
-    init_placements();
-
-    CHECK_CU(cudaMalloc(&m_rewards_d, m_num_placements * sizeof(float)));
+    // init_placements();
 
     CHECK_CU(cudaMalloc(&m_valid_placements_d, m_num_placements * sizeof(bool)));
 
@@ -56,31 +61,27 @@ Arpenteur::Arpenteur(const ArpenteurInput& input) :
     m_cur_placements = PlacementMapT::create(resolution, resolution, nullptr);
     m_cur_placements_d = to_device(m_cur_placements);
 
-    m_colored_placements.reserve(k_max_colored_placements);
-    CHECK_CU(cudaMalloc(&m_colored_placements_d, k_max_colored_placements * sizeof(ColoredPlacement)));
-}
+    m_placement_solver = std::make_unique<PlacementSolver>(m_num_placements, resolution);
 
-__global__
-void init_placements_kernel(Arpenteur* self)
-{
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    tfm::printf("[INFO ] [Arpenteur] Allocations:\n");
+    tfm::printf("[INFO ] [Arpenteur]   Num placements: %zu\n", m_num_placements);
+    tfm::printf("[INFO ] [Arpenteur]   Color map: %dx%d, %p (%zu bytes)\n", resolution, resolution, m_color_map_d, m_color_map.data_size());
+    tfm::printf(
+        "[INFO ] [Arpenteur]   Proximity map: %dx%d, %p (%zu bytes)\n", resolution, resolution, m_prev_proximity_map_d, m_prev_proximity_map.data_size()
+    );
+    tfm::printf(
+        "[INFO ] [Arpenteur]   Previous placement map: %dx%d, %p (%zu bytes)\n", resolution, resolution, m_prev_placements_d, m_prev_placements.data_size()
+    );
+    tfm::printf(
+        "[INFO ] [Arpenteur]   Current placement map: %dx%d, %p (%zu bytes)\n", resolution, resolution, m_cur_placements_d, m_cur_placements.data_size()
+    );
 
-    uint32_t resolution = self->m_input.resolution;
+    cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size_t(1) << 30 /* 1GB */);
 
-    if (i < self->m_num_placements)
-    {
-        Placement& placement = self->m_placements_d[i];
-
-        placement.m_bid = i % k_num_bricks;
-        placement.m_x = (i / k_num_bricks) % resolution;
-        placement.m_y = i / (resolution * k_num_bricks);
-    }
-}
-
-void Arpenteur::init_placements()
-{
-    size_t num_blocks = div_ceil<size_t>(m_num_placements, 1024);
-    init_placements_kernel<<<num_blocks, 1024>>>(to_device(*this));  // this to device, even if some fields aren't initialized yet
+    tfm::printf("[DEBUG] [Arpenteur] Device capabilities:\n");
+    size_t printf_buffer_size;
+    cudaDeviceGetLimit(&printf_buffer_size, cudaLimitPrintfFifoSize);
+    tfm::printf("[DEBUG] [Arpenteur]   cudaLimitPrintfFifoSize: %zu KB\n", printf_buffer_size >> 10);
 }
 
 uint8_t Arpenteur::calc_proximity_threshold(int resolution)
@@ -105,7 +106,7 @@ void Arpenteur::transform_model()
 
     // Transform from Model space to Conversion space
     glm::vec3 scale_matrix{m_input.resolution / max_xz_side};
-    scale_matrix.y /= 1.2f;  // Brick height adjustment
+    scale_matrix.y /= 1.2f; // Brick height adjustment
 
     glm::mat4 transform = glm::identity<glm::mat4>();
     transform = glm::scale(transform, scale_matrix);
@@ -117,8 +118,7 @@ void Arpenteur::transform_model()
     m_model->update_min_max(true /* update_mesh_min_max */);
 }
 
-__global__
-void init_proximity_map_from_color_map_kernel(const ColorMapT* color_map, uint8_t init_val, ProximityMapT* out_proximity_map)
+__global__ void init_proximity_map_from_color_map_kernel(const ColorMapT* color_map, uint8_t init_val, ProximityMapT* out_proximity_map)
 {
     assert(color_map->m_width == out_proximity_map->m_width && color_map->m_height == out_proximity_map->m_height);
 
@@ -146,53 +146,6 @@ void Arpenteur::init_proximity_map_from_color_map()
     CHECK_CU(cudaDeviceSynchronize());
 }
 
-template<bool IS_SUBSLICE0>
-__global__
-void eval_placements_kernel(Arpenteur* self)
-{
-    uint32_t warp_i = blockIdx.x * 32 + (threadIdx.x >> 5); // One placement per warp
-
-    if (warp_i < self->m_num_placements)
-    {
-        if (!self->m_valid_placements_d[warp_i]) return;
-
-        Placement& placement = self->m_placements_d[warp_i];
-
-        float reward;
-        bool is_valid = eval_placement<IS_SUBSLICE0>(*self, placement, reward);
-
-        if ((threadIdx.x & 0x1F) == 0)
-        {
-            if (!is_valid) self->m_valid_placements_d[warp_i] = false;
-            self->m_rewards_d[warp_i] = is_valid ? reward : 0.0f;
-        }
-    }
-}
-
-template<uint32_t SUBSLICE>
-std::pair<Placement, float> Arpenteur::compute_next_placement()
-{
-    // Not necessary because every placement will write its reward
-    //CHECK_CU(cudaMemset(m_rewards_d, 0, m_num_placements * sizeof(float)));
-    //CHECK_CU(cudaDeviceSynchronize());
-
-    CHECK_CU(cudaProfilerStart());
-
-    size_t num_blocks = div_ceil<size_t>(m_num_placements, 32);
-    size_t dim_block = 1024;
-    eval_placements_kernel<SUBSLICE == 0><<<num_blocks, dim_block>>>(m_self_d);
-    CHECK_CU(cudaDeviceSynchronize());
-
-    CHECK_CU(cudaProfilerStop());
-
-    float* max_reward_d = thrust::max_element(
-        thrust::device, m_rewards_d, m_rewards_d + m_num_placements);  // Fake IDE error on CLion :')
-    size_t max_i = max_reward_d - m_rewards_d;
-
-    std::pair<Placement, float> result = {to_host(&m_placements_d[max_i]), to_host(max_reward_d)};
-    return result;
-}
-
 void Arpenteur::place(const Placement& placement)
 {
     uint16_t pid = m_next_pid;
@@ -200,7 +153,7 @@ void Arpenteur::place(const Placement& placement)
 
     // TODO 64 iterations... not very efficient...
     //  every write is a host-to-device copy...
-    auto& brick = k_bricks[placement.m_bid];
+    const auto& brick = k_bricks[placement.m_bid];
     for (uint8_t bx = 0; bx < BRICK_MAX_WIDTH; bx++)
     {
         for (uint8_t by = 0; by < BRICK_MAX_HEIGHT; by++)
@@ -211,10 +164,11 @@ void Arpenteur::place(const Placement& placement)
             }
         }
     }
+
+    // ARP_INFO("Placed BID=%d at (%d, %d) with PID=%d", placement.m_bid, placement.m_x, placement.m_y, pid);
 }
 
-template<uint32_t SUBSLICE>
-size_t Arpenteur::place_on_subslice(uint32_t slice_y)
+size_t Arpenteur::place_on_subslice(uint32_t slice_y, int subslice)
 {
     size_t num_placed_bricks = 0;
 
@@ -225,47 +179,31 @@ size_t Arpenteur::place_on_subslice(uint32_t slice_y)
 
     while (true)
     {
-        auto [placement, reward] = compute_next_placement<SUBSLICE>();
-
+        PlacementSolver::Input params{};
+        params.is_subslice0 = subslice == 0;
+        params.color_map_d = m_color_map_d;
+        params.current_placement_map_d = m_cur_placements_d;
+        params.previous_placement_map_d = m_prev_placements_d;
+        params.proximity_map_d = m_prev_proximity_map_d;
+        auto [placement, reward] = m_placement_solver->solve(params);
         if (reward < m_min_reward) break;
-
-        if (false) {
-            printf("[DEBUG] [Arpenteur] Placing brick %d at (%d, %d), reward: %f\n", placement.m_bid, placement.m_x, placement.m_y, reward);
-            printf("[DEBUG] [Arpenteur] Placement; BID: %d, Pos: (%d, %d)\n", placement.m_bid, placement.m_x, placement.m_y);
-            printf("[DEBUG] [Arpenteur]   is_outside: %s, "
-                   "is_overlapping: %s, "
-                   "num_covered_map_cells: %d, "
-                   "brick_size: %d, "
-                   "num_neighbors: %d, "
-                   "num_connectible_sides: %d, "
-                   "num_connected_bricks: %d\n",
-                   placement.computed.is_outside ? "y" : "n",
-                   placement.computed.is_overlapping ? "y" : "n",
-                   placement.computed.num_covered_map_cells,
-                   placement.computed.brick_size,
-                   placement.computed.num_neighbors,
-                   placement.computed.num_connectible_sides,
-                   placement.computed.num_connected_bricks
-            );
-        }
 
         place(placement);
 
-        uint8_t subslice_bit = 1 << SUBSLICE;
-        auto [iterator, inserted] = m_stacked_placements.emplace(placement, subslice_bit);
-        if (!inserted) iterator->second |= subslice_bit;
+        placement.m_subslice_mask = 1 << subslice;
+        placement.m_cid = 0;
+        auto [iterator, inserted] = m_stacked_placements.emplace(placement);
+        if (!inserted) iterator->m_subslice_mask |= 1 << subslice;
         // If the placement is stacked 3 times (3 equal placements for the slice), then can be compacted
 
         if (m_listener) m_listener->on_place(m_slice_y, placement, reward);
 
         if (log_stopwatch.elapsed_millis() >= 5000)
         {
-            printf("[Arpenteur] PLACE %d; Placed bricks: %zu, Last placement: (%d, %d) -> BID %d, Last reward: %.3f, Reward threshold: %.3f\n",
-                   SUBSLICE, num_placed_bricks,
-                   placement.m_x, placement.m_y, placement.m_bid,
-                   reward,
-                   m_min_reward
-                   );
+            printf(
+                "[Arpenteur] PLACE %d; Placed bricks: %zu, Last placement: (%d, %d) -> BID %d, Last reward: %.3f, Reward threshold: %.3f\n", subslice,
+                num_placed_bricks, placement.m_x, placement.m_y, placement.m_bid, reward, m_min_reward
+            );
             log_stopwatch.reset();
         }
 
@@ -275,41 +213,58 @@ size_t Arpenteur::place_on_subslice(uint32_t slice_y)
     return num_placed_bricks;
 }
 
-void Arpenteur::linearize_and_colorize()
+void Arpenteur::linearize_placements_to_output()
 {
-    m_colored_placements.clear();
+    ARP_DEBUG("Linearizing placements to output...");
 
-    CHECK_STATE_MSG(m_stacked_placements.size() < k_max_colored_placements,
-                    "Too many placements! You must increase the buffer size");
+    m_linear_stacked_placements.clear();
+    CHECK_STATE(!m_linear_stacked_placements_d);
 
-    // Empty the stacked placements hashmap into a vector
-    for (auto& [placement, subslice_mask] : m_stacked_placements)
+    size_t num_placements = m_stacked_placements.size();
+    if (num_placements == 0)
     {
-        ColoredPlacement colored_placement{};
-        colored_placement.m_placement = placement;
-        colored_placement.m_subslice_mask = subslice_mask;
-        m_colored_placements.emplace_back(colored_placement);
+        ARP_WARN("No placement to color");
+        return;
     }
 
-    // Copy the vector to device
-    CHECK_CU(cudaMemcpy(m_colored_placements_d, m_colored_placements.data(), m_colored_placements.size() * sizeof(ColoredPlacement), cudaMemcpyHostToDevice));
+    // Copy placements unordered_set to linear memory (vector) for GPU uploading
+    m_linear_stacked_placements.resize(num_placements);
+    std::copy(m_stacked_placements.begin(), m_stacked_placements.end(), m_linear_stacked_placements.begin());
+
+    ARP_DEBUG("%zu placements linearized", m_linear_stacked_placements.size());
+
+    // Upload placements on GPU
+    CHECK_CU(cudaMalloc(&m_linear_stacked_placements_d, num_placements * sizeof(Placement)));
+    CHECK_CU(cudaMemcpy(m_linear_stacked_placements_d, m_linear_stacked_placements.data(), num_placements * sizeof(Placement), cudaMemcpyHostToDevice));
 
     // Colorize!
-    const size_t num_blocks = div_ceil<size_t>(m_colored_placements.size(), 32);
-    const size_t dim_block = 1024;
-    compute_placements_color_kernel<<<num_blocks, dim_block>>>(m_self_d, m_colored_placements_d, m_colored_placements.size());
+    const size_t num_blocks = div_ceil<size_t>(num_placements, 32);
+    const size_t block_dim = 1024;
+    assign_placements_color_kernel<<<num_blocks, block_dim>>>(m_self_d, m_linear_stacked_placements_d, num_placements);
     CHECK_CU(cudaDeviceSynchronize());
 
-    // Copy the vector back to host
-    CHECK_CU(cudaMemcpy(m_colored_placements.data(), m_colored_placements_d, m_colored_placements.size() * sizeof(ColoredPlacement), cudaMemcpyDeviceToHost));
+    // Copy placements from GPU back to host to get the color assignments
+    CHECK_CU(cudaMemcpy(m_linear_stacked_placements.data(), m_linear_stacked_placements_d, num_placements * sizeof(Placement), cudaMemcpyDeviceToHost));
 
-    // TODO There could be placements without a color!
-    //   Because not all placements cover at least one colored cell of the Color map.
+    CHECK_CU(cudaFree(m_linear_stacked_placements_d));
+    m_linear_stacked_placements_d = nullptr;
+
+    ARP_DEBUG("Placements:");
+    for (int pi = 0; pi < m_linear_stacked_placements.size(); ++pi)
+    {
+        const Placement& placement = m_linear_stacked_placements[pi];
+        ARP_DEBUG(
+            "  %3d Placement BID: %2d, X: %3d, Y: %3d, Subslice mask: %d, CID: %2d", pi, placement.m_bid, placement.m_x, placement.m_y,
+            placement.m_subslice_mask, placement.m_cid
+        );
+    }
+
+    tfm::printf("[Arpenteur] Colored!\n");
 }
 
 void Arpenteur::run()
 {
-    m_self_d = to_device(*this);  // Make a screenshot of "this" and transfer it on device
+    m_self_d = to_device(*this); // Make a screenshot of "this" and transfer it on device
 
     StopWatch stop_watch{};
     std::string dur_str;
@@ -333,21 +288,20 @@ void Arpenteur::run()
     int num_slices = glm::ceil(m_model->size().y);
 
     m_slicer = std::make_unique<Slicer>(*m_model, m_input.resolution, m_input.alpha_test_threshold);
-    m_model.reset();  // We don't need host-side model anymore
+    m_model.reset(); // We don't need host-side model anymore
 
     // INIT
-    m_prev_placements.fill(0xFFFF);
-    m_cur_placements.fill(0);
-    m_prev_proximity_map.fill(m_proximity_max_value);
+    m_prev_placements.fill(ARP_NO_PLACEMENT_VALUE);
+    m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE);
+    m_prev_proximity_map.fill(0);
 
     for (m_slice_y = 0; m_slice_y < num_slices; m_slice_y++)
     {
         if (m_stop) return;
 
-        printf("[Arpenteur] Slice %d/%d\n", m_slice_y, num_slices);
+        ARP_INFO("---------------------------------------------------------------- Slice %d/%d", m_slice_y + 1, num_slices);
 
         m_stacked_placements.clear();
-        m_colored_placements.clear();
         m_next_pid = 0;
 
         // COMPUTE SLICE (i.e. voxelization)
@@ -355,7 +309,7 @@ void Arpenteur::run()
 
         m_slicer->slice(m_slice_y, m_color_map);
 
-        printf("[Arpenteur]   COMPUTE SLICE; %s\n", stop_watch.elapsed_time_str().c_str());
+        ARP_INFO("Voxelization performed in %s", stop_watch.elapsed_time_str().c_str());
 
         // PLACEMENT BEGIN
         if (m_listener) m_listener->on_placement_begin(m_slice_y);
@@ -365,38 +319,35 @@ void Arpenteur::run()
         // PLACE0
         stop_watch.reset();
 
-        num_placed_bricks = place_on_subslice<0>(m_slice_y);
+        num_placed_bricks = place_on_subslice(m_slice_y, 0 /* subslice */);
 
         m_prev_placements.copy_from(m_cur_placements);
-        m_cur_placements.fill(0);
+        m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE);
 
-        printf("[Arpenteur]   PLACE 0; Placed bricks: %zu, Elapsed: %s\n",
-               num_placed_bricks, stop_watch.elapsed_time_str().c_str());
+        ARP_INFO("Subslice 0 covered in %s; Placed bricks: %zu", stop_watch.elapsed_time_str().c_str(), num_placed_bricks);
 
         // PLACE1
         stop_watch.reset();
 
-        num_placed_bricks = place_on_subslice<1>(m_slice_y);
+        num_placed_bricks = place_on_subslice(m_slice_y, 1 /* subslice */);
 
         m_prev_placements.copy_from(m_cur_placements);
-        m_cur_placements.fill(0);
+        m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE);
 
-        printf("[Arpenteur]   PLACE 1; Placed bricks: %zu, Elapsed: %s\n",
-               num_placed_bricks, stop_watch.elapsed_time_str().c_str());
+        ARP_INFO("Subslice 1 covered in %s; Placed bricks: %zu", stop_watch.elapsed_time_str().c_str(), num_placed_bricks);
 
         // PLACE2
         stop_watch.reset();
 
-        num_placed_bricks = place_on_subslice<2>(m_slice_y);
+        num_placed_bricks = place_on_subslice(m_slice_y, 2 /* subslice */);
 
         m_prev_placements.copy_from(m_cur_placements);
-        m_cur_placements.fill(0);
+        m_cur_placements.fill(ARP_NO_PLACEMENT_VALUE);
 
-        printf("[Arpenteur]   PLACE 2; Placed bricks: %zu, Elapsed: %s\n",
-               num_placed_bricks, stop_watch.elapsed_time_str().c_str());
+        ARP_INFO("Subslice 2 covered in %s; Placed bricks: %zu", stop_watch.elapsed_time_str().c_str(), num_placed_bricks);
 
         // LINEARIZE & COLORIZE
-        linearize_and_colorize();
+        linearize_placements_to_output();
 
         // SLICE END
         if (m_listener) m_listener->on_placement_end(m_slice_y);
@@ -405,7 +356,7 @@ void Arpenteur::run()
         stop_watch.reset();
 
         init_proximity_map_from_color_map();
-        m_spread_value.spread(m_prev_proximity_map, m_proximity_max_value /* num_iterations */);  // Spread the init values on the proximity map
+        m_spread_value.spread(m_prev_proximity_map, m_proximity_max_value /* num_iterations */); // Spread the init values on the proximity map
 
         printf("[Arpenteur]   COMPUTE PROXIMITY MAP; %s\n", stop_watch.elapsed_time_str().c_str());
     }

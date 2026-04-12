@@ -44,8 +44,8 @@ inline void inspect_neighborhood(
 {
     auto& brick = k_bricks[placement.m_bid];
 
-    int32_t mx = placement.m_x + bx;
-    int32_t my = placement.m_y + by;
+    int mx = placement.m_x + bx;
+    int my = placement.m_y + by;
 
     if (mx + 1 < placement_map->m_width && (bx + 1 >= BRICK_MAX_WIDTH || !brick[by][bx + 1]))
     {
@@ -53,7 +53,7 @@ inline void inspect_neighborhood(
         ++inout_num_connectible_sides;
     }
 
-    if (my + 1 < placement_map->m_width && (by + 1 >= BRICK_MAX_HEIGHT || !brick[by + 1][bx]))
+    if (my + 1 < placement_map->m_height && (by + 1 >= BRICK_MAX_HEIGHT || !brick[by + 1][bx]))
     {
         if (placement_map->read_pixel(mx, my + 1).x > 0) ++inout_num_neighbors;
         ++inout_num_connectible_sides;
@@ -172,15 +172,6 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
 
     // ONLY THREAD 0 IS VALID FROM NOW ON
 
-    auto& computed_props = placement.computed;
-    computed_props.is_outside = is_outside;
-    computed_props.is_overlapping = is_overlapping;
-    computed_props.num_covered_map_cells = num_covered_map_cells;
-    computed_props.brick_size = brick_size;
-    computed_props.num_neighbors = num_neighbors;
-    computed_props.num_connectible_sides = num_connectible_sides;
-    computed_props.num_connected_bricks = num_connected_bricks;
-
     bool discard = false;
     discard |= brick_size == 0;  // Empty brick
     discard |= is_outside_or_overlapping;
@@ -234,7 +225,7 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
             out_reward = 0.f;
         }
     } else {
-        out_reward = bn * (an + dn) + (.2f + cn * .8f);
+        out_reward = bn * (an + dn + ch) + (.2f + cn * .8f);
     }
 
     return true;

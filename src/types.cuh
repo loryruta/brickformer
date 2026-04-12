@@ -4,36 +4,29 @@
 
 #include "DeviceImage.cuh"
 
+#define ARP_NO_PLACEMENT_VALUE uint16_t(UINT16_MAX)
+
 namespace lego_builder
 {
 
 /// A struct representing a placement within a slice: (x, y) and brick ID (= bid).
 struct Placement
 {
-    uint8_t m_bid;
-    uint8_t m_x;
-    uint8_t m_y;
-    uint8_t _pad;  // Autistic padding to 32bit
+    /* Keys */
+    uint8_t m_bid; ///< The Brick Index to bricks.hpp
+    uint8_t m_x;   ///< The X coordinate of the brick's top-left corner within the slice
+    uint8_t m_y;   ///< The Y coordinate of the brick's top-left corner within the slice
+    // TODO rename m_y to m_z please
 
-    struct {
-        bool is_outside;
-        bool is_overlapping;
-        int num_covered_map_cells;
-        int brick_size;
-        int num_neighbors;
-        int num_connectible_sides;
-        int num_connected_bricks;
-    } computed;
+    mutable uint8_t m_cid = UINT8_MAX;           ///< The Color Index to brick_colors.hpp
+    mutable uint8_t m_subslice_mask = UINT8_MAX; ///< 3 bits bitmask; if i-th is set, this placement occupies the i-th subslice (out of 3)
 
-    bool operator==(const Placement& other) const
-    {
-        return m_bid == other.m_bid && m_x == other.m_x && m_y == other.m_y;
-    }
+    bool operator==(const Placement& other) const { return m_bid == other.m_bid && m_x == other.m_x && m_y == other.m_y; }
 };
 
-struct PlacementHash  // Used for stacking placements
+struct PlacementHash // Used for stacking placements
 {
-    size_t operator()(const Placement& key) const
+    uint64_t operator()(const Placement& key) const
     {
         uint32_t hash = 0;
         hash |= key.m_bid;
@@ -55,13 +48,4 @@ using ProximityMapT = DeviceImage<1, uint8_t>;
 /// meaningless and only useful to identify the occupied region.
 using PlacementMapT = DeviceImage<1, uint16_t>;
 
-/// A placement with exact information about its location within the slice (e.g. the subslice; possibly stacked), and
-/// the color.
-struct ColoredPlacement
-{
-    Placement m_placement;
-    uint8_t m_subslice_mask;
-    glm::vec<4, uint8_t> m_color;
-};
-
-}  // namespace lego_builder
+} // namespace lego_builder

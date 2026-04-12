@@ -3,3 +3,5 @@
 # Build directories
 /cmake-build-*
 /docker-build
+
+/venv

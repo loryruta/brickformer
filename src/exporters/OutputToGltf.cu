@@ -6,6 +6,7 @@
 
 #include "brick_models.hpp"
 #include "bricks.hpp"
+#include "brick_colors.hpp"
 
 using namespace lego_builder;
 
@@ -83,10 +84,8 @@ void OutputToGltf::set_brick_1x1(int x, int y, int z, int subslice_mask, const g
 
 void OutputToGltf::on_placement_end(uint32_t slice_y)
 {
-    for (const ColoredPlacement& colored_placement : m_arpenteur.m_colored_placements)
+    for (const Placement& placement : m_arpenteur.m_linear_stacked_placements)
     {
-        const Placement& placement = colored_placement.m_placement;
-
         int x = placement.m_x;
         int z = placement.m_y;
         int y = (int) slice_y;
@@ -98,7 +97,8 @@ void OutputToGltf::on_placement_end(uint32_t slice_y)
             {
                 if (brick[bz][bx])
                 {
-                    set_brick_1x1(x + bx, y, z + bz, colored_placement.m_subslice_mask, colored_placement.m_color);
+                    const BrickColor& brick_color =  k_brick_colors[placement.m_cid];
+                    set_brick_1x1(x + bx, y, z + bz, placement.m_subslice_mask, brick_color.color_u8());
                 }
             }
         }
