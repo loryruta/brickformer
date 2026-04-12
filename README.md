@@ -1,6 +1,10 @@
-# BrickFormer
+<p align="center">
+  <img height="128" alt="brickformer_logo" src="https://github.com/user-attachments/assets/98fa4ada-15f5-4f85-bf15-ead1008bd030" />
+</p>
 
+<p align="center">
 BrickFormer is a tool for converting a 3D model into a LEGO construction.
+</p>
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/ba24c962-cca4-4b60-a6a2-7abd56932262" alt="R2-D2 Preview" />
@@ -8,6 +12,11 @@ BrickFormer is a tool for converting a 3D model into a LEGO construction.
 
 To use the tool,
 you can either build it from source, or download the pre-built version at https://brickformer.io/.
+
+#### How does it work?
+
+Recently, I have prepared a presentation describing how the current algorithm work.\
+You can find it online at https://loryruta.dev/brickformer/
 
 ## Requirements
 
