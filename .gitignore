@@ -1,6 +1,7 @@
 /.idea
 
 # Build directories
+/build*
 /cmake-build-*
 /docker-build
 
@@ -8,4 +9,4 @@
 
 /external/firebase_cpp_sdk
 
-.env
+.env.cmake
