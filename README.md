@@ -9,7 +9,6 @@ BrickFormer is a tool for converting a 3D model into a LEGO construction.
 To use the tool,
 you can either build it from source, or download the pre-built version at https://brickformer.io/.
 
-
 ## Requirements
 
 - [VCPKG](https://learn.microsoft.com/en-us/vcpkg/get_started/get-started?pivots=shell-bash#1---set-up-vcpkg). Make sure the `VCPKG_ROOT` environment variable is set to the installation path
@@ -22,6 +21,8 @@ you can either build it from source, or download the pre-built version at https:
 
 ## Build from source
 
+Encouraged, as it would provide you with the premium license 😉
+
 ##### Linux and Windows x86
 
 ```sh
@@ -29,14 +30,16 @@ you can either build it from source, or download the pre-built version at https:
 git clone https://github.com/loryruta/brickformer
 cd brickformer
 git submodule update --init --recursive
-# Configure the project for build
-ing
+
+# Configure the project for building
 mkdir build
 cd build
 cmake .. \
     -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+
 # Build BrickFormer
 cmake --build . --target BrickFormer -j
+
 # Run it
 cd src
 ./BrickFormer
