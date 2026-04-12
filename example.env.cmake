@@ -1,0 +1,5 @@
+set(BF_FIREBASE_API_KEY "fagioli")
+set(BF_FIREBASE_PROJECT_ID "pizza")
+set(BF_FIREBASE_STORAGE_BUCKET "paperino")
+set(BF_FIREBASE_MESSAGING_SENDER_ID "pollo")
+set(BF_FIREBASE_APP_ID "crudo")
