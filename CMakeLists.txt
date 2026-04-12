@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.25)
 
 set(CMAKE_CUDA_ARCHITECTURES 75)
 
+option(BF_OPENSOURCE "Configure BrickFormer opensource version (without Firebase auth, everything allowed)." ON)
+
+if (BF_OPENSOURCE)
+    message(STATUS "****************************************************************")
+    message(STATUS "Configuring BrickFormer opensource version")
+    message(STATUS "****************************************************************")
+endif ()
+
 # Important: nvcc 12.3 requires GNU version <= 12
 # There could be situations where the system's default compiler has an incompatible version, in such cases the developer
 # might explicit the compiler to use by setting CXX env variable
@@ -64,8 +72,11 @@ find_package(glfw3 CONFIG REQUIRED)
 if (MSVC)
     set(MSVC_RUNTIME_MODE MD)
 endif ()
-set(FIREBASE_CPP_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/firebase_cpp_sdk)
-add_subdirectory(${FIREBASE_CPP_SDK_DIR} bin/ EXCLUDE_FROM_ALL)
+
+if (NOT BF_OPENSOURCE)
+    set(FIREBASE_CPP_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/firebase_cpp_sdk)
+    add_subdirectory(${FIREBASE_CPP_SDK_DIR} bin/ EXCLUDE_FROM_ALL)
+endif ()
 
 # GLM
 find_package(glm CONFIG REQUIRED)
@@ -138,6 +149,28 @@ add_compile_definitions(
         -DBF_GIT_VERSION_FULL="${BF_GIT_VERSION_FULL}"
         -DBF_GIT_COMMIT_HASH="${BF_GIT_COMMIT_HASH}"
         -DBF_GIT_COMMIT_TIMESTAMP="${BF_GIT_COMMIT_TIMESTAMP}")
+
+if (NOT BF_OPENSOURCE)
+    if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.env.cmake")
+        message(CRITICAL_ERROR "When not building the opensource version, .env.cmake is required (for example, for firebase credentials)")
+    endif ()
+endif ()
+
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.env.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/.env.cmake")
+    message(STATUS ".env.cmake loaded")
+    add_compile_definitions(
+            -DBF_FIREBASE_API_KEY="${BF_FIREBASE_API_KEY}"
+            -DBF_FIREBASE_PROJECT_ID="${BF_FIREBASE_PROJECT_ID}"
+            -DBF_FIREBASE_STORAGE_BUCKET="${BF_FIREBASE_STORAGE_BUCKET}"
+            -DBF_FIREBASE_MESSAGING_SENDER_ID="${BF_FIREBASE_MESSAGING_SENDER_ID}"
+            -DBF_FIREBASE_APP_ID="${BF_FIREBASE_APP_ID}"
+    )
+endif ()
+
+if (BF_OPENSOURCE)
+    add_compile_definitions(BF_OPENSOURCE)
+endif ()
 
 # ------------------------------------------------------------------------------------------------
 

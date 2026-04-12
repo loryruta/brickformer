@@ -4,7 +4,9 @@
 #include <imgui.h>
 
 #include "App.h"
+#ifndef BF_OPENSOURCE
 #include "AuthScreen.h"
+#endif
 #include "BrickColors.h"
 #include "Converter.h"
 #include "UIStyle.h"
@@ -102,7 +104,9 @@ MainScreen::MainScreen()
     m_ui.brick_model_window = std::make_unique<BrickModelWindow>(*this);
     m_ui.brick_colors_window = std::make_unique<BrickColorsWindow>();
 
+#ifndef BF_OPENSOURCE
     g_app->sync_daemon().force_plan_check = true;
+#endif
 }
 
 MainScreen::~MainScreen()

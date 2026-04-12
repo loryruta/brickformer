@@ -3,12 +3,16 @@
 #include <memory>
 #include <optional>
 
+#ifndef BF_OPENSOURCE
 #include <firebase/app.h>
 #include <firebase/auth.h>
+#endif
 
 #include "BrickModel.h"
 #include "Screen.h"
+#ifndef BF_OPENSOURCE
 #include "SyncDaemon.h"
+#endif
 #include "util/Queue.h"
 #include "util/StopWatch.h"
 #include "video/BrickPlaneRenderer.h"
@@ -40,8 +44,10 @@ private:
     const float k_placement_visualization_period = 5.0f; // In seconds
 
     /* Firebase */
-    firebase::App* m_firebase_app;
-    firebase::auth::Auth* m_firebase_auth;
+#ifndef BF_OPENSOURCE
+    firebase::App* m_firebase_app = nullptr;
+    firebase::auth::Auth* m_firebase_auth = nullptr;
+#endif
 
     std::shared_ptr<Screen> m_screen;
 
@@ -54,7 +60,9 @@ private:
     mutable std::mutex m_job_queue_mutex;
     std::condition_variable m_job_queue_cond_var; ///< Used to wait for main thread jobs to complete before proceeding.
 
+#ifndef BF_OPENSOURCE
     std::unique_ptr<SyncDaemon> m_sync_daemon;
+#endif
 
 public:
     explicit App(Window& window);
@@ -69,8 +77,10 @@ public:
     BrickRenderer& brick_renderer() const { return *m_brick_renderer; }
     BrickPlaneRenderer& brick_plane_renderer() const { return *m_brick_plane_renderer; }
 
+#ifndef BF_OPENSOURCE
     firebase::App* firebase_app() const { return m_firebase_app; }
     firebase::auth::Auth* firebase_auth() const { return m_firebase_auth; }
+#endif
 
     void set_screen(std::shared_ptr<Screen>&& new_screen)
     {
@@ -104,7 +114,9 @@ public:
     }
     void clear_jobs_queue();
 
+#ifndef BF_OPENSOURCE
     SyncDaemon& sync_daemon() const { return *m_sync_daemon; }
+#endif
 
 private:
     void setup_firebase();

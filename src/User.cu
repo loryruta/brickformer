@@ -23,7 +23,12 @@ User::User(std::string uid, std::string email) : m_uid(std::move(uid)), m_email(
     std::mt19937_64 gen(rd());
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
 
+#ifndef BF_OPENSOURCE
     set_plan("free"); // Imperative: set the free plan at initialization
+#else
+    // For users who manage to build BrickFormer, we reward the lifetime Premium plan!
+    set_plan("premium");
+#endif
 }
 
 User::User(const User& other) : m_uid(other.m_uid), m_email(other.m_email), m_plan(other.m_plan) {}

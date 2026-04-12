@@ -23,6 +23,10 @@
 using namespace bf;
 using namespace firebase;
 
+#ifndef BF_OPENSOURCE // Sanity check
+#error "This class shouldn't be provided in the opensource version"
+#endif
+
 namespace
 {
 /// Class to verify that the firebase user is present within the firebase SDK cache.

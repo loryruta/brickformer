@@ -8,6 +8,10 @@
 
 #include "Screen.h"
 
+#ifndef BF_OPENSOURCE // Sanity check
+#error "This class shouldn't be provided in the opensource version"
+#endif
+
 namespace bf
 {
 class AuthScreen : public Screen

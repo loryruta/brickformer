@@ -25,8 +25,6 @@ add_executable(BrickFormer
         ui/windows/View3dWindow.h
         ui/App.cu
         ui/App.h
-        ui/AuthScreen.cu
-        ui/AuthScreen.h
         ui/MainScreen.cu
         ui/MainScreen.h
         ui/ConverterVisualizationBridge.cu
@@ -92,21 +90,38 @@ add_executable(BrickFormer
         SpreadValue.h
         User.cu
         User.h
-        SyncDaemon.cu
-        SyncDaemon.h
         util/external_libs.cpp
 )
+
+if (NOT BF_OPENSOURCE)
+        target_sources(BrickFormer PRIVATE
+                ui/AuthScreen.cu
+                SyncDaemon.cu)
+endif ()
 
 target_include_directories(BrickFormer PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${Stb_INCLUDE_DIR}
         ${TINYGLTF_INCLUDE_DIRS}
 )
+
+# ----------------------------------------------------------------
+# BrickFormer dependencies
+# ----------------------------------------------------------------
+
+# It's important for the Firebase dependencies to be in this order!
 target_link_libraries(BrickFormer PUBLIC
-        # It's important for the Firebase dependencies to be in this order!
         CURL::libcurl
-        firebase_auth
-        firebase_app
+)
+
+if (NOT BF_OPENSOURCE)
+        target_link_libraries(BrickFormer PUBLIC
+                firebase_auth
+                firebase_app
+                )
+endif ()
+
+target_link_libraries(BrickFormer PUBLIC
         glad
         glfw
         glm::glm

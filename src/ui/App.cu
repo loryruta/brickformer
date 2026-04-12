@@ -6,8 +6,12 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#ifndef BF_OPENSOURCE
 #include "AuthScreen.h"
+#endif
+#include "MainScreen.h"
 #include "UIStyle.h"
+#include "User.h"
 #include "log.h"
 #include "util/exceptions.h"
 #include "video/gl_helpers.hpp"
@@ -46,16 +50,23 @@ App::App(Window& window) : m_window(window)
     setup_firebase();
 
     // Set initial screen: authentication
+#ifdef BF_OPENSOURCE
+    User::set("no-uid", "no-email");
+    m_screen = std::make_unique<MainScreen>();
+#else
     m_screen = std::make_unique<AuthScreen>();
 
     // Start sync daemon
     m_sync_daemon = std::make_unique<SyncDaemon>();
     m_sync_daemon->start();
+#endif
 }
 
 App::~App()
 {
+#ifndef BF_OPENSOURCE
     m_sync_daemon.reset();
+#endif
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
