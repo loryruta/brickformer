@@ -1,4 +1,4 @@
-#include "View3dWindow.hpp"
+#include "View3dWindow.h"
 
 #include <imgui.h>
 
@@ -28,7 +28,7 @@ void View3dWindow::show()
 
         float img_content_ar = float(image_size.x) / float(image_size.y);
         float e = std::min((img_content_ar / framebuffer_ar) * .5f, .5f);
-        ImGui::Image(reinterpret_cast<void*>(m_framebuffer->get_texture()), image_size, ImVec2(.5f - e, 1.f), ImVec2(.5f + e, 0.f));
+        ImGui::Image((ImTextureID) m_framebuffer->get_texture(), image_size, ImVec2(.5f - e, 1.f), ImVec2(.5f + e, 0.f));
 
         if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left) && !m_cursor_captured)
         {

@@ -8,7 +8,7 @@ class BrickModelBuilder  // TODO Rename to BrickConstructionBuilder ?
 {
 private:
     Model m_model;
-    Mesh* m_mesh;  // A point to the first and only mesh of the model
+    Mesh* m_mesh;  // A pointer to the first and only mesh of the model
 
 public:
     explicit BrickModelBuilder();

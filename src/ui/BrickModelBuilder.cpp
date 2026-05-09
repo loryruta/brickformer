@@ -1,4 +1,4 @@
-#include "BrickModelBuilder.hpp"
+#include "BrickModelBuilder.h"
 
 #include <algorithm>
 #include <numeric>

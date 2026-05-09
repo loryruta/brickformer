@@ -6,8 +6,10 @@
 
 namespace lego_builder
 {
+/// A thread-safe queue implementation.w
 template <typename T>
-class Queue {
+class Queue
+{
 private:
     std::queue<T> m_queue;
     std::mutex m_mutex;
@@ -16,18 +18,18 @@ public:
     explicit Queue() = default;
     ~Queue() = default;
 
-    /// Pushes an item into the queue.
+    /// Push an item into the queue.
     void push(const T& item)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_queue.push(item);
     }
 
-    /// Pops an item from the queue. Throws an exception if empty.
+    /// Pop an item from the queue. Throw an exception if empty.
     T pop()
     {
         std::unique_lock<std::mutex> lock(m_mutex);
-        T item = m_queue.front();  // Exception if no element is present
+        T item = m_queue.front(); // Exception if no element is present
         m_queue.pop();
         return item;
     }
@@ -38,4 +40,4 @@ public:
         return m_queue.empty();
     }
 };
-}
+} // namespace lego_builder

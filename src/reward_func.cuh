@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Arpenteur.cuh"
+#include "Converter.h"
 #include "bricks.hpp"
 #include "primitives.cuh"
 #include "types.cuh"
@@ -74,16 +74,16 @@ inline void inspect_neighborhood(
 
 template<bool IS_SUBSLICE0>
 __device__
-inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, float& out_reward)
+inline bool eval_placement(const Converter& converter, Placement& placement, float& out_reward)
 {
     auto& brick = k_bricks[placement.m_bid];
 
     int warp_i = threadIdx.x >> 5;
 
-    ColorMapT* color_map_d = arpenteur.m_color_map_d;
-    ProximityMapT* prev_proximity_map_d = arpenteur.m_prev_proximity_map_d;
-    PlacementMapT* prev_placements_d = arpenteur.m_prev_placements_d;
-    PlacementMapT* cur_placements_d = arpenteur.m_cur_placements_d;
+    ColorMapT* color_map_d = converter.m_color_map_d;
+    ProximityMapT* prev_proximity_map_d = converter.m_prev_proximity_map_d;
+    PlacementMapT* prev_placements_d = converter.m_prev_placements_d;
+    PlacementMapT* cur_placements_d = converter.m_cur_placements_d;
 
     // The placement reward depends on:
     // - the number of colored cells covered of the current subslice
@@ -183,7 +183,7 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     {
         // For the first subslice0, we have to consider that the model could be made of separated voxel clusters. If a
         // cluster is "far enough" (albeit the threshold), then accept the placement
-        is_floating &= highest_proximity > arpenteur.m_proximity_threshold;
+        is_floating &= highest_proximity > converter.m_proximity_threshold;
     }
     discard |= is_floating;
 
@@ -195,7 +195,7 @@ inline bool eval_placement(const Arpenteur& arpenteur, Placement& placement, flo
     float bn = float(brick_size) / float(BRICK_MAX_WIDTH * BRICK_MAX_HEIGHT);
     float cn = float(num_covered_map_cells) / float(brick_size);
     float dn = float(num_connected_bricks) / float(brick_size);
-    float pn = float(highest_proximity) / float(arpenteur.m_proximity_max_value);
+    float pn = float(highest_proximity) / float(converter.m_proximity_max_value);
 
     static constexpr float max_color_diff = 260100.0f;  // 255^2 + 255^2 + 255^2 + 255^2
     glm::vec4 minmax_color_diff = max_color - min_color;

@@ -20,7 +20,7 @@ Window::Window(GLFWwindow* window) : m_glfw_window(window)
 
 Window::~Window() { glfwDestroyWindow(m_glfw_window); }
 
-glm::ivec2 Window::get_framebuffer_size() const
+glm::ivec2 Window::framebuffer_size() const
 {
     glm::ivec2 framebuffer_size;
     glfwGetFramebufferSize(m_glfw_window, &framebuffer_size.x, &framebuffer_size.y);
@@ -30,7 +30,6 @@ glm::ivec2 Window::get_framebuffer_size() const
 void Window::begin_frame()
 {
     glfwPollEvents();
-
     if (is_key_pressed(GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(m_glfw_window, GLFW_TRUE);
 }
 

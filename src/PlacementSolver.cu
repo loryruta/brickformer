@@ -1,4 +1,4 @@
-#include "PlacementSolver.cuh"
+#include "PlacementSolver.h"
 
 #include <thrust/extrema.h>
 

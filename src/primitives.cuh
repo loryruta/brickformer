@@ -24,7 +24,7 @@ namespace lego_builder
         __host__ __device__ T operator()(const T& a, const T& b) const { return a + b; }
     };
 
-    /// Perform a reduction within a warp. We expect all threads to run this function.
+    /// Perform a reduction within a warp. We expect all threads to start this function.
     /// @return the reduced value for the current lane. The aggregated value is held by the lane 0
     template<typename T, typename OPERATION>
     __device__ T warp_reduce(T val)
